@@ -20,7 +20,7 @@ export default function RegisterPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -32,20 +32,28 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      // PERHATIAN: Ini simulasi sukses sementara.
-      // Nanti kita akan ganti bagian ini dengan fetch() ke file API Next.js kita
-      setTimeout(() => {
-        alert('Pendaftaran berhasil! Silakan masuk dengan akun Anda.');
-        router.push('/login'); // Arahkan kembali ke halaman Login pakai router Next.js
-        setIsLoading(false);
-      }, 1000);
-      
+      // Menembak API Next.js kita sendiri
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert('Pendaftaran berhasil! Silakan login.');
+        router.push('/login');
+      } else {
+        setErrorMsg(data.message || 'Gagal mendaftar');
+      }
     } catch (err) {
-      setErrorMsg('Gagal memproses pendaftaran.');
+      setErrorMsg('Gagal terhubung ke server.');
+    } finally {
       setIsLoading(false);
     }
   };
-
+  
   return (
     <div className="login-container">
       {/* Sisi Kiri (Branding sama dengan Login) */}
