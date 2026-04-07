@@ -36,7 +36,8 @@ export default function LoginPage() {
 
       if (response.ok) {
         alert(`Selamat datang, ${data.user.name}!`);
-        // Nanti kamu bisa simpan data.user ini ke localStorage atau Context
+        // Simpan user ke localStorage
+        localStorage.setItem('user', JSON.stringify(data.user));
         router.push('/'); // Arahkan ke halaman utama
       } else {
         setErrorMsg(data.message || 'Gagal login');

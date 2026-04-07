@@ -1,0 +1,50 @@
+[
+  {
+    "id": "1775590870211",
+    "serviceId": "1775590778621",
+    "serviceTitle": "Sediakan Sate Keliling",
+    "vendorId": "1775589203562",
+    "vendorName": "Jeje",
+    "customerId": "1775590828434",
+    "customerName": "Bryan",
+    "messages": [
+      {
+        "id": "1775590870211",
+        "senderId": "1775590828434",
+        "senderName": "Bryan",
+        "message": "halo",
+        "timestamp": "2026-04-07T19:41:10.211Z"
+      },
+      {
+        "id": "1775591440152",
+        "senderId": "1775590828434",
+        "senderName": "Bryan",
+        "message": "hohoho kontol",
+        "timestamp": "2026-04-07T19:50:40.152Z"
+      },
+      {
+        "id": "1775591550000",
+        "senderId": "1775589203562",
+        "senderName": "Jeje",
+        "message": "Halo Bryan! Terimakasih sudah menghubungi, saya bisa membantu",
+        "timestamp": "2026-04-07T19:55:00.000Z"
+      },
+      {
+        "id": "1775591865909",
+        "senderId": "1775590828434",
+        "senderName": "Bryan",
+        "message": "poke",
+        "timestamp": "2026-04-07T19:57:45.909Z"
+      },
+      {
+        "id": "1775591894988",
+        "senderId": "1775590828434",
+        "senderName": "Bryan",
+        "message": "kon sing poke cok sok jago anjing",
+        "timestamp": "2026-04-07T19:58:14.988Z"
+      }
+    ],
+    "createdAt": "2026-04-07T19:41:10.211Z",
+    "dealStatus": null
+  }
+]

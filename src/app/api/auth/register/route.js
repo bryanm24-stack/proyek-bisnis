@@ -33,7 +33,11 @@ export async function POST(request) {
     // Simpan kembali ke file
     await fs.writeFile(filePath, JSON.stringify(users, null, 2));
 
-    return NextResponse.json({ success: true, message: 'Registrasi berhasil!' }, { status: 201 });
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Registrasi berhasil!',
+      user: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role }
+    }, { status: 201 });
   } catch (error) {
     console.error('Error di API Register:', error);
     return NextResponse.json({ success: false, message: 'Terjadi kesalahan server.' }, { status: 500 });
