@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import SearchBar from './SearchBar';
 
 export default function HomePageClient() {
   const [services, setServices] = useState([]);
@@ -19,6 +20,8 @@ export default function HomePageClient() {
   const [ratingReview, setRatingReview] = useState('');
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -267,6 +270,31 @@ export default function HomePageClient() {
     setShowNotifications(!showNotifications);
   };
 
+  // Filter services berdasarkan search term dan category
+  const getFilteredServices = () => {
+    let filtered = services;
+
+    // Filter by category
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(service => service.category === selectedCategory);
+    }
+
+    // Filter by search term
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(service =>
+        service.title.toLowerCase().includes(term) ||
+        service.vendorName.toLowerCase().includes(term) ||
+        service.shortDescription.toLowerCase().includes(term) ||
+        service.description.toLowerCase().includes(term)
+      );
+    }
+
+    return filtered;
+  };
+
+  const filteredServices = getFilteredServices();
+
   return (
     <div>
       {/* Navbar */}
@@ -275,10 +303,6 @@ export default function HomePageClient() {
           <Link href="/" className="nav-logo">
             🛡️ RentGuard
           </Link>
-          <div className="nav-search">
-            <span className="search-icon">🔍</span>
-            <input type="text" placeholder="Cari vendor, layanan sewa..." />
-          </div>
         </div>
 
         <div className="nav-right">
@@ -396,18 +420,30 @@ export default function HomePageClient() {
 
       {/* Vendor/Services List */}
       <div className="vendor-section">
+        {/* Search Bar with Category Filter */}
+        <SearchBar 
+          services={filteredServices}
+          onSearch={(term, category) => {
+            setSearchTerm(term);
+            setSelectedCategory(category);
+          }}
+          onCategoryChange={(category) => setSelectedCategory(category)}
+        />
+
         <div className="vendor-header">
           <h2>Semua Layanan Sewa</h2>
-          {services.length > 0 && <p style={{ color: '#666', marginTop: '8px' }}>{services.length} layanan tersedia</p>}
+          {filteredServices.length > 0 && <p style={{ color: '#666', marginTop: '8px' }}>{filteredServices.length} layanan tersedia</p>}
         </div>
 
         {loading ? (
           <p style={{ textAlign: 'center', padding: '40px', color: '#999' }}>Memuat layanan...</p>
-        ) : services.length === 0 ? (
-          <p style={{ textAlign: 'center', padding: '40px', color: '#999' }}>Belum ada layanan sewa</p>
+        ) : filteredServices.length === 0 ? (
+          <p style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+            {services.length === 0 ? 'Belum ada layanan sewa' : 'Tidak ada layanan yang sesuai dengan pencarian Anda'}
+          </p>
         ) : (
           <div className="vendor-grid">
-            {services.map((service) => {
+            {filteredServices.map((service) => {
               // Parse rentCount - handle both string and number
               let rentCountNum = 0;
               if (typeof service.rentCount === 'string') {
@@ -683,35 +719,6 @@ export default function HomePageClient() {
           opacity: 0.8;
         }
 
-        .nav-search {
-          position: relative;
-          flex: 1;
-          max-width: 350px;
-        }
-
-        .search-icon {
-          position: absolute;
-          left: 12px;
-          top: 50%;
-          transform: translateY(-50%);
-          font-size: 16px;
-        }
-
-        .nav-search input {
-          width: 100%;
-          padding: 10px 12px 10px 36px;
-          border: 1px solid #ddd;
-          border-radius: 8px;
-          font-size: 14px;
-          transition: all 0.2s;
-        }
-
-        .nav-search input:focus {
-          outline: none;
-          border-color: #7c3aed;
-          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
-        }
-
         .nav-right {
           display: flex;
           align-items: center;
@@ -960,10 +967,6 @@ export default function HomePageClient() {
           .navbar {
             padding: 12px 24px;
           }
-
-          .nav-search {
-            max-width: 250px;
-          }
         }
 
         @media (max-width: 768px) {
@@ -973,15 +976,6 @@ export default function HomePageClient() {
 
           .nav-left {
             gap: 12px;
-          }
-
-          .nav-search {
-            max-width: 150px;
-            display: none;
-          }
-
-          .nav-search input {
-            font-size: 12px;
           }
         }
 
