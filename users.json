@@ -1,3 +1,48 @@
 [
-
+  {
+    "id": "admin1",
+    "name": "Admin RentGuard",
+    "email": "admin@rentguard.com",
+    "password": "admin123",
+    "role": "admin"
+  },
+  {
+    "id": "1775585231961",
+    "name": "Vin",
+    "email": "skevinbudiman@gmail.com",
+    "password": "123",
+    "role": "member"
+  },
+  {
+    "id": "2",
+    "name": "Budi Santoso",
+    "email": "budi@example.com",
+    "password": "password123",
+    "role": "vendor"
+  },
+  {
+    "id": "3",
+    "name": "Citra Dewi",
+    "email": "citra@example.com",
+    "password": "password123",
+    "role": "vendor"
+  },
+  {
+    "id": "1775589203562",
+    "name": "Jeje",
+    "email": "jeje@gmail.com",
+    "password": "123",
+    "role": "vendor",
+    "vendorName": "Jaya Abadi Permata Utama Perdana Purnama Cipta Mulya",
+    "phoneNumber": "12345678900"
+  },
+  {
+    "id": "1775590828434",
+    "name": "Bryan",
+    "email": "bririan@gmail.com",
+    "password": "123",
+    "role": "vendor",
+    "vendorName": "Jaya Abadi Permata Utama Perdana Purnama Cipta Mulya",
+    "phoneNumber": "12345678900"
+  }
 ]
