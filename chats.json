@@ -1,0 +1,105 @@
+[
+  {
+    "id": "1775590870211",
+    "serviceId": "1775590778621",
+    "serviceTitle": "Sediakan Sate Keliling",
+    "vendorId": "1775589203562",
+    "vendorName": "Jeje",
+    "customerId": "1775590828434",
+    "customerName": "Bryan",
+    "messages": [
+      {
+        "id": "1775590870211",
+        "senderId": "1775590828434",
+        "senderName": "Bryan",
+        "message": "halo",
+        "timestamp": "2026-04-07T19:41:10.211Z"
+      },
+      {
+        "id": "1775591440152",
+        "senderId": "1775590828434",
+        "senderName": "Bryan",
+        "message": "hohoho kontol",
+        "timestamp": "2026-04-07T19:50:40.152Z"
+      },
+      {
+        "id": "1775591550000",
+        "senderId": "1775589203562",
+        "senderName": "Jeje",
+        "message": "Halo Bryan! Terimakasih sudah menghubungi, saya bisa membantu",
+        "timestamp": "2026-04-07T19:55:00.000Z"
+      },
+      {
+        "id": "1775591865909",
+        "senderId": "1775590828434",
+        "senderName": "Bryan",
+        "message": "poke",
+        "timestamp": "2026-04-07T19:57:45.909Z"
+      },
+      {
+        "id": "1775591894988",
+        "senderId": "1775590828434",
+        "senderName": "Bryan",
+        "message": "kon sing poke cok sok jago anjing",
+        "timestamp": "2026-04-07T19:58:14.988Z"
+      },
+      {
+        "id": "1775621528913",
+        "senderId": "1775590828434",
+        "senderName": "Bryan",
+        "message": "ho",
+        "timestamp": "2026-04-08T04:12:08.913Z"
+      },
+      {
+        "id": "1775621726541",
+        "senderId": "1775589203562",
+        "senderName": "Jeje",
+        "message": "ho",
+        "timestamp": "2026-04-08T04:15:26.541Z"
+      },
+      {
+        "id": "1775628576233",
+        "senderId": "1775590828434",
+        "senderName": "Bryan",
+        "message": "okeh",
+        "timestamp": "2026-04-08T06:09:36.233Z"
+      },
+      {
+        "id": "1775628604389",
+        "senderId": "1775589203562",
+        "senderName": "Jeje",
+        "message": "sip",
+        "timestamp": "2026-04-08T06:10:04.389Z"
+      }
+    ],
+    "createdAt": "2026-04-07T19:41:10.211Z",
+    "dealStatus": null
+  },
+  {
+    "id": "1775628806493",
+    "serviceId": "1775628740028",
+    "serviceTitle": "Meja",
+    "vendorId": "1775589203562",
+    "vendorName": "Jeje",
+    "customerId": "1775590828434",
+    "customerName": "Bryan",
+    "messages": [
+      {
+        "id": "1775628806493",
+        "senderId": "1775590828434",
+        "senderName": "Bryan",
+        "message": "saya mau pesan",
+        "timestamp": "2026-04-08T06:13:26.493Z"
+      },
+      {
+        "id": "1775628863059",
+        "senderId": "1775589203562",
+        "senderName": "Jeje",
+        "message": "mau pesan 1? boleh",
+        "timestamp": "2026-04-08T06:14:23.059Z"
+      }
+    ],
+    "createdAt": "2026-04-08T06:13:26.493Z",
+    "dealStatus": "agreed"
+  }
+]
