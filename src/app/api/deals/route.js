@@ -2,6 +2,33 @@ import fs from 'fs/promises';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
+// Helper function to create notification
+async function createNotification(userId, type, message, relatedId, relatedData = {}) {
+  try {
+    const notificationsPath = path.join(process.cwd(), 'notifications.json');
+    const data = await fs.readFile(notificationsPath, 'utf-8');
+    const notifications = JSON.parse(data);
+
+    const newNotification = {
+      id: `notif_${Date.now()}`,
+      userId,
+      type,
+      message,
+      relatedId,
+      relatedData,
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+
+    notifications.push(newNotification);
+    await fs.writeFile(notificationsPath, JSON.stringify(notifications, null, 2));
+
+    return newNotification;
+  } catch (error) {
+    console.error('Error creating notification:', error);
+  }
+}
+
 // POST - Accept or cancel deal
 export async function POST(request) {
   try {
@@ -44,6 +71,15 @@ export async function POST(request) {
       chatRoom.dealStatus = 'cancelled';
       await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
 
+      // Create notification untuk vendor
+      await createNotification(
+        vendorId,
+        'deal_cancelled',
+        'Deal dibatalkan oleh customer',
+        chatId,
+        { customerId, serviceId }
+      );
+
       return NextResponse.json({
         success: true,
         message: 'Deal dibatalkan',
@@ -75,6 +111,15 @@ export async function POST(request) {
         await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
         await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
 
+        // Create notification untuk vendor
+        await createNotification(
+          vendorId,
+          'deal_pending',
+          'Ada penawaran baru dari customer',
+          chatId,
+          { customerId, serviceId }
+        );
+
         return NextResponse.json({
           success: true,
           message: 'Penawaran dikirim, menunggu vendor menerima',
@@ -89,6 +134,15 @@ export async function POST(request) {
         chatRoom.dealStatus = 'agreed';
         await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
         await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
+
+        // Create notification untuk customer
+        await createNotification(
+          customerId,
+          'deal_accepted',
+          'Vendor menerima penawaran Anda!',
+          chatId,
+          { vendorId, serviceId }
+        );
 
         return NextResponse.json({
           success: true,

@@ -118,77 +118,104 @@ export default function VendorApprovalPage() {
     return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
   }
 
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    setUser(null);
+    router.push('/login');
+  };
+
   const pendingRegistrations = registrations.filter(r => r.status === 'pending');
   const approvedRegistrations = registrations.filter(r => r.status === 'approved');
   const rejectedRegistrations = registrations.filter(r => r.status === 'rejected');
 
   return (
-    <div className="admin-container">
+    <div className="admin-page">
       {/* Navbar */}
       <nav className="navbar">
-        <div className="nav-brand">
-          <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>RentGuard Admin</Link>
+        <div className="nav-left">
+          <Link href="/" className="nav-logo">
+            🛡️ RentGuard
+          </Link>
         </div>
-        <div className="nav-actions">
-          <Link href="/" className="btn-link">Home</Link>
-          <span style={{ margin: '0 12px', color: '#999' }}>|</span>
-          <span style={{ fontWeight: '600', color: '#333' }}>{user?.name}</span>
+        <div className="nav-right">
+          <span className="user-info">Admin: {user?.name}</span>
+          <Link href="/" className="nav-link">Home</Link>
+          <button className="btn-logout" onClick={handleLogout}>
+            Logout
+          </button>
         </div>
       </nav>
 
       {/* Main Content */}
-      <div className="admin-main">
+      <div className="admin-content">
         <div className="admin-header">
-          <h1>🛡️ Admin Dashboard - Verifikasi Vendor</h1>
-          <p>Kelola dan setujui registrasi vendor baru</p>
+          <h1>Admin Dashboard</h1>
+          <p className="subtitle">Verifikasi dan kelola registrasi vendor baru</p>
         </div>
 
         {successMsg && <div className="alert alert-success">{successMsg}</div>}
         {errorMsg && <div className="alert alert-error">{errorMsg}</div>}
 
         {/* Pending Registrations */}
-        <div className="registration-section">
-          <h2>
-            ⏳ Menunggu Verifikasi ({pendingRegistrations.length})
-          </h2>
+        <div className="registration-section pending">
+          <div className="section-header">
+            <h2>⏳ Menunggu Verifikasi</h2>
+            <span className="section-badge pending-badge">{pendingRegistrations.length}</span>
+          </div>
 
           {pendingRegistrations.length === 0 ? (
-            <p style={{ color: '#999', textAlign: 'center', padding: '40px 0' }}>Tidak ada registrasi yang menunggu verifikasi</p>
+            <p className="empty-state">Tidak ada registrasi yang menunggu verifikasi</p>
           ) : (
             <div className="registrations-list">
               {pendingRegistrations.map((reg) => (
                 <div key={reg.id} className="registration-card">
-                  <div className="reg-header">
+                  <div className="card-header">
                     <div>
                       <h3>{reg.vendorName}</h3>
-                      <p className="reg-detail">Nama Pengguna: {reg.userName}</p>
-                      <p className="reg-detail">Email: {reg.userEmail}</p>
-                      <p className="reg-detail">Nomor Telepon: {reg.phoneNumber}</p>
-                      <p className="reg-detail">File Identitas: {reg.identityFileName}</p>
-                      <p className="reg-detail">Tanggal Registrasi: {new Date(reg.createdAt).toLocaleDateString('id-ID')}</p>
+                      <p className="vendor-email">{reg.userEmail}</p>
+                    </div>
+                    <span className="status-badge pending">Pending</span>
+                  </div>
+
+                  <div className="card-details">
+                    <div className="detail-row">
+                      <span className="detail-label">Nama Pengguna</span>
+                      <span className="detail-value">{reg.userName}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="detail-label">Nomor Telepon</span>
+                      <span className="detail-value">{reg.phoneNumber}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="detail-label">File Identitas</span>
+                      <span className="detail-value">{reg.identityFileName}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="detail-label">Tanggal Registrasi</span>
+                      <span className="detail-value">{new Date(reg.createdAt).toLocaleDateString('id-ID')}</span>
                     </div>
                   </div>
 
-                  <div className="reg-actions">
+                  <div className="card-actions">
                     {selectedRegistration === reg.id ? (
                       <div className="reject-form">
-                        <label>Alasan Penolakan:</label>
+                        <label>Alasan Penolakan</label>
                         <textarea
                           value={rejectReason}
                           onChange={(e) => setRejectReason(e.target.value)}
                           placeholder="Jelaskan alasan penolakan..."
                           rows="3"
                         ></textarea>
-                        <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
+                        <div className="form-buttons">
                           <button
-                            className="btn-danger"
+                            className="btn-action reject"
                             onClick={() => handleReject(reg.id)}
                             disabled={actionLoading === reg.id}
                           >
                             Kirim Penolakan
                           </button>
                           <button
-                            className="btn-secondary"
+                            className="btn-action cancel"
                             onClick={() => {
                               setSelectedRegistration(null);
                               setRejectReason('');
@@ -199,16 +226,16 @@ export default function VendorApprovalPage() {
                         </div>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                      <div className="action-buttons">
                         <button
-                          className="btn-approve"
+                          className="btn-action approve"
                           onClick={() => handleApprove(reg.id)}
                           disabled={actionLoading === reg.id}
                         >
                           ✓ Setujui
                         </button>
                         <button
-                          className="btn-reject"
+                          className="btn-action reject-btn"
                           onClick={() => setSelectedRegistration(reg.id)}
                         >
                           ✕ Tolak
@@ -224,17 +251,29 @@ export default function VendorApprovalPage() {
 
         {/* Approved Registrations */}
         {approvedRegistrations.length > 0 && (
-          <div className="registration-section">
-            <h2>✅ Sudah Disetujui ({approvedRegistrations.length})</h2>
+          <div className="registration-section approved">
+            <div className="section-header">
+              <h2>✅ Sudah Disetujui</h2>
+              <span className="section-badge approved-badge">{approvedRegistrations.length}</span>
+            </div>
             <div className="registrations-list">
               {approvedRegistrations.map((reg) => (
-                <div key={reg.id} className="registration-card approved">
-                  <div className="reg-header">
+                <div key={reg.id} className="registration-card">
+                  <div className="card-header">
                     <div>
                       <h3>{reg.vendorName}</h3>
-                      <p className="reg-detail">Nama Pengguna: {reg.userName}</p>
-                      <p className="reg-detail">Email: {reg.userEmail}</p>
-                      <p className="reg-detail">Disetujui pada: {new Date(reg.approvedAt).toLocaleDateString('id-ID')}</p>
+                      <p className="vendor-email">{reg.userEmail}</p>
+                    </div>
+                    <span className="status-badge success">Approved</span>
+                  </div>
+                  <div className="card-details">
+                    <div className="detail-row">
+                      <span className="detail-label">Nama Pengguna</span>
+                      <span className="detail-value">{reg.userName}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="detail-label">Disetujui pada</span>
+                      <span className="detail-value">{new Date(reg.approvedAt).toLocaleDateString('id-ID')}</span>
                     </div>
                   </div>
                 </div>
@@ -245,18 +284,33 @@ export default function VendorApprovalPage() {
 
         {/* Rejected Registrations */}
         {rejectedRegistrations.length > 0 && (
-          <div className="registration-section">
-            <h2>❌ Ditolak ({rejectedRegistrations.length})</h2>
+          <div className="registration-section rejected">
+            <div className="section-header">
+              <h2>❌ Ditolak</h2>
+              <span className="section-badge rejected-badge">{rejectedRegistrations.length}</span>
+            </div>
             <div className="registrations-list">
               {rejectedRegistrations.map((reg) => (
-                <div key={reg.id} className="registration-card rejected">
-                  <div className="reg-header">
+                <div key={reg.id} className="registration-card">
+                  <div className="card-header">
                     <div>
                       <h3>{reg.vendorName}</h3>
-                      <p className="reg-detail">Nama Pengguna: {reg.userName}</p>
-                      <p className="reg-detail">Email: {reg.userEmail}</p>
-                      <p className="reg-detail">Alasan Penolakan: <strong>{reg.rejectionReason}</strong></p>
-                      <p className="reg-detail">Ditolak pada: {new Date(reg.approvedAt).toLocaleDateString('id-ID')}</p>
+                      <p className="vendor-email">{reg.userEmail}</p>
+                    </div>
+                    <span className="status-badge danger">Rejected</span>
+                  </div>
+                  <div className="card-details">
+                    <div className="detail-row">
+                      <span className="detail-label">Nama Pengguna</span>
+                      <span className="detail-value">{reg.userName}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="detail-label">Alasan Penolakan</span>
+                      <span className="detail-value rejection-reason">{reg.rejectionReason}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="detail-label">Ditolak pada</span>
+                      <span className="detail-value">{new Date(reg.approvedAt).toLocaleDateString('id-ID')}</span>
                     </div>
                   </div>
                 </div>
@@ -267,45 +321,193 @@ export default function VendorApprovalPage() {
       </div>
 
       <style jsx>{`
-        .admin-container {
+        /* Page Layout */
+        .admin-page {
           min-height: 100vh;
-          background-color: #f9fafb;
+          background: linear-gradient(135deg, #f5f3ff 0%, #f0f4ff 100%);
         }
 
-        .admin-main {
+        /* Navbar */
+        .navbar {
+          background: white;
+          border-bottom: 1px solid #e5e7eb;
+          padding: 16px 24px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          position: sticky;
+          top: 0;
+          z-index: 100;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .nav-left {
+          display: flex;
+          align-items: center;
+          gap: 24px;
+        }
+
+        .nav-logo {
+          font-size: 20px;
+          font-weight: 700;
+          color: #7c3aed;
+          text-decoration: none;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          transition: all 0.3s;
+        }
+
+        .nav-logo:hover {
+          color: #a855f7;
+          opacity: 0.9;
+        }
+
+        .nav-right {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .user-info {
+          font-size: 14px;
+          color: #666;
+          font-weight: 600;
+          padding: 6px 12px;
+          background: #f3f4f6;
+          border-radius: 6px;
+        }
+
+        .nav-link {
+          color: #666;
+          text-decoration: none;
+          font-weight: 500;
+          font-size: 14px;
+          transition: all 0.3s;
+          padding: 6px 12px;
+          border-radius: 6px;
+        }
+
+        .nav-link:hover {
+          color: #7c3aed;
+          background: #f3f4f6;
+        }
+
+        .btn-logout {
+          padding: 8px 16px;
+          background: #ef4444;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 13px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .btn-logout:hover {
+          background: #dc2626;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-logout:active {
+          transform: translateY(0);
+        }
+
+        /* Content Area */
+        .admin-content {
           max-width: 1000px;
           margin: 40px auto;
           padding: 0 20px;
         }
 
         .admin-header {
-          text-align: center;
           margin-bottom: 40px;
+          text-align: center;
         }
 
         .admin-header h1 {
           font-size: 32px;
-          color: #333;
-          margin-bottom: 8px;
+          font-weight: 700;
+          color: #1a1a1a;
+          margin: 0 0 12px 0;
         }
 
-        .admin-header p {
-          color: #666;
-          font-size: 16px;
+        .subtitle {
+          font-size: 14px;
+          color: #999;
+          margin: 0;
         }
 
+        /* Alert Messages */
+        .alert {
+          padding: 14px 16px;
+          border-radius: 8px;
+          margin-bottom: 24px;
+          font-size: 14px;
+          font-weight: 500;
+        }
+
+        .alert-error {
+          background: #fee2e2;
+          color: #991b1b;
+          border: 1px solid #fecaca;
+        }
+
+        .alert-success {
+          background: #dcfce7;
+          color: #166534;
+          border: 1px solid #bbf7d0;
+        }
+
+        /* Registration Sections */
         .registration-section {
           margin-bottom: 40px;
         }
 
-        .registration-section h2 {
-          font-size: 20px;
-          color: #333;
-          margin-bottom: 16px;
-          padding-bottom: 12px;
-          border-bottom: 2px solid #e5e7eb;
+        .section-header {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 20px;
         }
 
+        .registration-section h2 {
+          font-size: 18px;
+          font-weight: 700;
+          color: #1a1a1a;
+          margin: 0;
+        }
+
+        .section-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          font-size: 12px;
+          font-weight: 700;
+          color: white;
+        }
+
+        .pending-badge {
+          background: #f59e0b;
+        }
+
+        .approved-badge {
+          background: #10b981;
+        }
+
+        .rejected-badge {
+          background: #ef4444;
+        }
+
+        /* Registration List */
         .registrations-list {
           display: flex;
           flex-direction: column;
@@ -316,144 +518,255 @@ export default function VendorApprovalPage() {
           background: white;
           padding: 24px;
           border-radius: 12px;
-          border-left: 4px solid #f59e0b;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+          box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+          border: 1px solid #e5e7eb;
+          transition: all 0.3s ease;
         }
 
-        .registration-card.approved {
-          border-left-color: #22c55e;
-          background-color: #f0fdf4;
+        .registration-card:hover {
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+          border-color: #7c3aed;
         }
 
-        .registration-card.rejected {
-          border-left-color: #ef4444;
-          background-color: #fef2f2;
+        /* Card Header */
+        .card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 20px;
+          padding-bottom: 16px;
+          border-bottom: 1px solid #f3f4f6;
         }
 
-        .reg-header {
-          margin-bottom: 16px;
+        .card-header h3 {
+          font-size: 16px;
+          font-weight: 700;
+          color: #1a1a1a;
+          margin: 0 0 6px 0;
         }
 
-        .registration-card h3 {
-          font-size: 18px;
-          margin: 0 0 12px 0;
-          color: #333;
+        .vendor-email {
+          font-size: 13px;
+          color: #999;
+          margin: 0;
         }
 
-        .reg-detail {
-          margin: 6px 0;
-          color: #666;
+        .status-badge {
+          display: inline-block;
+          padding: 6px 12px;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .status-badge.pending {
+          background: #fef3c7;
+          color: #92400e;
+        }
+
+        .status-badge.success {
+          background: #dcfce7;
+          color: #166534;
+        }
+
+        .status-badge.danger {
+          background: #fee2e2;
+          color: #991b1b;
+        }
+
+        /* Card Details */
+        .card-details {
+          margin-bottom: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .detail-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .detail-label {
+          font-size: 13px;
+          color: #999;
+          font-weight: 500;
+          min-width: 120px;
+        }
+
+        .detail-value {
+          font-size: 14px;
+          color: #1a1a1a;
+          font-weight: 500;
+        }
+
+        .rejection-reason {
+          color: #ef4444;
+          font-style: italic;
+        }
+
+        .empty-state {
+          color: #999;
+          text-align: center;
+          padding: 40px 0;
           font-size: 14px;
         }
 
-        .reg-actions {
+        /* Card Actions */
+        .card-actions {
           display: flex;
-          gap: 8px;
-          padding-top: 16px;
-          border-top: 1px solid #e5e7eb;
+          gap: 12px;
         }
 
-        .btn-approve,
-        .btn-reject,
-        .btn-danger,
-        .btn-secondary {
+        .action-buttons {
+          display: flex;
+          gap: 12px;
+          width: 100%;
+        }
+
+        .btn-action {
+          flex: 1;
           padding: 10px 16px;
           border: none;
-          border-radius: 6px;
+          border-radius: 8px;
           font-weight: 600;
+          font-size: 13px;
           cursor: pointer;
-          font-size: 14px;
-          transition: all 0.3s;
+          transition: all 0.3s ease;
         }
 
-        .btn-approve {
-          background-color: #22c55e;
+        .btn-action.approve {
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
           color: white;
         }
 
-        .btn-approve:hover:not(:disabled) {
-          background-color: #16a34a;
+        .btn-action.approve:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 16px rgba(16, 185, 129, 0.3);
         }
 
-        .btn-reject {
-          background-color: #ef4444;
+        .btn-action.reject-btn {
+          background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
           color: white;
         }
 
-        .btn-reject:hover {
-          background-color: #dc2626;
+        .btn-action.reject-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 16px rgba(239, 68, 68, 0.3);
         }
 
-        .btn-danger {
-          background-color: #ef4444;
+        .btn-action.cancel {
+          background: #f3f4f6;
+          color: #1a1a1a;
+          border: 1px solid #e5e7eb;
+        }
+
+        .btn-action.cancel:hover {
+          background: #e5e7eb;
+        }
+
+        .btn-action.reject {
+          background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
           color: white;
         }
 
-        .btn-danger:hover:not(:disabled) {
-          background-color: #dc2626;
+        .btn-action.reject:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 16px rgba(239, 68, 68, 0.3);
         }
 
-        .btn-secondary {
-          background-color: #e5e7eb;
-          color: #333;
+        .btn-action:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
         }
 
-        .btn-secondary:hover {
-          background-color: #d1d5db;
-        }
-
+        /* Reject Form */
         .reject-form {
           width: 100%;
-          padding: 12px;
-          background-color: #fef3c7;
-          border-radius: 6px;
+          padding: 16px;
+          background: #fef3c7;
+          border-radius: 8px;
+          border: 1px solid #fcd34d;
         }
 
         .reject-form label {
           display: block;
           font-weight: 600;
           margin-bottom: 8px;
-          color: #333;
+          color: #1a1a1a;
+          font-size: 13px;
         }
 
         .reject-form textarea {
           width: 100%;
-          padding: 10px;
+          padding: 10px 12px;
           border: 1px solid #fcd34d;
           border-radius: 6px;
-          font-family: 'Inter', sans-serif;
-          font-size: 14px;
+          font-family: inherit;
+          font-size: 13px;
           resize: vertical;
+          min-height: 80px;
+          color: #1a1a1a;
         }
 
-        .alert {
-          padding: 12px 16px;
-          border-radius: 6px;
-          margin-bottom: 24px;
-          font-size: 14px;
+        .reject-form textarea:focus {
+          outline: none;
+          border-color: #f59e0b;
+          box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.1);
         }
 
-        .alert-error {
-          background-color: #fee2e2;
-          color: #991b1b;
-          border: 1px solid #fecaca;
+        .form-buttons {
+          margin-top: 12px;
+          display: flex;
+          gap: 8px;
         }
 
-        .alert-success {
-          background-color: #dcfce7;
-          color: #166534;
-          border: 1px solid #bbf7d0;
-        }
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+          .navbar {
+            flex-direction: column;
+            gap: 12px;
+            padding: 12px 16px;
+          }
 
-        .btn-link {
-          color: #5A45D1;
-          text-decoration: none;
-          font-weight: 600;
-          cursor: pointer;
-        }
+          .nav-left,
+          .nav-right {
+            width: 100%;
+            justify-content: space-between;
+          }
 
-        .btn-link:hover {
-          text-decoration: underline;
+          .admin-content {
+            margin: 24px auto;
+          }
+
+          .admin-header h1 {
+            font-size: 24px;
+          }
+
+          .card-header {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .status-badge {
+            align-self: flex-start;
+          }
+
+          .detail-row {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .action-buttons {
+            flex-direction: column;
+          }
+
+          .btn-action {
+            width: 100%;
+          }
         }
       `}</style>
     </div>

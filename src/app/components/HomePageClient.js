@@ -17,6 +17,8 @@ export default function HomePageClient() {
   const [showRatingForm, setShowRatingForm] = useState(false);
   const [ratingValue, setRatingValue] = useState(5);
   const [ratingReview, setRatingReview] = useState('');
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -39,12 +41,45 @@ export default function HomePageClient() {
     };
 
     fetchServices();
+
+    // Refresh services setiap 10 detik untuk deteksi service baru dari vendor
+    const serviceInterval = setInterval(fetchServices, 10000);
+    return () => clearInterval(serviceInterval);
   }, []);
+
+  // Fetch notifications for current user
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchNotifications = async () => {
+      try {
+        const response = await fetch(`/api/notifications?userId=${user.id}`);
+        const data = await response.json();
+        setNotifications(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+      }
+    };
+
+    fetchNotifications();
+
+    // Polling every 5 seconds untuk check notifikasi baru
+    const interval = setInterval(fetchNotifications, 5000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const handleLogout = () => {
     localStorage.removeItem('user');
     setUser(null);
     window.location.reload();
+  };
+
+  // Helper function to safely format price
+  const formatPrice = (price) => {
+    if (typeof price === 'number' && isFinite(price) && price > 0 && price < 1e20) {
+      return price.toLocaleString('id-ID');
+    }
+    return '0';
   };
 
   const openModal = (service) => {
@@ -215,78 +250,104 @@ export default function HomePageClient() {
     }
   };
 
+  const handleChatClick = () => {
+    if (!user) {
+      alert('Silakan login terlebih dahulu');
+      return;
+    }
+    if (user.role === 'vendor') {
+      window.location.href = '/vendor/chats';
+    } else {
+      // Customer - buka chat list page
+      window.location.href = '/customer/chats';
+    }
+  };
+
+  const handleNotificationClick = () => {
+    setShowNotifications(!showNotifications);
+  };
+
   return (
     <div>
       {/* Navbar */}
       <nav className="navbar">
-        <div className="nav-brand">RentGuard</div>
-        <div className="nav-search">
-          <input type="text" placeholder="Cari vendor, layanan sewa..." />
+        <div className="nav-left">
+          <Link href="/" className="nav-logo">
+            🛡️ RentGuard
+          </Link>
+          <div className="nav-search">
+            <span className="search-icon">🔍</span>
+            <input type="text" placeholder="Cari vendor, layanan sewa..." />
+          </div>
         </div>
-        <div className="nav-actions">
-          <span>🔔</span>
-          <span>❤️</span>
-          <span>📋</span>
-          
+
+        <div className="nav-right">
+          {/* Dashboard Vendor Button - hanya untuk vendor */}
+          {user && user.role === 'vendor' && (
+            <Link href="/vendor" className="btn-nav-vendor" title="Dashboard Vendor">
+              📊 Dashboard
+            </Link>
+          )}
+
+          {/* Admin Verification Button - hanya untuk admin */}
+          {user && user.role === 'admin' && (
+            <Link href="/admin/vendor-approval" className="btn-nav-admin" title="Verifikasi Vendor">
+              ✓ Verifikasi
+            </Link>
+          )}
+
+          {/* Notification Bell */}
+          <button className="nav-icon-btn" onClick={handleNotificationClick} title="Notifikasi">
+            🔔
+            {notifications.length > 0 && (
+              <span className="notification-badge">{notifications.length}</span>
+            )}
+            {showNotifications && (
+              <div className="notification-dropdown">
+                {notifications.length === 0 ? (
+                  <div className="notification-empty">Tidak ada notifikasi</div>
+                ) : (
+                  notifications.map((notif) => (
+                    <div key={notif.id} className={`notification-item ${notif.read ? 'read' : 'unread'}`}>
+                      <div className="notif-message">{notif.message}</div>
+                      <div className="notif-time">
+                        {new Date(notif.createdAt).toLocaleTimeString('id-ID')}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </button>
+
+          {/* Chat Button */}
+          <button className="nav-icon-btn" onClick={handleChatClick} title="Chat">
+            💬
+          </button>
+
+          {/* User Menu */}
           {user ? (
-            <>
-              {user.role === 'vendor' && (
-                <>
-                  <Link href="/vendor" className="jadi-vendor-btn">
-                    Dashboard Vendor
-                  </Link>
-                  <Link href="/vendor/chats" className="jadi-vendor-btn" style={{ marginRight: '12px' }}>
-                    💬 Pesan Customer
-                  </Link>
-                </>
-              )}
-              {user.role === 'admin' && (
-                <Link href="/admin/vendor-approval" className="jadi-vendor-btn admin-btn">
-                  Admin Panel
-                </Link>
-              )}
-              <div className="user-profile">
-                <div style={{ 
-                  background: '#ec4899', 
-                  color: 'white', 
-                  padding: '6px 12px', 
-                  borderRadius: '50%', 
-                  fontWeight: 'bold',
-                  minWidth: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  {user.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{user.name}</div>
-                  <div style={{ fontSize: '12px', color: '#666' }}>
-                    {user.role === 'vendor' ? 'Vendor' : (user.role === 'admin' ? 'Admin' : 'Member')}
-                  </div>
-                </div>
+            <div className="user-menu-wrapper">
+              <div className="user-menu">
+                <button className="user-button">
+                  <div className="user-avatar">{user.name.charAt(0).toUpperCase()}</div>
+                  <span>{user.name}</span>
+                </button>
               </div>
               <button 
                 onClick={handleLogout}
-                style={{
-                  background: '#f3f4f6',
-                  border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}
+                className="btn-logout"
+                title="Logout"
               >
-                Logout
+                🚪 Logout
               </button>
-            </>
+            </div>
           ) : (
-            <>
-              <Link href="/login" style={{ color: '#5A45D1', textDecoration: 'none', fontWeight: '600' }}>
+            <div className="user-menu-guest">
+              <Link href="/login" className="btn-login">
                 Masuk
               </Link>
-            </>
+            </div>
           )}
         </div>
       </nav>
@@ -346,42 +407,61 @@ export default function HomePageClient() {
           <p style={{ textAlign: 'center', padding: '40px', color: '#999' }}>Belum ada layanan sewa</p>
         ) : (
           <div className="vendor-grid">
-            {services.map((service) => (
-              <div key={service.id} className="vendor-card">
-                <div className="vendor-cover">
-                  <img src={service.images[0]} alt={service.title} />
-                  <div className="vendor-rating-badge">⭐ {service.rating}</div>
-                </div>
-                
-                <div className="vendor-content">
-                  <h3 className="vendor-title">{service.title}</h3>
+            {services.map((service) => {
+              // Parse rentCount - handle both string and number
+              let rentCountNum = 0;
+              if (typeof service.rentCount === 'string') {
+                const parsed = parseInt(service.rentCount.replace(/[K,]/g, ''));
+                rentCountNum = isNaN(parsed) ? 0 : parsed;
+              } else {
+                rentCountNum = service.rentCount;
+              }
+              
+              const isPopular = rentCountNum >= 100;
+              const shortDesc = service.detailDescription || service.shortDescription || (service.description ? service.description.substring(0, 80) + '...' : '');
+              
+              return (
+                <div key={service.id} className="vendor-card">
+                  {isPopular && <div className="popular-badge">🔥 Populer</div>}
                   
-                  <p className="vendor-vendor-name">🏢 {service.vendorName}</p>
-                  
-                  <p className="vendor-short-desc">
-                    {service.shortDescription || service.description.substring(0, 80) + '...'}
-                  </p>
-                  
-                  <div className="vendor-stats">
-                    <span className="stat-item">
-                      <span className="stat-icon">📊</span>
-                      <span>{service.rentCount} disewa</span>
-                    </span>
+                  <div className="vendor-cover">
+                    <img src={service.image || service.images[0]} alt={service.title} />
                   </div>
+                  
+                  <div className="vendor-content">
+                    <h3 className="vendor-title">{service.title}</h3>
+                    
+                    <p className="vendor-vendor-name">{service.vendorName}</p>
+                    
+                    <p className="vendor-short-desc">
+                      {shortDesc}
+                    </p>
+                    
+                    <div className="vendor-stats">
+                      <div className="stat-rating">
+                        <span className="rating-stars">⭐ {service.rating.toFixed(1)}</span>
+                        <span className="rating-count">({service.rentCount} disewa)</span>
+                      </div>
+                    </div>
 
-                  <div className="vendor-price">
-                    Rp {service.price.toLocaleString('id-ID')}
+                    <div className="vendor-footer">
+                      <div className="vendor-price">
+                        <span className="price-label">Rp</span>
+                        <span className="price-amount">{formatPrice(service.price)}</span>
+                        <span className="price-period">/ hari</span>
+                      </div>
+
+                      <button 
+                        className="btn-detail"
+                        onClick={() => openModal(service)}
+                      >
+                        Lihat Detail
+                      </button>
+                    </div>
                   </div>
-
-                  <button 
-                    className="btn-detail"
-                    onClick={() => openModal(service)}
-                  >
-                    Lihat Detail →
-                  </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -419,7 +499,7 @@ export default function HomePageClient() {
                 <div className="info-section">
                   <h4>💰 Harga</h4>
                   <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#5A45D1' }}>
-                    Rp {selectedService.price.toLocaleString('id-ID')}
+                    Rp {formatPrice(selectedService.price)}
                   </p>
                 </div>
 
@@ -566,6 +646,345 @@ export default function HomePageClient() {
       )}
 
       <style jsx>{`
+        /* Navbar Styles */
+        .navbar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px 40px;
+          background: white;
+          border-bottom: 1px solid #e5e7eb;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+          position: sticky;
+          top: 0;
+          z-index: 100;
+          font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        .nav-left {
+          display: flex;
+          align-items: center;
+          gap: 24px;
+          flex: 1;
+        }
+
+        .nav-logo {
+          font-size: 20px;
+          font-weight: 700;
+          color: #7c3aed;
+          text-decoration: none;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          white-space: nowrap;
+        }
+
+        .nav-logo:hover {
+          opacity: 0.8;
+        }
+
+        .nav-search {
+          position: relative;
+          flex: 1;
+          max-width: 350px;
+        }
+
+        .search-icon {
+          position: absolute;
+          left: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          font-size: 16px;
+        }
+
+        .nav-search input {
+          width: 100%;
+          padding: 10px 12px 10px 36px;
+          border: 1px solid #ddd;
+          border-radius: 8px;
+          font-size: 14px;
+          transition: all 0.2s;
+        }
+
+        .nav-search input:focus {
+          outline: none;
+          border-color: #7c3aed;
+          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+        }
+
+        .nav-right {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .nav-icon-btn {
+          background: none;
+          border: none;
+          font-size: 20px;
+          cursor: pointer;
+          position: relative;
+          padding: 6px;
+          transition: transform 0.2s;
+        }
+
+        .nav-icon-btn:hover {
+          transform: scale(1.1);
+        }
+
+        .notification-badge {
+          position: absolute;
+          top: 0;
+          right: 0;
+          background: #ef4444;
+          color: white;
+          border-radius: 50%;
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+          font-weight: 600;
+        }
+
+        .notification-dropdown {
+          position: absolute;
+          top: 100%;
+          right: 0;
+          background: white;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          min-width: 360px;
+          max-height: 400px;
+          overflow-y: auto;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+          margin-top: 8px;
+          z-index: 1000;
+        }
+
+        .notification-empty {
+          padding: 24px;
+          text-align: center;
+          color: #999;
+          font-size: 14px;
+        }
+
+        .notification-item {
+          padding: 16px;
+          border-bottom: 1px solid #f3f4f6;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+
+        .notification-item:hover {
+          background: #f9fafb;
+        }
+
+        .notification-item.unread {
+          background: #f0f4ff;
+          border-left: 4px solid #7c3aed;
+          padding-left: 12px;
+        }
+
+        .notification-item:last-child {
+          border-bottom: none;
+        }
+
+        .notif-message {
+          font-size: 14px;
+          color: #1a1a1a;
+          font-weight: 500;
+          margin-bottom: 4px;
+        }
+
+        .notif-time {
+          font-size: 12px;
+          color: #999;
+        }
+
+        .btn-nav-vendor {
+          padding: 8px 14px;
+          background: linear-gradient(135deg, #7c3aed, #a855f7);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          transition: all 0.2s;
+          white-space: nowrap;
+        }
+
+        .btn-nav-vendor:hover {
+          background: linear-gradient(135deg, #6d28d9, #9333ea);
+          transform: scale(1.05);
+        }
+
+        .btn-nav-vendor:active {
+          transform: scale(0.98);
+        }
+
+        .btn-nav-admin {
+          padding: 8px 14px;
+          background: linear-gradient(135deg, #059669, #10b981);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          transition: all 0.2s;
+          white-space: nowrap;
+        }
+
+        .btn-nav-admin:hover {
+          background: linear-gradient(135deg, #047857, #059669);
+          transform: scale(1.05);
+        }
+
+        .btn-nav-admin:active {
+          transform: scale(0.98);
+        }
+
+        .user-menu {
+          position: relative;
+        }
+
+        .user-menu-wrapper {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .user-button {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 6px 12px;
+          border-radius: 8px;
+          transition: background 0.2s;
+        }
+
+        .user-button:hover {
+          background: #f3f4f6;
+        }
+
+        .user-avatar {
+          width: 32px;
+          height: 32px;
+          background: linear-gradient(135deg, #7c3aed, #a855f7);
+          color: white;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 600;
+          font-size: 14px;
+        }
+
+        .user-button span {
+          font-size: 14px;
+          font-weight: 500;
+          color: #1a1a1a;
+          display: none;
+        }
+
+        @media (min-width: 768px) {
+          .user-button span {
+            display: block;
+          }
+        }
+
+        .btn-logout {
+          padding: 8px 14px;
+          background: #ef4444;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          white-space: nowrap;
+        }
+
+        .btn-logout:hover {
+          background: #dc2626;
+          transform: scale(1.05);
+        }
+
+        .btn-logout:active {
+          transform: scale(0.98);
+        }
+
+        .user-menu-guest {
+          display: flex;
+          gap: 8px;
+        }
+
+        .btn-login {
+          padding: 8px 16px;
+          background: linear-gradient(135deg, #7c3aed, #a855f7);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          text-decoration: none;
+          display: inline-block;
+          transition: all 0.2s;
+        }
+
+        .btn-login:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+        }
+
+        @media (max-width: 1024px) {
+          .navbar {
+            padding: 12px 24px;
+          }
+
+          .nav-search {
+            max-width: 250px;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .navbar {
+            padding: 12px 16px;
+          }
+
+          .nav-left {
+            gap: 12px;
+          }
+
+          .nav-search {
+            max-width: 150px;
+            display: none;
+          }
+
+          .nav-search input {
+            font-size: 12px;
+          }
+        }
+
         .jadi-vendor-btn {
           background-color: #5A45D1;
           color: white;
@@ -597,15 +1016,32 @@ export default function HomePageClient() {
           background: white;
           border-radius: 12px;
           overflow: hidden;
+          border: 1px solid #e5e7eb;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           display: flex;
           flex-direction: column;
+          position: relative;
         }
 
         .vendor-card:hover {
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+          box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
           transform: translateY(-4px);
+          border-color: #7c3aed;
+        }
+
+        .popular-badge {
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          background: linear-gradient(135deg, #f97316, #ea580c);
+          color: white;
+          padding: 6px 12px;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 600;
+          z-index: 10;
+          box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
         }
 
         .vendor-cover {
@@ -613,7 +1049,7 @@ export default function HomePageClient() {
           width: 100%;
           height: 200px;
           overflow: hidden;
-          background: #f0f0f0;
+          background: #f3f4f6;
         }
 
         .vendor-cover img {
@@ -640,7 +1076,7 @@ export default function HomePageClient() {
         }
 
         .vendor-content {
-          padding: 20px;
+          padding: 16px;
           flex: 1;
           display: flex;
           flex-direction: column;
@@ -649,15 +1085,15 @@ export default function HomePageClient() {
         .vendor-title {
           font-size: 16px;
           font-weight: 700;
-          color: #333;
-          margin: 0 0 8px 0;
+          color: #1a1a1a;
+          margin: 0 0 4px 0;
           line-height: 1.4;
         }
 
         .vendor-vendor-name {
           font-size: 13px;
-          color: #666;
-          margin: 0 0 12px 0;
+          color: #7c3aed;
+          margin: 0 0 10px 0;
           font-weight: 500;
         }
 
@@ -675,10 +1111,28 @@ export default function HomePageClient() {
 
         .vendor-stats {
           display: flex;
-          gap: 12px;
+          align-items: center;
+          gap: 8px;
           margin-bottom: 12px;
           padding-bottom: 12px;
-          border-bottom: 1px solid #eee;
+          border-bottom: 1px solid #f0f0f0;
+        }
+
+        .stat-rating {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .rating-stars {
+          font-size: 13px;
+          font-weight: 600;
+          color: #1a1a1a;
+        }
+
+        .rating-count {
+          font-size: 12px;
+          color: #999;
         }
 
         .stat-item {
@@ -694,28 +1148,111 @@ export default function HomePageClient() {
         }
 
         .vendor-price {
+          font-size: 16px;
+          font-weight: 700;
+          color: #7c3aed;
+          margin-bottom: 12px;
+          display: flex;
+          align-items: baseline;
+          gap: 2px;
+        }
+
+        .price-label {
+          font-size: 12px;
+          color: #7c3aed;
+          font-weight: 600;
+        }
+
+        .price-amount {
           font-size: 18px;
           font-weight: 700;
-          color: #5A45D1;
-          margin-bottom: 12px;
+          color: #7c3aed;
+        }
+
+        .price-period {
+          font-size: 12px;
+          color: #999;
+        }
+
+        .vendor-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          gap: 12px;
         }
 
         .btn-detail {
-          background-color: #5A45D1;
+          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
           color: white;
           border: none;
           padding: 10px 16px;
           border-radius: 8px;
           font-weight: 600;
-          font-size: 14px;
+          font-size: 13px;
           cursor: pointer;
           transition: all 0.3s;
-          width: 100%;
+          white-space: nowrap;
+          flex-shrink: 0;
         }
 
         .btn-detail:hover {
-          background-color: #3B2B85;
           transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+        }
+
+        .btn-detail:active {
+          transform: translateY(0);
+        }
+
+        /* Vendor Section & Grid */
+        .vendor-section {
+          padding: 60px 40px;
+          background: white;
+        }
+
+        .vendor-header {
+          margin-bottom: 32px;
+        }
+
+        .vendor-header h2 {
+          font-size: 32px;
+          font-weight: 700;
+          margin: 0;
+          color: #1a1a1a;
+        }
+
+        .vendor-header p {
+          font-size: 14px;
+          color: #666;
+          margin-top: 8px;
+        }
+
+        .vendor-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 24px;
+        }
+
+        @media (max-width: 1200px) {
+          .vendor-grid {
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .vendor-section {
+            padding: 40px 16px;
+          }
+
+          .vendor-header h2 {
+            font-size: 24px;
+          }
+
+          .vendor-grid {
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+          }
         }
 
         /* Modal Styles */
@@ -758,7 +1295,8 @@ export default function HomePageClient() {
         .modal-header h2 {
           margin: 0;
           font-size: 24px;
-          color: #333;
+          font-weight: 700;
+          color: #1a1a1a;
         }
 
         .modal-close {
@@ -768,10 +1306,17 @@ export default function HomePageClient() {
           cursor: pointer;
           color: #999;
           transition: color 0.3s;
+          width: 36px;
+          height: 36px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .modal-close:hover {
           color: #333;
+          background: #f3f4f6;
+          border-radius: 8px;
         }
 
         .modal-body {
@@ -811,13 +1356,14 @@ export default function HomePageClient() {
           margin: 0 0 12px 0;
           font-size: 16px;
           font-weight: 700;
-          color: #333;
+          color: #1a1a1a;
         }
 
         .info-section p {
           margin: 0;
           color: #555;
           line-height: 1.6;
+          font-size: 14px;
         }
 
         .modal-actions {
@@ -830,7 +1376,7 @@ export default function HomePageClient() {
 
         .btn-primary-modal {
           flex: 1;
-          background-color: #5A45D1;
+          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
           color: white;
           border: none;
           padding: 12px;
@@ -838,28 +1384,39 @@ export default function HomePageClient() {
           font-weight: 600;
           font-size: 16px;
           cursor: pointer;
-          transition: background-color 0.3s;
+          transition: all 0.3s ease;
         }
 
         .btn-primary-modal:hover {
-          background-color: #3B2B85;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(124, 58, 237, 0.3);
+        }
+
+        .btn-primary-modal:active {
+          transform: translateY(0);
         }
 
         .btn-secondary-modal {
           flex: 1;
-          background-color: #f0f0f0;
-          color: #333;
-          border: none;
+          background-color: #f3f4f6;
+          color: #1a1a1a;
+          border: 1px solid #e5e7eb;
           padding: 12px;
           border-radius: 8px;
           font-weight: 600;
           font-size: 16px;
           cursor: pointer;
-          transition: background-color 0.3s;
+          transition: all 0.3s ease;
         }
 
         .btn-secondary-modal:hover {
-          background-color: #e0e0e0;
+          background-color: #e5e7eb;
+          border-color: #d1d5db;
+          transform: translateY(-2px);
+        }
+
+        .btn-secondary-modal:active {
+          transform: translateY(0);
         }
 
         /* Chat Modal Styles */
@@ -875,7 +1432,7 @@ export default function HomePageClient() {
         }
 
         .chat-modal-header {
-          padding: 20px;
+          padding: 24px;
           border-bottom: 1px solid #eee;
           display: flex;
           justify-content: space-between;
@@ -886,14 +1443,14 @@ export default function HomePageClient() {
 
         .chat-header-info h2 {
           margin: 0;
-          font-size: 18px;
-          color: #333;
+          font-size: 20px;
+          color: #1a1a1a;
           font-weight: 700;
         }
 
         .chat-deal-actions {
           display: flex;
-          gap: 10px;
+          gap: 12px;
           padding: 16px 20px;
           border-bottom: 1px solid #eee;
           align-items: center;
@@ -904,20 +1461,26 @@ export default function HomePageClient() {
           padding: 10px;
           border: none;
           border-radius: 8px;
-          background-color: #10b981;
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
           color: white;
           font-weight: 600;
           cursor: pointer;
-          transition: background-color 0.3s;
+          transition: all 0.3s ease;
         }
 
         .btn-deal:hover:not(:disabled) {
-          background-color: #059669;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 16px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-deal:active:not(:disabled) {
+          transform: translateY(0);
         }
 
         .btn-deal:disabled {
-          background-color: #d1d5db;
+          background: #d1d5db;
           cursor: not-allowed;
+          opacity: 0.7;
         }
 
         .btn-cancel {
@@ -925,20 +1488,26 @@ export default function HomePageClient() {
           padding: 10px;
           border: none;
           border-radius: 8px;
-          background-color: #ef4444;
+          background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
           color: white;
           font-weight: 600;
           cursor: pointer;
-          transition: background-color 0.3s;
+          transition: all 0.3s ease;
         }
 
         .btn-cancel:hover:not(:disabled) {
-          background-color: #dc2626;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 16px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-cancel:active:not(:disabled) {
+          transform: translateY(0);
         }
 
         .btn-cancel:disabled {
-          background-color: #d1d5db;
+          background: #d1d5db;
           cursor: not-allowed;
+          opacity: 0.7;
         }
 
         .deal-status {
@@ -980,32 +1549,36 @@ export default function HomePageClient() {
 
         .message-content {
           max-width: 70%;
-          padding: 12px;
+          padding: 12px 16px;
           border-radius: 12px;
-          background-color: #5A45D1;
+          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
           color: white;
+          box-shadow: 0 2px 8px rgba(124, 58, 237, 0.2);
         }
 
         .chat-message.vendor .message-content {
           background-color: #e5e7eb;
-          color: #333;
+          color: #1a1a1a;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
 
         .message-text {
           margin: 0 0 4px 0;
           font-size: 14px;
           word-wrap: break-word;
+          line-height: 1.4;
         }
 
         .message-time {
           font-size: 11px;
           opacity: 0.7;
           display: block;
+          margin-top: 4px;
         }
 
         .chat-input-section {
           display: flex;
-          gap: 10px;
+          gap: 12px;
           padding: 16px 20px;
           border-top: 1px solid #eee;
           background: white;
@@ -1014,32 +1587,38 @@ export default function HomePageClient() {
 
         .chat-input {
           flex: 1;
-          border: 1px solid #ddd;
+          border: 1px solid #d1d5db;
           border-radius: 8px;
           padding: 10px 12px;
           font-size: 14px;
           font-family: inherit;
+          transition: all 0.3s ease;
         }
 
         .chat-input:focus {
           outline: none;
-          border-color: #5A45D1;
-          box-shadow: 0 0 0 3px rgba(90, 69, 209, 0.1);
+          border-color: #7c3aed;
+          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
         }
 
         .btn-send {
           padding: 10px 16px;
           border: none;
           border-radius: 8px;
-          background-color: #5A45D1;
+          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
           color: white;
           font-weight: 600;
           cursor: pointer;
-          transition: background-color 0.3s;
+          transition: all 0.3s ease;
         }
 
         .btn-send:hover {
-          background-color: #3B2B85;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 16px rgba(124, 58, 237, 0.3);
+        }
+
+        .btn-send:active {
+          transform: translateY(0);
         }
 
         .rating-form {
@@ -1052,7 +1631,7 @@ export default function HomePageClient() {
         .rating-form h3 {
           margin: 0 0 16px 0;
           font-size: 16px;
-          color: #333;
+          color: #1a1a1a;
           font-weight: 700;
         }
 
@@ -1069,20 +1648,22 @@ export default function HomePageClient() {
           font-size: 32px;
           cursor: pointer;
           opacity: 0.3;
-          transition: opacity 0.2s;
+          transition: opacity 0.2s, transform 0.2s;
+        }
+
+        .star:hover {
+          transform: scale(1.1);
+          opacity: 0.7;
         }
 
         .star.active {
           opacity: 1;
-        }
-
-        .star:hover {
-          opacity: 0.7;
+          transform: scale(1.15);
         }
 
         .rating-textarea {
           width: 100%;
-          border: 1px solid #ddd;
+          border: 1px solid #d1d5db;
           border-radius: 8px;
           padding: 12px;
           font-size: 14px;
@@ -1091,12 +1672,13 @@ export default function HomePageClient() {
           min-height: 80px;
           margin-bottom: 12px;
           box-sizing: border-box;
+          transition: all 0.3s ease;
         }
 
         .rating-textarea:focus {
           outline: none;
-          border-color: #5A45D1;
-          box-shadow: 0 0 0 3px rgba(90, 69, 209, 0.1);
+          border-color: #7c3aed;
+          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
         }
 
         .btn-submit-rating {
@@ -1104,16 +1686,22 @@ export default function HomePageClient() {
           padding: 12px;
           border: none;
           border-radius: 8px;
-          background-color: #5A45D1;
+          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
           color: white;
           font-weight: 600;
           font-size: 16px;
           cursor: pointer;
-          transition: background-color 0.3s;
+          transition: all 0.3s ease;
         }
 
         .btn-submit-rating:hover {
-          background-color: #3B2B85;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 16px rgba(124, 58, 237, 0.3);
+        }
+
+        .btn-submit-rating:active {
+          transform: translateY(0);
+        }
         }
       `}</style>
     </div>

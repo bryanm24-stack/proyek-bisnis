@@ -7,7 +7,7 @@
     "shortDescription": "Alat konstruksi berkualitas tinggi dengan teknologi terkini untuk semua proyek",
     "description": "Menyediakan berbagai alat konstruksi berkualitas tinggi dengan teknologi terkini. Kami melayani sewa alat berat seperti excavator, bulldozer, dan crane, serta alat ringan seperti palu bor, sander, dan power tools lainnya. Semua alat dalam kondisi prima dan dirawat secara berkala. Tim profesional kami siap membantu kebutuhan konstruksi Anda dengan harga yang kompetitif.",
     "rating": 4.7,
-    "rentCount": "1.3K",
+    "rentCount": "1300",
     "price": 500000,
     "images": [
       "https://images.unsplash.com/photo-1541888086425-d81bb19240f5?w=150&q=80"
@@ -21,7 +21,7 @@
     "shortDescription": "Koleksi lengkap pakaian adat nusantara dengan kualitas premium untuk setiap acara",
     "description": "Koleksi lengkap pakaian tradisional dari seluruh nusantara dengan kualitas premium. Kami menyediakan pakaian adat dari berbagai daerah, baju pengantin, kostum untuk acara khusus, serta aksesori lengkap. Semua pakaian telah didesain oleh profesional berpengalaman dan menggunakan bahan berkualitas tinggi. Cocok untuk pernikahan, akad nikah, acara keluarga, dan berbagai perayaan lainnya.",
     "rating": 4.8,
-    "rentCount": "3.8K",
+    "rentCount": "3800",
     "price": 750000,
     "images": [
       "https://images.unsplash.com/photo-1595956553066-fe24a8c33395?w=150&q=80"
@@ -35,24 +35,24 @@
     "shortDescription": "Ruang modern dengan fasilitas lengkap untuk kebutuhan bisnis dan event",
     "description": "Ruang modern dengan fasilitas lengkap untuk berbagai kebutuhan bisnis dan event. Kami menyediakan ruang kantor, meeting room, studio foto, dan aula dengan WiFi cepat, AC, furniture lengkap, dan parkir gratis. Lokasi strategis di pusat kota dengan akses mudah dari berbagai tempat. Paket sewa fleksibel untuk jangka pendek maupun jangka panjang dengan harga yang kompetitif.",
     "rating": 4.9,
-    "rentCount": "2.6K",
+    "rentCount": "2600",
     "price": 1000000,
     "images": [
       "https://images.unsplash.com/photo-1497366216548-37526070297c?w=150&q=80"
     ]
   },
   {
-    "id": "1775590778621",
+    "id": "1775628740028",
     "vendorId": "1775589203562",
     "vendorName": "Jeje",
-    "title": "Sediakan Sate Keliling",
-    "shortDescription": "Sate Gratis",
-    "description": "Haha Mbojok",
-    "price": 1e+31,
+    "title": "Meja",
+    "shortDescription": "Meja Gratis",
+    "description": "Kena Tipu hehehe",
+    "price": 49995,
     "rating": 5,
-    "rentCount": "0",
+    "rentCount": "1",
     "images": [
-      "blob:http://localhost:3000/5552944b-6ec1-4564-b81d-018395d736ec"
+      "blob:http://localhost:3000/43c67605-f67f-4894-83b5-cb320f48f002"
     ]
   }
 ]

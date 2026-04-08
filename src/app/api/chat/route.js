@@ -41,7 +41,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { serviceId, serviceTitle, vendorId, vendorName, customerId, customerName, message } = body;
+    const { serviceId, serviceTitle, vendorId, vendorName, customerId, customerName, message, senderId, senderName } = body;
 
     if (!serviceId || !vendorId || !customerId || !message) {
       return NextResponse.json({
@@ -76,11 +76,11 @@ export async function POST(request) {
       chats.push(chatRoom);
     }
 
-    // Tambah pesan baru
+    // Tambah pesan baru - gunakan senderId & senderName yang dikirim (bisa dari customer atau vendor)
     chatRoom.messages.push({
       id: Date.now().toString(),
-      senderId: customerId,
-      senderName: customerName,
+      senderId: senderId || customerId,
+      senderName: senderName || customerName,
       message,
       timestamp: new Date().toISOString()
     });

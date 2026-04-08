@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "id": "1775628912040",
+    "chatId": "1775628806493",
+    "customerId": "1775590828434",
+    "vendorId": "1775589203562",
+    "serviceId": "1775628740028",
+    "customerAccepted": true,
+    "vendorAccepted": true,
+    "status": "agreed",
+    "createdAt": "2026-04-08T06:15:12.040Z",
+    "agreedAt": "2026-04-08T06:15:35.459Z"
+  }
+]
