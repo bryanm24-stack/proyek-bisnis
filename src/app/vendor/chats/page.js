@@ -20,12 +20,12 @@ export default function VendorChatsPage() {
       const parsedUser = JSON.parse(userData);
       setUser(parsedUser);
       
-      if (parsedUser.role !== 'vendor') {
-        window.location.href = '/';
-        return;
+      // Fetch vendor chats - hanya fetch jika user adalah vendor
+      if (parsedUser.role === 'vendor') {
+        fetchVendorChats(parsedUser.id);
+      } else {
+        setLoading(false);
       }
-
-      fetchVendorChats(parsedUser.id);
     } else {
       window.location.href = '/login';
     }
@@ -147,8 +147,16 @@ export default function VendorChatsPage() {
     }
   };
 
-  if (!user || user.role !== 'vendor') {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Akses ditolak</div>;
+  if (!user) {
+    return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>;
+  }
+
+  if (user.role !== 'vendor') {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <p>❌ Anda bukan vendor. Hanya vendor yang bisa mengakses halaman ini.</p>
+      </div>
+    );
   }
 
   return (
@@ -171,6 +179,12 @@ export default function VendorChatsPage() {
           </Link>
           <Link href="/vendor" style={{ color: '#666', textDecoration: 'none', fontWeight: '500', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.3s' }}>
             Dashboard
+          </Link>
+          <Link href="/vendor/chats" style={{ color: '#7c3aed', textDecoration: 'none', fontWeight: '600', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', background: '#f0e6ff', transition: 'all 0.3s' }}>
+            💬 Chat
+          </Link>
+          <Link href="/vendor/ongoing" style={{ color: '#666', textDecoration: 'none', fontWeight: '500', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.3s' }}>
+            ⏳ Sedang Berlangsung
           </Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ 

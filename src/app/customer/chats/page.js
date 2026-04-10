@@ -20,11 +20,7 @@ export default function CustomerChatsPage() {
       const parsedUser = JSON.parse(userData);
       setUser(parsedUser);
       
-      if (parsedUser.role === 'vendor') {
-        window.location.href = '/vendor/chats';
-        return;
-      }
-
+      // Fetch chats as customer - user yang adalah vendor juga bisa jadi customer saat chat dengan vendor lain
       fetchCustomerChats(parsedUser.id);
     } else {
       window.location.href = '/login';
@@ -168,6 +164,12 @@ export default function CustomerChatsPage() {
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           <Link href="/" style={{ color: '#666', textDecoration: 'none', fontWeight: '500', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.3s' }}>
             🏠 Home
+          </Link>
+          <Link href="/customer/chats" style={{ color: '#7c3aed', textDecoration: 'none', fontWeight: '600', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', background: '#f0e6ff', transition: 'all 0.3s' }}>
+            💬 Chat
+          </Link>
+          <Link href="/customer/ongoing" style={{ color: '#666', textDecoration: 'none', fontWeight: '500', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.3s' }}>
+            ⏳ Sedang Berlangsung
           </Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ 
