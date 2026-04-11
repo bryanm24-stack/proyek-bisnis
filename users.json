@@ -44,5 +44,12 @@
     "role": "vendor",
     "vendorName": "Jaya Abadi Permata Utama Perdana Purnama Cipta Mulya",
     "phoneNumber": "12345678900"
+  },
+  {
+    "id": "1775917450950",
+    "name": "Will",
+    "email": "will@gmail.com",
+    "password": "123",
+    "role": "member"
   }
 ]

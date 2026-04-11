@@ -101,5 +101,32 @@
     ],
     "createdAt": "2026-04-08T06:13:26.493Z",
     "dealStatus": "agreed"
+  },
+  {
+    "id": "1775917472761",
+    "serviceId": "1775628740028",
+    "serviceTitle": "Meja",
+    "vendorId": "1775589203562",
+    "vendorName": "Jeje",
+    "customerId": "1775917450950",
+    "customerName": "Will",
+    "messages": [
+      {
+        "id": "1775917472761",
+        "senderId": "1775917450950",
+        "senderName": "Will",
+        "message": "1 ya",
+        "timestamp": "2026-04-11T14:24:32.761Z"
+      },
+      {
+        "id": "1775917498829",
+        "senderId": "1775589203562",
+        "senderName": "Jeje",
+        "message": "yoooo",
+        "timestamp": "2026-04-11T14:24:58.829Z"
+      }
+    ],
+    "createdAt": "2026-04-11T14:24:32.761Z",
+    "dealStatus": "agreed"
   }
 ]
