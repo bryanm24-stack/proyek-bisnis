@@ -233,6 +233,27 @@
   cursor: not-allowed;
 }
 
+.inspectButton {
+  flex: 1;
+  min-width: 150px;
+  padding: 10px;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inspectButton:hover {
+  background-color: #2980b9;
+}
+
 @media (max-width: 768px) {
   .container {
     flex-direction: column;

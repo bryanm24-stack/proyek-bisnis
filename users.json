@@ -1,55 +1,52 @@
 [
   {
-    "id": "admin1",
-    "name": "Admin RentGuard",
-    "email": "admin@rentguard.com",
-    "password": "admin123",
-    "role": "admin"
-  },
-  {
-    "id": "1775585231961",
-    "name": "Vin",
-    "email": "skevinbudiman@gmail.com",
+    "id": "1",
+    "username": "apple",
     "password": "123",
-    "role": "member"
+    "name": "Apple Vendor",
+    "role": "vendor",
+    "email": "apple@rentguard.com",
+    "phone": "081234567890",
+    "createdAt": "2026-04-01T00:00:00.000Z"
   },
   {
     "id": "2",
-    "name": "Budi Santoso",
-    "email": "budi@example.com",
-    "password": "password123",
-    "role": "vendor"
+    "username": "banana",
+    "password": "123",
+    "name": "Banana Vendor",
+    "role": "vendor",
+    "email": "banana@rentguard.com",
+    "phone": "081234567891",
+    "createdAt": "2026-04-01T00:00:00.000Z"
   },
   {
     "id": "3",
-    "name": "Citra Dewi",
-    "email": "citra@example.com",
-    "password": "password123",
-    "role": "vendor"
-  },
-  {
-    "id": "1775589203562",
-    "name": "Jeje",
-    "email": "jeje@gmail.com",
+    "username": "orange",
     "password": "123",
+    "name": "Orange Vendor",
     "role": "vendor",
-    "vendorName": "Jaya Abadi Permata Utama Perdana Purnama Cipta Mulya",
-    "phoneNumber": "12345678900"
+    "email": "orange@rentguard.com",
+    "phone": "081234567892",
+    "createdAt": "2026-04-01T00:00:00.000Z"
   },
   {
-    "id": "1775590828434",
-    "name": "Bryan",
-    "email": "bririan@gmail.com",
+    "id": "4",
+    "username": "strawberry",
     "password": "123",
-    "role": "vendor",
-    "vendorName": "Jaya Abadi Permata Utama Perdana Purnama Cipta Mulya",
-    "phoneNumber": "12345678900"
+    "name": "Strawberry Customer",
+    "role": "customer",
+    "email": "strawberry@rentguard.com",
+    "phone": "089876543210",
+    "createdAt": "2026-04-02T00:00:00.000Z"
   },
   {
-    "id": "1775917450950",
-    "name": "Will",
-    "email": "will@gmail.com",
+    "id": "5",
+    "username": "grape",
     "password": "123",
-    "role": "member"
+    "name": "Grape Customer",
+    "role": "customer",
+    "email": "grape@rentguard.com",
+    "phone": "089876543211",
+    "createdAt": "2026-04-02T00:00:00.000Z"
   }
 ]

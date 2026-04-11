@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-export default function PaymentPage() {
+function PaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const dealId = searchParams.get('dealId');
@@ -212,9 +212,9 @@ export default function PaymentPage() {
       {/* Main Content */}
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '40px 20px' }}>
         {/* Debug Info - Remove later */}
-        {process.env.NODE_ENV === 'development' && (
-          <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '12px', marginBottom: '20px', fontSize: '12px', fontFamily: 'monospace', color: '#b91c1c', display: 'none' }}>
-            Deal: {JSON.stringify(deal).substring(0, 200)}...
+        {deal && (
+          <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '12px', marginBottom: '20px', fontSize: '12px', fontFamily: 'monospace', color: '#b91c1c' }}>
+            <strong>DEBUG DEAL:</strong> ID={deal.id} | Price={deal.totalPrice} | Vendor={deal.vendorName} | Item={deal.itemName}
           </div>
         )}
 
@@ -234,8 +234,8 @@ export default function PaymentPage() {
               <div style={{ background: 'white', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                   <span style={{ fontSize: '20px' }}>⭐</span>
-                  <span style={{ fontSize: '16px', fontWeight: '700', color: '#1f2937' }}>4.7</span>
-                  <span style={{ fontSize: '14px', color: '#6b7280' }}>→ 1.3K disewa</span>
+                  <span style={{ fontSize: '16px', fontWeight: '700', color: '#1f2937' }}>{deal?.rating?.toFixed(1) || '4.7'}</span>
+                  <span style={{ fontSize: '14px', color: '#6b7280' }}>→ {deal?.rentCount || '1.3K'} disewa</span>
                 </div>
 
                 <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1f2937', marginBottom: '12px', lineHeight: '1.3' }}>
@@ -243,7 +243,7 @@ export default function PaymentPage() {
                 </h1>
 
                 <p style={{ fontSize: '14px', color: '#6b7280', lineHeight: '1.6', marginBottom: '24px' }}>
-                  Menyediakan berbagai alat konstruksi berkualitas tinggi dengan teknologi terkini. Kami melayani sewa alat berat dengan profesional berpengalaman dan harga kompetitif.
+                  {deal?.detailDescription || deal?.description || 'Menyediakan berbagai alat konstruksi berkualitas tinggi dengan teknologi terkini. Kami melayani sewa alat berat dengan profesional berpengalaman dan harga kompetitif.'}
                 </p>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', paddingTop: '24px', borderTop: '1px solid #e5e7eb' }}>
@@ -499,5 +499,13 @@ export default function PaymentPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function PaymentPage() {
+  return (
+    <Suspense fallback={<div>Loading payment...</div>}>
+      <PaymentContent />
+    </Suspense>
   );
 }

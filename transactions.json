@@ -1,1 +1,22 @@
-[]
+[
+  {
+    "id": "TRX-1775936698530",
+    "dealId": "1775934693221",
+    "userId": "4",
+    "paymentMethod": "cod",
+    "basePrice": 150000,
+    "quantity": 1,
+    "quantityType": "Unit",
+    "durationDays": 1,
+    "notes": "",
+    "startDate": "2026-04-11",
+    "amount": 150000,
+    "serviceFee": 25000,
+    "totalAmount": 175000,
+    "status": "success",
+    "timestamp": "2026-04-11T19:44:58.530Z",
+    "cardDetails": null,
+    "qrCode": null,
+    "createdAt": "2026-04-11T19:44:58.649Z"
+  }
+]

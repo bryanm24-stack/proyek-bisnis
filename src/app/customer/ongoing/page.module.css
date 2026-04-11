@@ -242,6 +242,27 @@
   background-color: #c0392b;
 }
 
+.inspectButton {
+  flex: 1;
+  min-width: 120px;
+  padding: 10px;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inspectButton:hover {
+  background-color: #2980b9;
+}
+
 /* Modal Styles */
 .modal {
   position: fixed;

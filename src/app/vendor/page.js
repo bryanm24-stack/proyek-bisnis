@@ -333,6 +333,9 @@ export default function VendorPage() {
           <Link href="/vendor/chats" className="nav-link">
             💬 Pesan
           </Link>
+          <Link href="/vendor/ongoing" className="nav-link">
+            📦 Sedang Berlangsung
+          </Link>
           <Link href="/" className="nav-link">
             Kembali
           </Link>

@@ -1,0 +1,267 @@
+'use client';
+
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+
+function VendorInspectionContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get('orderId');
+
+  const [order, setOrder] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      router.push('/login');
+      return;
+    }
+
+    const user = JSON.parse(userData);
+    if (user.role !== 'vendor') {
+      alert('Hanya vendor yang bisa mengakses halaman ini');
+      router.push('/');
+      return;
+    }
+
+    // Fetch order data
+    const fetchOrder = async () => {
+      try {
+        const response = await fetch('/api/deals/all');
+        const deals = await response.json();
+        const currentOrder = deals.find(d => d.id === orderId);
+        
+        if (!currentOrder) {
+          alert('Order tidak ditemukan');
+          router.push('/');
+          return;
+        }
+
+        setOrder(currentOrder);
+      } catch (error) {
+        console.error('Error fetching order:', error);
+        alert('Gagal memuat data order');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (orderId) {
+      fetchOrder();
+    }
+  }, [orderId, router]);
+
+  const handleConfirmComplaint = async () => {
+    if (!order) return;
+
+    if (window.confirm('Anda setuju dengan komplain customer? Uang akan direfund penuh.')) {
+      setIsSubmitting(true);
+      try {
+        const response = await fetch('/api/orders/update-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: order.id,
+            action: 'confirm-complaint'
+          })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          alert('Komplain telah disetujui. Refund sedang diproses.');
+          router.push('/vendor/orders');
+        } else {
+          alert('Gagal memproses: ' + result.message);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Terjadi kesalahan');
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+        Memuat data order...
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+        Order tidak ditemukan
+      </div>
+    );
+  }
+
+  const statusLabels = {
+    checking: '⏳ Sedang Diperiksa Customer',
+    approved: '✅ Customer Setuju',
+    complaint: '⚠️ Customer Komplain',
+    refunded: '💰 Refund Selesai'
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#f5f5f5', padding: '20px' }}>
+      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+        {/* Header */}
+        <div style={{ marginBottom: '20px' }}>
+          <button
+            onClick={() => router.back()}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '16px',
+              cursor: 'pointer',
+              color: '#666'
+            }}
+          >
+            ← Kembali
+          </button>
+        </div>
+
+        {/* Main Card */}
+        <div style={{ background: 'white', borderRadius: '12px', padding: '30px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+          <h1 style={{ fontSize: '24px', marginBottom: '20px', color: '#333' }}>
+            Status Pengecekan Customer
+          </h1>
+
+          {/* Status Info */}
+          <div style={{ background: '#f9f9f9', padding: '15px', borderRadius: '8px', marginBottom: '20px', borderLeft: '4px solid #5A45D1' }}>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>Status Saat Ini</div>
+            <div style={{ fontSize: '18px', fontWeight: '600', color: '#333' }}>
+              {statusLabels[order.inspectionStatus] || statusLabels.checking}
+            </div>
+          </div>
+
+          {/* Order Details */}
+          <div style={{ marginBottom: '30px', paddingBottom: '20px', borderBottom: '1px solid #eee' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '15px' }}>Detail Order</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '14px' }}>
+              <div>
+                <div style={{ color: '#666', marginBottom: '4px' }}>Layanan</div>
+                <div style={{ fontSize: '15px', fontWeight: '600' }}>{order.itemName}</div>
+              </div>
+              <div>
+                <div style={{ color: '#666', marginBottom: '4px' }}>Customer</div>
+                <div style={{ fontSize: '15px', fontWeight: '600' }}>{order.customerName}</div>
+              </div>
+              <div>
+                <div style={{ color: '#666', marginBottom: '4px' }}>Harga</div>
+                <div style={{ fontSize: '15px', fontWeight: '600' }}>Rp {(order.totalPrice || 0).toLocaleString('id-ID')}</div>
+              </div>
+              <div>
+                <div style={{ color: '#666', marginBottom: '4px' }}>Tanggal Order</div>
+                <div style={{ fontSize: '15px', fontWeight: '600' }}>{new Date(order.createdAt).toLocaleDateString('id-ID')}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Complaint Section */}
+          {order.inspectionStatus === 'complaint' && order.complaintDescription && (
+            <>
+              <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '8px', padding: '20px', marginBottom: '20px' }}>
+                <h3 style={{ margin: '0 0 15px 0', color: '#d97706', fontSize: '16px' }}>⚠️ Komplain dari Customer</h3>
+                
+                <div style={{ background: 'white', padding: '15px', borderRadius: '6px', marginBottom: '15px' }}>
+                  <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>Deskripsi Masalah:</div>
+                  <p style={{ margin: '0', fontSize: '14px', color: '#333', lineHeight: '1.6' }}>
+                    {order.complaintDescription}
+                  </p>
+                </div>
+
+                {order.complaintPhoto && (
+                  <div style={{ marginBottom: '15px' }}>
+                    <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>Foto Bukti:</div>
+                    <img 
+                      src={order.complaintPhoto} 
+                      alt="Komplain photo" 
+                      style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '6px', border: '1px solid #ddd' }}
+                    />
+                  </div>
+                )}
+
+                <div style={{ fontSize: '12px', color: '#9a3412', marginTop: '10px' }}>
+                  📅 Tanggal komplain: {new Date(order.complaintDate).toLocaleDateString('id-ID', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '15px', marginBottom: '20px' }}>
+                <p style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#166534' }}>
+                  Pilih aksi yang sesuai untuk menyelesaikan komplain ini:
+                </p>
+                <button
+                  onClick={handleConfirmComplaint}
+                  disabled={isSubmitting}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    opacity: isSubmitting ? 0.6 : 1
+                  }}
+                >
+                  {isSubmitting ? '⏳ Memproses...' : '✅ Setujui Komplain & Refund'}
+                </button>
+              </div>
+            </>
+          )}
+
+          {order.inspectionStatus === 'approved' && (
+            <div style={{ background: '#dcfce7', border: '1px solid #86efac', borderRadius: '8px', padding: '15px', marginBottom: '20px' }}>
+              <h3 style={{ margin: '0 0 10px 0', color: '#15803d', fontSize: '16px' }}>✅ Customer Puas</h3>
+              <p style={{ margin: '0', fontSize: '14px', color: '#166534' }}>
+                Customer telah menyetujui kondisi barang. Transaksi ini berhasil diselesaikan.
+              </p>
+            </div>
+          )}
+
+          {order.inspectionStatus === 'refunded' && (
+            <div style={{ background: '#dcfce7', border: '1px solid #86efac', borderRadius: '8px', padding: '15px', marginBottom: '20px' }}>
+              <h3 style={{ margin: '0 0 10px 0', color: '#15803d', fontSize: '16px' }}>💰 Refund Selesai</h3>
+              <p style={{ margin: '8px 0', fontSize: '14px', color: '#166534' }}>
+                Refund sebesar Rp {(order.refundAmount || 0).toLocaleString('id-ID')} telah diproses untuk customer.
+              </p>
+              <div style={{ marginTop: '10px', fontSize: '12px', color: '#4d7c0f' }}>
+                📅 Tanggal refund: {new Date(order.refundedAt).toLocaleDateString('id-ID')}
+              </div>
+            </div>
+          )}
+
+          {order.inspectionStatus === 'checking' && (
+            <div style={{ background: '#e0e7ff', border: '1px solid #a5b4fc', borderRadius: '8px', padding: '15px' }}>
+              <p style={{ margin: '0', fontSize: '14px', color: '#3730a3' }}>
+                ⏳ Menunggu customer untuk memeriksa barang. Silakan tunggu hingga customer memberikan keputusan.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function VendorInspectionPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>}>
+      <VendorInspectionContent />
+    </Suspense>
+  );
+}

@@ -453,13 +453,14 @@ export default function HomePageClient() {
               
               const isPopular = rentCountNum >= 100;
               const shortDesc = service.detailDescription || service.shortDescription || (service.description ? service.description.substring(0, 80) + '...' : '');
+              const imageUrl = service.image || (service.images && service.images.length > 0 ? service.images[0] : 'https://via.placeholder.com/300x200?text=' + encodeURIComponent(service.title || 'Service'));
               
               return (
                 <div key={service.id} className="vendor-card">
                   {isPopular && <div className="popular-badge">🔥 Populer</div>}
                   
                   <div className="vendor-cover">
-                    <img src={service.image || service.images[0]} alt={service.title} />
+                    <img src={imageUrl} alt={service.title} />
                   </div>
                   
                   <div className="vendor-content">
@@ -511,7 +512,7 @@ export default function HomePageClient() {
 
             <div className="modal-body">
               <div className="modal-image">
-                <img src={selectedService.images[0]} alt={selectedService.title} />
+                <img src={selectedService.image || (selectedService.images && selectedService.images.length > 0 ? selectedService.images[0] : 'https://via.placeholder.com/400x300?text=' + encodeURIComponent(selectedService.title || 'Service'))} alt={selectedService.title} />
               </div>
 
               <div className="modal-price-block">
@@ -593,7 +594,7 @@ export default function HomePageClient() {
                       <div className="info-section">
                         <h4>📝 Deskripsi Lengkap</h4>
                         <p style={{ lineHeight: '1.6', color: '#555' }}>
-                          {selectedService.description}
+                          {selectedService.detailDescription || selectedService.description}
                         </p>
                       </div>
 
@@ -618,17 +619,17 @@ export default function HomePageClient() {
                             </div>
                           )}
 
-                          {selectedService.denda && (
+                          {selectedService.dendaKeterlambatan && (
                             <div className="info-section">
                               <h4>⚠️ Denda Keterlambatan</h4>
-                              <p>Rp {formatPrice(Number(selectedService.denda))} / hari</p>
+                              <p>{selectedService.dendaKeterlambatan}</p>
                             </div>
                           )}
 
-                          {selectedService.syaratSewa && (
+                          {selectedService.syaratKetentuan && (
                             <div className="info-section">
-                              <h4>📝 Syarat & Ketentuan</h4>
-                              <p>{selectedService.syaratSewa}</p>
+                              <h4>📋 Syarat & Ketentuan</h4>
+                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
                             </div>
                           )}
                         </>
@@ -636,38 +637,24 @@ export default function HomePageClient() {
 
                       {(selectedService.type === 'jasa' || selectedService.category === 'jasa') && (
                         <>
-                          {selectedService.benefit && (
+                          {selectedService.spesifikBarang && (
                             <div className="info-section">
-                              <h4>✨ Benefit</h4>
-                              <p>{selectedService.benefit}</p>
+                              <h4>✨ Detail Layanan</h4>
+                              <p>{selectedService.spesifikBarang}</p>
                             </div>
                           )}
 
-                          {selectedService.jangkauanWilayah && selectedService.jangkauanWilayah.length > 0 && (
+                          {selectedService.dendaKeterlambatan && (
                             <div className="info-section">
-                              <h4>🌍 Jangkauan Wilayah</h4>
-                              <p>{selectedService.jangkauanWilayah.join(', ')}</p>
+                              <h4>⚠️ Denda Keterlambatan</h4>
+                              <p>{selectedService.dendaKeterlambatan}</p>
                             </div>
                           )}
 
-                          {selectedService.jamOperasional && (
+                          {selectedService.syaratKetentuan && (
                             <div className="info-section">
-                              <h4>🕒 Jam Operasional</h4>
-                              <p>{selectedService.jamOperasional.hari?.join(', ')} | {selectedService.jamOperasional.dari} - {selectedService.jamOperasional.sampai}</p>
-                            </div>
-                          )}
-
-                          {selectedService.estimasiPengerjaan && (
-                            <div className="info-section">
-                              <h4>⏱️ Estimasi Pengerjaan</h4>
-                              <p>{selectedService.estimasiPengerjaan}</p>
-                            </div>
-                          )}
-
-                          {selectedService.garansiLayanan && (
-                            <div className="info-section">
-                              <h4>🛡️ Garansi Layanan</h4>
-                              <p>{selectedService.garansiLayanan}</p>
+                              <h4>📋 Syarat & Ketentuan</h4>
+                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
                             </div>
                           )}
                         </>
