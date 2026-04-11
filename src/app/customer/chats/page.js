@@ -418,6 +418,26 @@ export default function CustomerChatsPage() {
                 )}
               </div>
 
+              {/* Show pricing and discount info when deal agreed */}
+              {dealData?.status === 'agreed' && (
+                <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '13px', color: '#666' }}>Deal telah disetujui</div>
+                    <div style={{ fontWeight: 800, fontSize: '16px', marginTop: '4px' }}>
+                      Harga akhir: Rp {(dealData.finalPrice || dealData.originalPrice || 0).toLocaleString('id-ID')}
+                    </div>
+                    {dealData.discountGiven && dealData.discount && (
+                      <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                        Potongan: Rp {dealData.discount.amount.toLocaleString('id-ID')} ({dealData.discount.type === 'percent' ? `${dealData.discount.value}%` : `Rp ${dealData.discount.value.toLocaleString('id-ID')}`})
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <button style={{ padding: '8px 12px', borderRadius: '8px', border: 'none', background: '#7c3aed', color: 'white', fontWeight: 700 }}>Lanjut ke Pembayaran</button>
+                  </div>
+                </div>
+              )}
+
               {/* Messages */}
               <div style={{
                 flex: 1,

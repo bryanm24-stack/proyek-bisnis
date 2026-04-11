@@ -75,7 +75,7 @@
       }
     ],
     "createdAt": "2026-04-07T19:41:10.211Z",
-    "dealStatus": null
+    "dealStatus": "agreed"
   },
   {
     "id": "1775628806493",
@@ -102,6 +102,33 @@
       }
     ],
     "createdAt": "2026-04-08T06:13:26.493Z",
+    "dealStatus": "agreed"
+  },
+  {
+    "id": "1775932495044",
+    "serviceId": "1775628740028",
+    "serviceTitle": "Meja",
+    "vendorId": "1775589203562",
+    "vendorName": "Jeje",
+    "customerId": "1775673270115",
+    "customerName": "cobajeje",
+    "messages": [
+      {
+        "id": "1775932495044",
+        "senderId": "1775673270115",
+        "senderName": "cobajeje",
+        "message": "hai",
+        "timestamp": "2026-04-11T18:34:55.044Z"
+      },
+      {
+        "id": "1775932614286",
+        "senderId": "1775589203562",
+        "senderName": "Jeje",
+        "message": "oke baik sudah dapat diskon ya]",
+        "timestamp": "2026-04-11T18:36:54.286Z"
+      }
+    ],
+    "createdAt": "2026-04-11T18:34:55.044Z",
     "dealStatus": "agreed"
   }
 ]
