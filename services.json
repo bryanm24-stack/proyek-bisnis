@@ -58,5 +58,32 @@
     "images": [
       "blob:http://localhost:3000/43c67605-f67f-4894-83b5-cb320f48f002"
     ]
+  },
+  {
+    "id": "1775845632823",
+    "vendorId": "1775844830737",
+    "vendorName": "Meta",
+    "type": "barang",
+    "category": "barang",
+    "rating": 5,
+    "rentCount": "0",
+    "images": [
+      "blob:http://localhost:3000/a7f66938-3ff0-4c25-9b9e-2108698e0c19"
+    ],
+    "title": "Halo",
+    "shortDescription": "Alat — Sepeda",
+    "description": "hehehe",
+    "price": 122222,
+    "namaBarang": "Halo",
+    "jenisBarang": "Alat",
+    "spesifikBarang": "Sepeda",
+    "jumlahBarang": "221",
+    "availability": "ready",
+    "lokasi": "HALAH",
+    "latitude": null,
+    "longitude": null,
+    "kebijakanKerusakan": "tidakaada",
+    "denda": "2222",
+    "syaratSewa": "1231232"
   }
 ]
