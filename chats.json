@@ -101,5 +101,94 @@
     ],
     "createdAt": "2026-04-08T06:13:26.493Z",
     "dealStatus": "agreed"
+  },
+  {
+    "id": "1775851130190",
+    "serviceId": "1775850989522",
+    "serviceTitle": "kkkk",
+    "vendorId": "1775590828431",
+    "vendorName": "Ken",
+    "customerId": "1775851101180",
+    "customerName": "ken1",
+    "messages": [
+      {
+        "id": "1775851130190",
+        "senderId": "1775851101180",
+        "senderName": "ken1",
+        "message": "cccc",
+        "timestamp": "2026-04-10T19:58:50.190Z"
+      }
+    ],
+    "createdAt": "2026-04-10T19:58:50.190Z",
+    "dealStatus": "agreed"
+  },
+  {
+<<<<<<< Updated upstream
+    "id": "1775928006431",
+=======
+    "id": "1775919165083",
+>>>>>>> Stashed changes
+    "serviceId": "1775628740028",
+    "serviceTitle": "Meja",
+    "vendorId": "1775589203562",
+    "vendorName": "Jeje",
+    "customerId": "1775590828431",
+    "customerName": "Ken",
+    "messages": [
+      {
+<<<<<<< Updated upstream
+        "id": "1775928006431",
+        "senderId": "1775590828431",
+        "senderName": "Ken",
+        "message": "test",
+        "timestamp": "2026-04-11T17:20:06.431Z"
+      }
+    ],
+    "createdAt": "2026-04-11T17:20:06.431Z",
+    "dealStatus": null
+  },
+  {
+    "id": "1775928159260",
+    "serviceId": "3",
+    "serviceTitle": "Penyewaan Ruang Kantor & Meeting Room",
+    "vendorId": "vendor3",
+    "vendorName": "Ruang Properti Indonesia",
+    "customerId": "1775590828431",
+    "customerName": "Ken",
+    "messages": [
+      {
+        "id": "1775928159260",
+        "senderId": "1775590828431",
+        "senderName": "Ken",
+        "message": "Cihuy",
+        "timestamp": "2026-04-11T17:22:39.260Z"
+      }
+    ],
+    "createdAt": "2026-04-11T17:22:39.260Z",
+=======
+        "id": "1775919165084",
+        "senderId": "1775590828431",
+        "senderName": "Ken",
+        "message": "sadvds",
+        "timestamp": "2026-04-11T14:52:45.084Z"
+      },
+      {
+        "id": "1775919219173",
+        "senderId": "1775590828431",
+        "senderName": "Ken",
+        "message": "tttacdtuasvgcavdu",
+        "timestamp": "2026-04-11T14:53:39.173Z"
+      },
+      {
+        "id": "1775921750867",
+        "senderId": "1775590828431",
+        "senderName": "Ken",
+        "message": "fsdf",
+        "timestamp": "2026-04-11T15:35:50.867Z"
+      }
+    ],
+    "createdAt": "2026-04-11T14:52:45.084Z",
+>>>>>>> Stashed changes
+    "dealStatus": null
   }
 ]

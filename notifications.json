@@ -50,5 +50,31 @@
     },
     "read": false,
     "createdAt": "2026-04-08T06:15:35.465Z"
+  },
+  {
+    "id": "notif_1775851131702",
+    "userId": "1775590828431",
+    "type": "deal_pending",
+    "message": "Ada penawaran baru dari customer",
+    "relatedId": "1775851130190",
+    "relatedData": {
+      "customerId": "1775851101180",
+      "serviceId": "1775850989522"
+    },
+    "read": false,
+    "createdAt": "2026-04-10T19:58:51.702Z"
+  },
+  {
+    "id": "notif_1775851155586",
+    "userId": "1775851101180",
+    "type": "deal_accepted",
+    "message": "Vendor menerima penawaran Anda!",
+    "relatedId": "1775851130190",
+    "relatedData": {
+      "vendorId": "1775590828431",
+      "serviceId": "1775850989522"
+    },
+    "read": false,
+    "createdAt": "2026-04-10T19:59:15.586Z"
   }
 ]

@@ -20,12 +20,12 @@ export default function VendorChatsPage() {
       const parsedUser = JSON.parse(userData);
       setUser(parsedUser);
       
-      if (parsedUser.role !== 'vendor') {
-        window.location.href = '/';
-        return;
+      // Fetch vendor chats - hanya fetch jika user adalah vendor
+      if (parsedUser.role === 'vendor') {
+        fetchVendorChats(parsedUser.id);
+      } else {
+        setLoading(false);
       }
-
-      fetchVendorChats(parsedUser.id);
     } else {
       window.location.href = '/login';
     }
@@ -147,8 +147,16 @@ export default function VendorChatsPage() {
     }
   };
 
-  if (!user || user.role !== 'vendor') {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Akses ditolak</div>;
+  if (!user) {
+    return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>;
+  }
+
+  if (user.role !== 'vendor') {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <p>❌ Anda bukan vendor. Hanya vendor yang bisa mengakses halaman ini.</p>
+      </div>
+    );
   }
 
   return (
@@ -171,6 +179,12 @@ export default function VendorChatsPage() {
           </Link>
           <Link href="/vendor" style={{ color: '#666', textDecoration: 'none', fontWeight: '500', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.3s' }}>
             Dashboard
+          </Link>
+          <Link href="/vendor/chats" style={{ color: '#7c3aed', textDecoration: 'none', fontWeight: '600', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', background: '#f0e6ff', transition: 'all 0.3s' }}>
+            💬 Chat
+          </Link>
+          <Link href="/vendor/ongoing" style={{ color: '#666', textDecoration: 'none', fontWeight: '500', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.3s' }}>
+            ⏳ Sedang Berlangsung
           </Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ 
@@ -300,7 +314,7 @@ export default function VendorChatsPage() {
                   }}
                 >
                   <div style={{ fontWeight: '600', fontSize: '14px' }}>
-                    {chat.customerName}
+                    {user.id === chat.customerId ? chat.vendorName : chat.customerName}
                   </div>
                   <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '4px' }}>
                     {chat.serviceTitle}
@@ -326,7 +340,7 @@ export default function VendorChatsPage() {
                 background: '#fff'
               }}>
                 <h2 style={{ margin: 0, fontSize: '18px' }}>
-                  {selectedChat.customerName} 👤
+                  {user.id === selectedChat.customerId ? selectedChat.vendorName : selectedChat.customerName} 👤
                 </h2>
                 <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#666' }}>
                   {selectedChat.serviceTitle}

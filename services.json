@@ -60,6 +60,29 @@
     ]
   },
   {
+    "id": "1775850989522",
+    "vendorId": "1775590828431",
+    "vendorName": "Ken",
+    "category": "barang",
+    "title": "kkkk",
+    "shortDescription": "Lemari",
+    "description": "jbhgytdyycjhcchigc jgvgjv f yuftuftuf utf uf uitd yd ",
+    "price": 10009900,
+    "type": "barang",
+    "jenisBarang": "Furniture",
+    "jumlahBarang": 35,
+    "availability": "ready",
+    "lokasi": "-7.292685, 112.757980",
+    "latitude": -7.292685,
+    "longitude": 112.75798,
+    "kebijakanKerusakan": "nbnbbnbnbnbnbn",
+    "denda": 22799,
+    "syaratSewa": "cghc tyd dgtfhgv nvjhbh g hjghjf hvh ftcjgftfh jfjfjfjg hgfddnb nm,ngtsgs cfsreg",
+    "rating": 5,
+    "rentCount": "0",
+    "images": [
+      "blob:http://localhost:3000/281d821c-5450-4a1c-b3e7-4d516662cf48"
+    ]
     "id": "1775845632823",
     "vendorId": "1775844830737",
     "vendorName": "Meta",
