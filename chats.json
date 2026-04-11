@@ -123,7 +123,11 @@
     "dealStatus": "agreed"
   },
   {
+<<<<<<< Updated upstream
     "id": "1775928006431",
+=======
+    "id": "1775919165083",
+>>>>>>> Stashed changes
     "serviceId": "1775628740028",
     "serviceTitle": "Meja",
     "vendorId": "1775589203562",
@@ -132,6 +136,7 @@
     "customerName": "Ken",
     "messages": [
       {
+<<<<<<< Updated upstream
         "id": "1775928006431",
         "senderId": "1775590828431",
         "senderName": "Ken",
@@ -160,6 +165,30 @@
       }
     ],
     "createdAt": "2026-04-11T17:22:39.260Z",
+=======
+        "id": "1775919165084",
+        "senderId": "1775590828431",
+        "senderName": "Ken",
+        "message": "sadvds",
+        "timestamp": "2026-04-11T14:52:45.084Z"
+      },
+      {
+        "id": "1775919219173",
+        "senderId": "1775590828431",
+        "senderName": "Ken",
+        "message": "tttacdtuasvgcavdu",
+        "timestamp": "2026-04-11T14:53:39.173Z"
+      },
+      {
+        "id": "1775921750867",
+        "senderId": "1775590828431",
+        "senderName": "Ken",
+        "message": "fsdf",
+        "timestamp": "2026-04-11T15:35:50.867Z"
+      }
+    ],
+    "createdAt": "2026-04-11T14:52:45.084Z",
+>>>>>>> Stashed changes
     "dealStatus": null
   }
 ]
