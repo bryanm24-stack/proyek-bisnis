@@ -121,5 +121,45 @@
     ],
     "createdAt": "2026-04-10T19:58:50.190Z",
     "dealStatus": "agreed"
+  },
+  {
+    "id": "1775928006431",
+    "serviceId": "1775628740028",
+    "serviceTitle": "Meja",
+    "vendorId": "1775589203562",
+    "vendorName": "Jeje",
+    "customerId": "1775590828431",
+    "customerName": "Ken",
+    "messages": [
+      {
+        "id": "1775928006431",
+        "senderId": "1775590828431",
+        "senderName": "Ken",
+        "message": "test",
+        "timestamp": "2026-04-11T17:20:06.431Z"
+      }
+    ],
+    "createdAt": "2026-04-11T17:20:06.431Z",
+    "dealStatus": null
+  },
+  {
+    "id": "1775928159260",
+    "serviceId": "3",
+    "serviceTitle": "Penyewaan Ruang Kantor & Meeting Room",
+    "vendorId": "vendor3",
+    "vendorName": "Ruang Properti Indonesia",
+    "customerId": "1775590828431",
+    "customerName": "Ken",
+    "messages": [
+      {
+        "id": "1775928159260",
+        "senderId": "1775590828431",
+        "senderName": "Ken",
+        "message": "Cihuy",
+        "timestamp": "2026-04-11T17:22:39.260Z"
+      }
+    ],
+    "createdAt": "2026-04-11T17:22:39.260Z",
+    "dealStatus": null
   }
 ]

@@ -101,11 +101,7 @@ export default function HomePageClient() {
       return;
     }
 
-    if (user.role === 'vendor') {
-      alert('Vendor tidak bisa melakukan chat');
-      return;
-    }
-
+    // Vendor juga bisa melakukan chat sebagai customer saat membeli dari vendor lain
     setSelectedService(service);
     setMessages([]);
     setNewMessage('');
@@ -550,6 +546,9 @@ export default function HomePageClient() {
                   <button 
                     className="btn-primary-modal"
                     onClick={() => openChatModal(selectedService)}
+                    disabled={user && user.id === selectedService.vendorId}
+                    title={user && user.id === selectedService.vendorId ? "Anda tidak bisa chat dengan service sendiri" : "Chat dengan vendor"}
+                    style={user && user.id === selectedService.vendorId ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                   >
                     💬 Chat Vendor
                   </button>

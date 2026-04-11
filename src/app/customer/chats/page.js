@@ -325,7 +325,7 @@ export default function CustomerChatsPage() {
                 background: '#fff'
               }}>
                 <h2 style={{ margin: 0, fontSize: '18px' }}>
-                  {selectedChat.vendorName} 🏪
+                  {user.id === selectedChat.customerId ? selectedChat.vendorName : selectedChat.customerName} 🏪
                 </h2>
                 <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#666' }}>
                   {selectedChat.serviceTitle}

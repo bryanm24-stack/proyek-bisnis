@@ -314,7 +314,7 @@ export default function VendorChatsPage() {
                   }}
                 >
                   <div style={{ fontWeight: '600', fontSize: '14px' }}>
-                    {chat.customerName}
+                    {user.id === chat.customerId ? chat.vendorName : chat.customerName}
                   </div>
                   <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '4px' }}>
                     {chat.serviceTitle}
@@ -340,7 +340,7 @@ export default function VendorChatsPage() {
                 background: '#fff'
               }}>
                 <h2 style={{ margin: 0, fontSize: '18px' }}>
-                  {selectedChat.customerName} 👤
+                  {user.id === selectedChat.customerId ? selectedChat.vendorName : selectedChat.customerName} 👤
                 </h2>
                 <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#666' }}>
                   {selectedChat.serviceTitle}

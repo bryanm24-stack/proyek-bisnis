@@ -34,18 +34,20 @@ export async function GET(request) {
     let ongoingDeals = [];
 
     if (userRole === 'customer') {
-      // Get deals where customer has accepted and status is agreed
+      // Get deals where customer has accepted and status is agreed atau complain
+      // Card tetap muncul meskipun ada complain
       ongoingDeals = deals.filter(d => 
         d.customerId === userId && 
         d.customerAccepted === true &&
-        d.status === 'agreed'
+        (d.status === 'agreed' || d.status === 'complain')
       );
     } else if (userRole === 'vendor') {
-      // Get deals where vendor has accepted and status is agreed
+      // Get deals where vendor has accepted and status is agreed atau complain
+      // Card tetap muncul meskipun ada complain
       ongoingDeals = deals.filter(d => 
         d.vendorId === userId && 
         d.vendorAccepted === true &&
-        d.status === 'agreed'
+        (d.status === 'agreed' || d.status === 'complain')
       );
     }
 
