@@ -17,5 +17,43 @@
     ],
     "createdAt": "2026-04-11T19:11:01.454Z",
     "dealStatus": "agreed"
+  },
+  {
+    "id": "1775939466935",
+    "serviceId": "s2",
+    "serviceTitle": "Catering Service",
+    "vendorId": "2",
+    "customerId": "1775589203562",
+    "customerName": "Jeje",
+    "messages": [
+      {
+        "id": "1775939466935",
+        "senderId": "1775589203562",
+        "senderName": "Jeje",
+        "message": "test",
+        "timestamp": "2026-04-11T20:31:06.935Z"
+      }
+    ],
+    "createdAt": "2026-04-11T20:31:06.935Z",
+    "dealStatus": "pending"
+  },
+  {
+    "id": "1775939986634",
+    "serviceId": "s1",
+    "serviceTitle": "Laptop Rental",
+    "vendorId": "1",
+    "customerId": "5",
+    "customerName": "Grape Customer",
+    "messages": [
+      {
+        "id": "1775939986634",
+        "senderId": "5",
+        "senderName": "Grape Customer",
+        "message": "p",
+        "timestamp": "2026-04-11T20:39:46.634Z"
+      }
+    ],
+    "createdAt": "2026-04-11T20:39:46.634Z",
+    "dealStatus": null
   }
 ]
