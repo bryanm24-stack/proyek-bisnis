@@ -60,5 +60,12 @@
     "email": "ken2@gmail.com",
     "password": "123",
     "role": "member"
+    "id": "1775844830737",
+    "name": "Meta",
+    "email": "KentangGorent@gmail.com",
+    "password": "123",
+    "role": "vendor",
+    "vendorName": "TOKO",
+    "phoneNumber": "3997746633443"
   }
 ]
