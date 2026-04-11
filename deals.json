@@ -22,7 +22,7 @@
     "serviceId": "1775850989522",
     "customerAccepted": true,
     "vendorAccepted": true,
-    "status": "complain",
+    "status": "completed",
     "createdAt": "2026-04-10T19:58:51.688Z",
     "agreedAt": "2026-04-10T19:59:15.574Z",
     "customerConfirmed": true,
@@ -36,6 +36,7 @@
         "createdAt": "2026-04-10T20:00:19.840Z",
         "resolved": false
       }
-    ]
+    ],
+    "vendorConfirmed": true
   }
 ]
