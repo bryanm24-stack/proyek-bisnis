@@ -1,0 +1,80 @@
+[
+  {
+    "id": "notif_1712594400000",
+    "userId": "1775590828434",
+    "type": "deal_accepted",
+    "message": "Vendor menerima penawaran Anda!",
+    "relatedId": "chat_1",
+    "relatedData": {
+      "vendorId": "vendor_1",
+      "serviceId": "service_1"
+    },
+    "read": false,
+    "createdAt": "2026-04-08T10:00:00.000Z"
+  },
+  {
+    "id": "notif_1712594500000",
+    "userId": "1775590828434",
+    "type": "deal_pending",
+    "message": "Ada penawaran baru dari customer",
+    "relatedId": "chat_2",
+    "relatedData": {
+      "customerId": "customer_1",
+      "serviceId": "service_2"
+    },
+    "read": false,
+    "createdAt": "2026-04-08T10:05:00.000Z"
+  },
+  {
+    "id": "notif_1775628912047",
+    "userId": "1775589203562",
+    "type": "deal_pending",
+    "message": "Ada penawaran baru dari customer",
+    "relatedId": "1775628806493",
+    "relatedData": {
+      "customerId": "1775590828434",
+      "serviceId": "1775628740028"
+    },
+    "read": false,
+    "createdAt": "2026-04-08T06:15:12.047Z"
+  },
+  {
+    "id": "notif_1775628935465",
+    "userId": "1775590828434",
+    "type": "deal_accepted",
+    "message": "Vendor menerima penawaran Anda!",
+    "relatedId": "1775628806493",
+    "relatedData": {
+      "vendorId": "1775589203562",
+      "serviceId": "1775628740028"
+    },
+    "read": false,
+    "createdAt": "2026-04-08T06:15:35.465Z"
+  },
+  {
+    "id": "notif_1775917475084",
+    "userId": "1775589203562",
+    "type": "deal_pending",
+    "message": "Ada penawaran baru dari customer",
+    "relatedId": "1775917472761",
+    "relatedData": {
+      "customerId": "1775917450950",
+      "serviceId": "1775628740028"
+    },
+    "read": false,
+    "createdAt": "2026-04-11T14:24:35.084Z"
+  },
+  {
+    "id": "notif_1775917490008",
+    "userId": "1775917450950",
+    "type": "deal_accepted",
+    "message": "Vendor menerima penawaran Anda!",
+    "relatedId": "1775917472761",
+    "relatedData": {
+      "vendorId": "1775589203562",
+      "serviceId": "1775628740028"
+    },
+    "read": false,
+    "createdAt": "2026-04-11T14:24:50.008Z"
+  }
+]
