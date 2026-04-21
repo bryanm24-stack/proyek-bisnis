@@ -91,32 +91,6 @@
     "createdAt": "2026-04-11T19:11:33.229Z"
   },
   {
-    "id": "notif_1775934716445",
-    "userId": "4",
-    "type": "deal_accepted",
-    "message": "Vendor menerima penawaran Anda!",
-    "relatedId": "1775934661453",
-    "relatedData": {
-      "vendorId": "1",
-      "serviceId": "s1"
-    },
-    "read": false,
-    "createdAt": "2026-04-11T19:11:56.445Z"
-  },
-  {
-    "id": "notif_1775939911306",
-    "userId": "4",
-    "type": "deal_accepted",
-    "message": "Vendor menerima penawaran Anda!",
-    "relatedId": "1775934661453",
-    "relatedData": {
-      "vendorId": "1",
-      "serviceId": "s1"
-    },
-    "read": false,
-    "createdAt": "2026-04-11T20:38:31.306Z"
-  },
-  {
     "id": "notif_1775940057495",
     "userId": "2",
     "type": "deal_pending",

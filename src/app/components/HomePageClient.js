@@ -21,8 +21,21 @@ export default function HomePageClient() {
   const [ratingReview, setRatingReview] = useState('');
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [serviceReviews, setServiceReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+
+  const fetchNotifications = async (currentUser) => {
+    if (!currentUser) return;
+    try {
+      const response = await fetch(`/api/notifications?userId=${currentUser.id}`);
+      const data = await response.json();
+      setNotifications(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -55,20 +68,10 @@ export default function HomePageClient() {
   useEffect(() => {
     if (!user) return;
 
-    const fetchNotifications = async () => {
-      try {
-        const response = await fetch(`/api/notifications?userId=${user.id}`);
-        const data = await response.json();
-        setNotifications(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error('Error fetching notifications:', error);
-      }
-    };
-
-    fetchNotifications();
+    fetchNotifications(user);
 
     // Polling every 5 seconds untuk check notifikasi baru
-    const interval = setInterval(fetchNotifications, 5000);
+    const interval = setInterval(() => fetchNotifications(user), 5000);
     return () => clearInterval(interval);
   }, [user]);
 
@@ -89,12 +92,50 @@ export default function HomePageClient() {
   const openModal = (service) => {
     setSelectedService(service);
     setDetailTab('information');
+    setServiceReviews([]);
+    setReviewsLoading(true);
     setModalOpen(true);
+
+    fetch(`/api/ratings?serviceId=${service.id}`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) {
+          setServiceReviews(data.data || []);
+        }
+      })
+      .catch((error) => {
+        console.error('Error fetching service reviews:', error);
+        setServiceReviews([]);
+      })
+      .finally(() => {
+        setReviewsLoading(false);
+      });
   };
 
   const closeModal = () => {
     setModalOpen(false);
     setSelectedService(null);
+    setServiceReviews([]);
+    setReviewsLoading(false);
+  };
+
+  const handleDeleteNotification = async (notificationId) => {
+    if (!user || !notificationId) return;
+
+    try {
+      const response = await fetch(`/api/notifications?id=${notificationId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        throw new Error('Gagal menghapus notifikasi');
+      }
+
+      setNotifications((prev) => prev.filter((notif) => notif.id !== notificationId));
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      alert('Gagal menghapus notifikasi');
+    }
   };
 
   const openChatModal = async (service) => {
@@ -124,7 +165,7 @@ export default function HomePageClient() {
         const dealDataResp = await dealResponse.json();
         if (dealDataResp.success && dealDataResp.data) {
           setDealData(dealDataResp.data);
-          if (dealDataResp.data.status === 'agreed') {
+          if (dealDataResp.data.status === 'completed') {
             setShowRatingForm(true);
           }
         }
@@ -319,11 +360,13 @@ export default function HomePageClient() {
           )}
 
           {/* Notification Bell */}
-          <button className="nav-icon-btn" onClick={handleNotificationClick} title="Notifikasi">
-            🔔
-            {notifications.length > 0 && (
-              <span className="notification-badge">{notifications.length}</span>
-            )}
+          <div className="notification-wrapper">
+            <button className="nav-icon-btn" onClick={handleNotificationClick} title="Notifikasi">
+              🔔
+              {notifications.length > 0 && (
+                <span className="notification-badge">{notifications.length}</span>
+              )}
+            </button>
             {showNotifications && (
               <div className="notification-dropdown">
                 {notifications.length === 0 ? (
@@ -331,16 +374,29 @@ export default function HomePageClient() {
                 ) : (
                   notifications.map((notif) => (
                     <div key={notif.id} className={`notification-item ${notif.read ? 'read' : 'unread'}`}>
-                      <div className="notif-message">{notif.message}</div>
-                      <div className="notif-time">
-                        {new Date(notif.createdAt).toLocaleTimeString('id-ID')}
+                      <div className="notification-content">
+                        <div className="notif-message">{notif.message}</div>
+                        <div className="notif-time">
+                          {new Date(notif.createdAt).toLocaleTimeString('id-ID')}
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        className="notif-delete-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteNotification(notif.id);
+                        }}
+                        title="Hapus notifikasi"
+                      >
+                        Hapus
+                      </button>
                     </div>
                   ))
                 )}
               </div>
             )}
-          </button>
+          </div>
 
           {/* Chat Button */}
           <button className="nav-icon-btn" onClick={handleChatClick} title="Chat">
@@ -562,6 +618,24 @@ export default function HomePageClient() {
                           </span>
                           <span style={{ color: '#666' }}>{selectedService.rentCount} orang telah menyewa</span>
                         </div>
+                        <div className="reviews-list">
+                          {reviewsLoading ? (
+                            <p className="review-empty">Memuat review...</p>
+                          ) : serviceReviews.length === 0 ? (
+                            <p className="review-empty">Belum ada review customer.</p>
+                          ) : (
+                            serviceReviews.slice(0, 5).map((review) => (
+                              <div key={review.id} className="review-item">
+                                <div className="review-header">
+                                  <span className="review-rating">⭐ {review.rating}/5</span>
+                                  <span className="review-date">{new Date(review.createdAt).toLocaleDateString('id-ID')}</span>
+                                </div>
+                                <p className="review-author">{review.customerName || 'Customer'}</p>
+                                <p className="review-text">{review.review?.trim() || 'Customer tidak menulis komentar.'}</p>
+                              </div>
+                            ))
+                          )}
+                        </div>
                       </div>
                     
 
@@ -771,7 +845,7 @@ export default function HomePageClient() {
             </div>
 
             {/* Rating Form */}
-            {showRatingForm && dealData?.status === 'agreed' && (
+            {showRatingForm && dealData?.status === 'completed' && (
               <div className="rating-form">
                 <h3>Berikan Rating &amp; Review</h3>
                 <div className="rating-stars">
@@ -876,6 +950,10 @@ export default function HomePageClient() {
           transition: transform 0.2s;
         }
 
+        .notification-wrapper {
+          position: relative;
+        }
+
         .nav-icon-btn:hover {
           transform: scale(1.1);
         }
@@ -939,6 +1017,33 @@ export default function HomePageClient() {
           border-bottom: none;
         }
 
+        .notification-content {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .notification-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .notif-delete-btn {
+          border: none;
+          background: #fee2e2;
+          color: #b91c1c;
+          border-radius: 6px;
+          padding: 6px 10px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          flex-shrink: 0;
+        }
+
+        .notif-delete-btn:hover {
+          background: #fecaca;
+        }
+
         .notif-message {
           font-size: 14px;
           color: #1a1a1a;
@@ -949,6 +1054,59 @@ export default function HomePageClient() {
         .notif-time {
           font-size: 12px;
           color: #999;
+        }
+
+        .reviews-list {
+          margin-top: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .review-item {
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 10px 12px;
+          background: #fafafa;
+        }
+
+        .review-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-bottom: 6px;
+        }
+
+        .review-rating {
+          font-size: 13px;
+          font-weight: 700;
+          color: #111827;
+        }
+
+        .review-date {
+          font-size: 12px;
+          color: #6b7280;
+        }
+
+        .review-author {
+          font-size: 12px;
+          color: #4b5563;
+          margin: 0 0 4px 0;
+          font-weight: 600;
+        }
+
+        .review-text {
+          margin: 0;
+          font-size: 13px;
+          color: #374151;
+          line-height: 1.5;
+        }
+
+        .review-empty {
+          margin: 8px 0 0;
+          font-size: 13px;
+          color: #6b7280;
         }
 
         .btn-nav-vendor {

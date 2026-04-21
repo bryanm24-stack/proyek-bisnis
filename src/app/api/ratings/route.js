@@ -112,10 +112,22 @@ export async function GET(request) {
     }
 
     const ratingsPath = path.join(process.cwd(), 'ratings.json');
+    const usersPath = path.join(process.cwd(), 'users.json');
     const ratingsData = await fs.readFile(ratingsPath, 'utf-8');
     const ratings = JSON.parse(ratingsData);
+    const usersData = await fs.readFile(usersPath, 'utf-8');
+    const users = JSON.parse(usersData);
 
-    const serviceRatings = ratings.filter(r => r.serviceId === serviceId);
+    const serviceRatings = ratings
+      .filter(r => r.serviceId === serviceId)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .map((ratingItem) => {
+        const customer = users.find((u) => u.id === ratingItem.customerId);
+        return {
+          ...ratingItem,
+          customerName: customer?.name || 'Customer'
+        };
+      });
 
     return NextResponse.json({
       success: true,
