@@ -4,30 +4,6 @@
     "chatId": "1775934661453",
     "customerId": "4",
     "vendorId": "1",
-    "serviceId": "s1",
-    "customerAccepted": true,
-    "vendorAccepted": true,
-    "status": "agreed",
-    "inspectionStatus": "checking",
-    "checkDeadline": "2026-04-14T19:11:33.221Z",
-    "complaintDescription": null,
-    "complaintPhoto": null,
-    "complaintDate": null,
-    "createdAt": "2026-04-11T19:11:33.221Z",
-    "agreedAt": "2026-04-11T20:38:31.299Z",
-    "customerConfirmed": true,
-    "vendorConfirmed": true
-  },
-  {
-    "id": "1775940057489",
-    "chatId": "1775939466935",
-    "customerId": "1775589203562",
-    "vendorId": "2",
-    "serviceId": "s2",
-    "customerAccepted": true,
-    "vendorAccepted": false,
-    "status": "pending",
-    "createdAt": "2026-04-11T20:40:57.489Z",
-    "agreedAt": null
+    "serviceId": "s1"
   }
 ]
