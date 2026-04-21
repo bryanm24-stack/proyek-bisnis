@@ -89,18 +89,5 @@
     },
     "read": false,
     "createdAt": "2026-04-11T19:11:33.229Z"
-  },
-  {
-    "id": "notif_1775940057495",
-    "userId": "2",
-    "type": "deal_pending",
-    "message": "Ada penawaran baru dari customer",
-    "relatedId": "1775939466935",
-    "relatedData": {
-      "customerId": "1775589203562",
-      "serviceId": "s2"
-    },
-    "read": false,
-    "createdAt": "2026-04-11T20:40:57.495Z"
   }
 ]
