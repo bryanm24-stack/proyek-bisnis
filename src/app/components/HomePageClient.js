@@ -23,6 +23,8 @@ export default function HomePageClient() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [serviceReviews, setServiceReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState('all');
+  const [reviewPage, setReviewPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
@@ -94,6 +96,8 @@ export default function HomePageClient() {
     setDetailTab('information');
     setServiceReviews([]);
     setReviewsLoading(true);
+    setReviewFilter('all');
+    setReviewPage(1);
     setModalOpen(true);
 
     fetch(`/api/ratings?serviceId=${service.id}`)
@@ -117,6 +121,8 @@ export default function HomePageClient() {
     setSelectedService(null);
     setServiceReviews([]);
     setReviewsLoading(false);
+    setReviewFilter('all');
+    setReviewPage(1);
   };
 
   const handleDeleteNotification = async (notificationId) => {
@@ -333,6 +339,23 @@ export default function HomePageClient() {
   };
 
   const filteredServices = getFilteredServices();
+  const REVIEWS_PER_PAGE = 5;
+  const filteredReviews = serviceReviews.filter((review) =>
+    reviewFilter === 'all' ? true : Number(review.rating) === Number(reviewFilter)
+  );
+  const totalReviewPages = Math.max(1, Math.ceil(filteredReviews.length / REVIEWS_PER_PAGE));
+  const currentReviewPage = Math.min(reviewPage, totalReviewPages);
+  const paginatedReviews = filteredReviews.slice(
+    (currentReviewPage - 1) * REVIEWS_PER_PAGE,
+    currentReviewPage * REVIEWS_PER_PAGE
+  );
+  const reviewAverage =
+    serviceReviews.length > 0
+      ? (
+          serviceReviews.reduce((sum, item) => sum + Number(item.rating || 0), 0) /
+          serviceReviews.length
+        ).toFixed(1)
+      : '0.0';
 
   return (
     <div>
@@ -347,16 +370,21 @@ export default function HomePageClient() {
         <div className="nav-right">
           {/* Dashboard Vendor Button - hanya untuk vendor */}
           {user && user.role === 'vendor' && (
-            <Link href="/vendor" className="btn-nav-vendor" title="Dashboard Vendor">
+            <Link href="/vendor" className="btn-nav-vendor" title="Dashboard Vendor" style={{ textDecoration: 'none', color: 'inherit' }}>
               📊 Dashboard
             </Link>
           )}
 
           {/* Admin Verification Button - hanya untuk admin */}
           {user && user.role === 'admin' && (
-            <Link href="/admin/vendor-approval" className="btn-nav-admin" title="Verifikasi Vendor">
-              ✓ Verifikasi
-            </Link>
+            <>
+              <Link href="/admin/vendor-approval" className="btn-nav-admin" title="Verifikasi Vendor">
+                ✓ Verifikasi Vendor
+              </Link>
+              <Link href="/admin/transaction-verification" className="btn-nav-admin" title="Verifikasi Identitas Transaksi">
+                🪪 Verifikasi Transaksi
+              </Link>
+            </>
           )}
 
           {/* Notification Bell */}
@@ -618,13 +646,38 @@ export default function HomePageClient() {
                           </span>
                           <span style={{ color: '#666' }}>{selectedService.rentCount} orang telah menyewa</span>
                         </div>
+                        {!reviewsLoading && serviceReviews.length > 0 && (
+                          <div className="review-summary-row">
+                            <span className="review-summary-chip">Rata-rata ulasan: ⭐ {reviewAverage}</span>
+                            <span className="review-summary-chip">Total review: {serviceReviews.length}</span>
+                          </div>
+                        )}
+                        <div className="review-filter-row">
+                          <label htmlFor="review-filter" className="review-filter-label">Filter bintang</label>
+                          <select
+                            id="review-filter"
+                            className="review-filter-select"
+                            value={reviewFilter}
+                            onChange={(e) => {
+                              setReviewFilter(e.target.value);
+                              setReviewPage(1);
+                            }}
+                          >
+                            <option value="all">Semua</option>
+                            <option value="5">5 bintang</option>
+                            <option value="4">4 bintang</option>
+                            <option value="3">3 bintang</option>
+                            <option value="2">2 bintang</option>
+                            <option value="1">1 bintang</option>
+                          </select>
+                        </div>
                         <div className="reviews-list">
                           {reviewsLoading ? (
                             <p className="review-empty">Memuat review...</p>
-                          ) : serviceReviews.length === 0 ? (
+                          ) : filteredReviews.length === 0 ? (
                             <p className="review-empty">Belum ada review customer.</p>
                           ) : (
-                            serviceReviews.slice(0, 5).map((review) => (
+                            paginatedReviews.map((review) => (
                               <div key={review.id} className="review-item">
                                 <div className="review-header">
                                   <span className="review-rating">⭐ {review.rating}/5</span>
@@ -636,6 +689,27 @@ export default function HomePageClient() {
                             ))
                           )}
                         </div>
+                        {!reviewsLoading && filteredReviews.length > REVIEWS_PER_PAGE && (
+                          <div className="review-pagination">
+                            <button
+                              type="button"
+                              className="review-page-btn"
+                              disabled={currentReviewPage <= 1}
+                              onClick={() => setReviewPage((prev) => Math.max(1, prev - 1))}
+                            >
+                              Sebelumnya
+                            </button>
+                            <span className="review-page-info">Halaman {currentReviewPage} / {totalReviewPages}</span>
+                            <button
+                              type="button"
+                              className="review-page-btn"
+                              disabled={currentReviewPage >= totalReviewPages}
+                              onClick={() => setReviewPage((prev) => Math.min(totalReviewPages, prev + 1))}
+                            >
+                              Berikutnya
+                            </button>
+                          </div>
+                        )}
                       </div>
                     
 
@@ -1063,6 +1137,44 @@ export default function HomePageClient() {
           gap: 10px;
         }
 
+        .review-summary-row {
+          margin-top: 10px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .review-summary-chip {
+          font-size: 12px;
+          color: #334155;
+          background: #e2e8f0;
+          border-radius: 999px;
+          padding: 4px 10px;
+          font-weight: 600;
+        }
+
+        .review-filter-row {
+          margin-top: 10px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .review-filter-label {
+          font-size: 12px;
+          color: #475569;
+          font-weight: 600;
+        }
+
+        .review-filter-select {
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+          padding: 6px 8px;
+          font-size: 12px;
+          color: #1f2937;
+          background: #fff;
+        }
+
         .review-item {
           border: 1px solid #e5e7eb;
           border-radius: 8px;
@@ -1107,6 +1219,36 @@ export default function HomePageClient() {
           margin: 8px 0 0;
           font-size: 13px;
           color: #6b7280;
+        }
+
+        .review-pagination {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-top: 10px;
+        }
+
+        .review-page-btn {
+          border: none;
+          background: #1d4ed8;
+          color: #fff;
+          border-radius: 6px;
+          padding: 6px 10px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .review-page-btn:disabled {
+          background: #cbd5e1;
+          cursor: not-allowed;
+        }
+
+        .review-page-info {
+          font-size: 12px;
+          color: #475569;
+          font-weight: 600;
         }
 
         .btn-nav-vendor {
