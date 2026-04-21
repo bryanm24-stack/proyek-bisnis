@@ -11,6 +11,7 @@ function PaymentContent() {
 
   const [user, setUser] = useState(null);
   const [deal, setDeal] = useState(null);
+  const [verificationData, setVerificationData] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [durationDays, setDurationDays] = useState(1);
   const [notes, setNotes] = useState('');
@@ -28,6 +29,11 @@ function PaymentContent() {
   });
   const [cardErrors, setCardErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoMessage, setPromoMessage] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState(null);
+  const [discountAmount, setDiscountAmount] = useState(0);
 
   const generateRandomQR = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -52,6 +58,22 @@ function PaymentContent() {
       alert('Hanya customer yang bisa mengakses halaman ini');
       router.push('/');
       return;
+    }
+
+    const verificationRaw = localStorage.getItem('verificationData');
+    if (!verificationRaw && dealId) {
+      alert('Silakan lengkapi verifikasi identitas terlebih dahulu');
+      router.push(`/transaction/identity-check?dealId=${dealId}`);
+      return;
+    }
+
+    if (verificationRaw) {
+      try {
+        const parsedVerification = JSON.parse(verificationRaw);
+        setVerificationData(parsedVerification);
+      } catch (error) {
+        console.error('Error parsing verification data:', error);
+      }
     }
 
     setUser(parsedUser);
@@ -129,6 +151,21 @@ function PaymentContent() {
     setIsSubmitting(true);
 
     try {
+      const identityVerification = verificationData ? {
+        fullName: verificationData.fullName || '',
+        phoneNumber: verificationData.phoneNumber || '',
+        email: verificationData.email || '',
+        idType: verificationData.idType || 'ktp',
+        idNumber: verificationData.idNumber || '',
+        idPhotoPreview: verificationData.idPhotoPreview || null,
+        selfiePhotoPreview: verificationData.selfiePhotoPreview || null,
+        notes: verificationData.notes || '',
+        status: 'pending',
+        reviewedAt: null,
+        reviewedBy: null,
+        adminNotes: ''
+      } : null;
+
       const transactionData = {
         id: `TRX-${Date.now()}`,
         dealId: dealId,
@@ -140,11 +177,22 @@ function PaymentContent() {
         durationDays: durationDays,
         notes: notes,
         startDate: startDate,
-        amount: totalPrice,
+        amount: discountedSubtotal,
+        discountAmount,
+        discountedSubtotal,
         serviceFee: serviceFee,
         totalAmount: totalAmount,
         status: 'success',
         timestamp: new Date().toISOString(),
+        identityVerification,
+        promo: appliedPromo
+          ? {
+              code: appliedPromo.code,
+              type: appliedPromo.type,
+              value: appliedPromo.value,
+              description: appliedPromo.description
+            }
+          : null,
         cardDetails: paymentMethod === 'card' ? {
           cardName: cardDetails.cardName,
           cardLast4: cardDetails.cardNumber.slice(-4),
@@ -160,6 +208,7 @@ function PaymentContent() {
       });
 
       if (response.ok) {
+        localStorage.removeItem('verificationData');
         router.push(`/transaction/success?transactionId=${transactionData.id}`);
       }
     } catch (error) {
@@ -169,6 +218,64 @@ function PaymentContent() {
       setIsSubmitting(false);
     }
   };
+
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) {
+      setPromoMessage('Masukkan kode promo terlebih dahulu.');
+      return;
+    }
+
+    setPromoLoading(true);
+    try {
+      const response = await fetch('/api/promos/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: promoCode.trim(),
+          subtotal: totalPrice
+        })
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        setAppliedPromo(null);
+        setDiscountAmount(0);
+        setPromoMessage(result.message || 'Promo tidak bisa digunakan.');
+        return;
+      }
+
+      setAppliedPromo(result.data);
+      setDiscountAmount(result.data.discountAmount || 0);
+      setPromoMessage(result.message || 'Promo berhasil diterapkan.');
+    } catch (error) {
+      console.error('Error applying promo:', error);
+      setPromoMessage('Terjadi kesalahan saat memvalidasi promo.');
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setDiscountAmount(0);
+    setPromoMessage('Promo dihapus.');
+  };
+
+  const serviceFee = 25000;
+  const basePrice = deal?.totalPrice || 0;
+  const totalPrice = basePrice * quantity * durationDays;
+  const discountedSubtotal = Math.max(0, totalPrice - discountAmount);
+  const totalAmount = discountedSubtotal + serviceFee;
+  const isService = deal?.itemName?.toLowerCase().includes('jasa') || false;
+  const quantityLabel = isService ? 'Hari' : 'Unit';
+
+  useEffect(() => {
+    if (appliedPromo) {
+      setAppliedPromo(null);
+      setDiscountAmount(0);
+      setPromoMessage('Subtotal berubah, silakan terapkan ulang kode promo.');
+    }
+  }, [quantity, durationDays, basePrice]);
 
   if (isLoading) {
     return <div style={{ padding: '40px', textAlign: 'center', minHeight: '100vh', background: '#f5f3ff' }}>⏳ Loading...</div>;
@@ -187,13 +294,6 @@ function PaymentContent() {
       </div>
     );
   }
-
-  const serviceFee = 25000;
-  const basePrice = deal?.totalPrice || 0;
-  const totalPrice = basePrice * quantity * durationDays;
-  const totalAmount = totalPrice + serviceFee;
-  const isService = deal?.itemName?.toLowerCase().includes('jasa') || false;
-  const quantityLabel = isService ? 'Hari' : 'Unit';
 
   return (
     <div style={{ minHeight: '100vh', background: '#f5f3ff' }}>
@@ -265,6 +365,39 @@ function PaymentContent() {
                 <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#1f2937', marginBottom: '24px' }}>Detail Pesanan</h2>
                 <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>Tentukan jumlah dan durasi sewa</p>
 
+                <div style={{ marginBottom: '20px', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', background: '#fafafa' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Kode Promo</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                      placeholder="Contoh: DEAL10"
+                      style={{ flex: 1, border: '1px solid #ddd', borderRadius: '8px', padding: '10px', fontSize: '14px' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyPromo}
+                      disabled={promoLoading}
+                      style={{ padding: '10px 14px', border: 'none', borderRadius: '8px', background: '#2563eb', color: 'white', fontWeight: '600', cursor: 'pointer' }}
+                    >
+                      {promoLoading ? 'Cek...' : 'Pakai'}
+                    </button>
+                    {appliedPromo && (
+                      <button
+                        type="button"
+                        onClick={handleRemovePromo}
+                        style={{ padding: '10px 14px', border: 'none', borderRadius: '8px', background: '#dc2626', color: 'white', fontWeight: '600', cursor: 'pointer' }}
+                      >
+                        Hapus
+                      </button>
+                    )}
+                  </div>
+                  {promoMessage && (
+                    <p style={{ margin: '8px 0 0', fontSize: '12px', color: appliedPromo ? '#166534' : '#b91c1c' }}>{promoMessage}</p>
+                  )}
+                </div>
+
                 {/* Jumlah Item */}
                 <div style={{ marginBottom: '20px' }}>
                   <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Jumlah Item</label>
@@ -326,6 +459,12 @@ function PaymentContent() {
                     <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>Subtotal</span>
                     <span style={{ fontSize: '14px', fontWeight: '700', color: '#22c55e' }}>Rp {totalPrice.toLocaleString('id-ID')}</span>
                   </div>
+                  {discountAmount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '13px', color: '#2563eb' }}>Diskon ({appliedPromo?.code})</span>
+                      <span style={{ fontSize: '14px', fontWeight: '700', color: '#2563eb' }}>- Rp {discountAmount.toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '13px', color: '#6b7280' }}>Biaya layanan (5%)</span>
                     <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>Rp {serviceFee.toLocaleString('id-ID')}</span>
@@ -479,6 +618,12 @@ function PaymentContent() {
                   <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>Subtotal</span>
                   <span style={{ fontSize: '14px', fontWeight: '700', color: '#22c55e' }}>Rp {totalPrice.toLocaleString('id-ID')}</span>
                 </div>
+                {discountAmount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+                    <span style={{ fontSize: '13px', color: '#2563eb' }}>Diskon ({appliedPromo?.code})</span>
+                    <span style={{ fontSize: '14px', fontWeight: '700', color: '#2563eb' }}>- Rp {discountAmount.toLocaleString('id-ID')}</span>
+                  </div>
+                )}
               </div>
 
               <div style={{ marginBottom: '16px', paddingBottom: '16px' }}>

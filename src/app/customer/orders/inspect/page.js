@@ -14,6 +14,8 @@ function InspectionContent() {
   const [complaintDescription, setComplaintDescription] = useState('');
   const [complaintPhoto, setComplaintPhoto] = useState(null);
   const [complaintPhotoPreview, setComplaintPhotoPreview] = useState(null);
+  const [complaintCategory, setComplaintCategory] = useState('damage');
+  const [complaintSeverity, setComplaintSeverity] = useState('major');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(null);
 
@@ -156,7 +158,9 @@ function InspectionContent() {
           orderId: order.id,
           action: 'complaint',
           complaintDescription: complaintDescription,
-          complaintPhoto: complaintPhotoPreview
+          complaintPhoto: complaintPhotoPreview,
+          complaintCategory,
+          complaintSeverity
         })
       });
 
@@ -167,6 +171,8 @@ function InspectionContent() {
         setComplaintDescription('');
         setComplaintPhoto(null);
         setComplaintPhotoPreview(null);
+        setComplaintCategory('damage');
+        setComplaintSeverity('major');
         // Refresh order data
         const dealsResponse = await fetch('/api/deals/all');
         const deals = await dealsResponse.json();
@@ -203,7 +209,10 @@ function InspectionContent() {
     checking: '⏳ Menunggu Pengecekan',
     approved: '✅ Disetujui',
     complaint: '⚠️ Ada Komplain',
-    refunded: '💰 Refund Selesai'
+    refunded: '💰 Refund Selesai',
+    partially_refunded: '💸 Partial Refund Selesai',
+    penalty_applied: '⚠️ Denda Diterapkan',
+    complaint_rejected: '❌ Komplain Ditolak'
   };
 
   return (
@@ -272,6 +281,9 @@ function InspectionContent() {
           {order.inspectionStatus === 'complaint' && order.complaintDescription && (
             <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '15px', marginBottom: '20px' }}>
               <h4 style={{ margin: '0 0 10px 0', color: '#b91c1c' }}>📝 Komplain Anda</h4>
+              <p style={{ margin: '4px 0', color: '#7f1d1d', fontSize: '13px' }}>
+                Kategori: <strong>{order.complaintCategory || 'damage'}</strong> | Tingkat: <strong>{order.complaintSeverity || 'major'}</strong>
+              </p>
               <p style={{ margin: '8px 0', color: '#7f1d1d', fontSize: '14px' }}>
                 {order.complaintDescription}
               </p>
@@ -299,6 +311,42 @@ function InspectionContent() {
               <div style={{ marginTop: '10px', fontSize: '12px', color: '#4d7c0f' }}>
                 Tanggal refund: {new Date(order.refundedAt).toLocaleDateString('id-ID')}
               </div>
+            </div>
+          )}
+
+          {order.inspectionStatus === 'partially_refunded' && (
+            <div style={{ background: '#dcfce7', border: '1px solid #86efac', borderRadius: '8px', padding: '15px', marginBottom: '20px' }}>
+              <h4 style={{ margin: '0 0 10px 0', color: '#15803d' }}>💸 Partial Refund Selesai</h4>
+              <p style={{ margin: '8px 0', color: '#166534', fontSize: '14px' }}>
+                Refund sebesar Rp {(order.refundAmount || 0).toLocaleString('id-ID')} diproses dengan denda Rp {(order.penaltyAmount || 0).toLocaleString('id-ID')}.
+              </p>
+              {order.complaintResolutionNotes && (
+                <p style={{ margin: '6px 0 0', color: '#166534', fontSize: '13px' }}>{order.complaintResolutionNotes}</p>
+              )}
+            </div>
+          )}
+
+          {order.inspectionStatus === 'penalty_applied' && (
+            <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '8px', padding: '15px', marginBottom: '20px' }}>
+              <h4 style={{ margin: '0 0 10px 0', color: '#a16207' }}>⚠️ Denda Diterapkan</h4>
+              <p style={{ margin: '8px 0', color: '#854d0e', fontSize: '14px' }}>
+                Denda sebesar Rp {(order.penaltyAmount || 0).toLocaleString('id-ID')} diberlakukan untuk transaksi ini.
+              </p>
+              {order.complaintResolutionNotes && (
+                <p style={{ margin: '6px 0 0', color: '#854d0e', fontSize: '13px' }}>{order.complaintResolutionNotes}</p>
+              )}
+            </div>
+          )}
+
+          {order.inspectionStatus === 'complaint_rejected' && (
+            <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '15px', marginBottom: '20px' }}>
+              <h4 style={{ margin: '0 0 10px 0', color: '#b91c1c' }}>❌ Komplain Ditolak</h4>
+              <p style={{ margin: '8px 0', color: '#7f1d1d', fontSize: '14px' }}>
+                Komplain tidak disetujui vendor/admin.
+              </p>
+              {order.complaintResolutionNotes && (
+                <p style={{ margin: '6px 0 0', color: '#7f1d1d', fontSize: '13px' }}>{order.complaintResolutionNotes}</p>
+              )}
             </div>
           )}
 
@@ -370,6 +418,37 @@ function InspectionContent() {
 
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px' }}>
+                  Kategori Komplain *
+                </label>
+                <select
+                  value={complaintCategory}
+                  onChange={(e) => setComplaintCategory(e.target.value)}
+                  style={{ width: '100%', border: '1px solid #ddd', borderRadius: '6px', padding: '10px', fontSize: '14px' }}
+                >
+                  <option value="damage">Kerusakan Barang</option>
+                  <option value="late_return">Keterlambatan/ketidaksesuaian waktu</option>
+                  <option value="service_quality">Kualitas layanan tidak sesuai</option>
+                  <option value="other">Lainnya</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px' }}>
+                  Tingkat Masalah *
+                </label>
+                <select
+                  value={complaintSeverity}
+                  onChange={(e) => setComplaintSeverity(e.target.value)}
+                  style={{ width: '100%', border: '1px solid #ddd', borderRadius: '6px', padding: '10px', fontSize: '14px' }}
+                >
+                  <option value="minor">Ringan</option>
+                  <option value="major">Sedang</option>
+                  <option value="critical">Berat</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px' }}>
                   Deskripsi Masalah *
                 </label>
                 <textarea
@@ -429,6 +508,8 @@ function InspectionContent() {
                     setComplaintDescription('');
                     setComplaintPhoto(null);
                     setComplaintPhotoPreview(null);
+                    setComplaintCategory('damage');
+                    setComplaintSeverity('major');
                   }}
                   style={{
                     padding: '10px',

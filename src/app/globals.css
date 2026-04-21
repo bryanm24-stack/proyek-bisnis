@@ -12,6 +12,14 @@ body {
   color: #333;
 }
 
+a,
+a:visited,
+a:hover,
+a:active,
+a:any-link {
+  text-decoration: none !important;
+}
+
 /* ================= LOGIN & REGISTER PAGE ================= */
 .login-container {
   display: flex;

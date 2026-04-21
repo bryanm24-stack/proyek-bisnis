@@ -32,8 +32,19 @@ export async function POST(request) {
     let transactions = JSON.parse(data);
     
     // Add new transaction
+    const identityVerification = body.identityVerification
+      ? {
+          ...body.identityVerification,
+          status: body.identityVerification.status || 'pending',
+          reviewedAt: body.identityVerification.reviewedAt || null,
+          reviewedBy: body.identityVerification.reviewedBy || null,
+          adminNotes: body.identityVerification.adminNotes || ''
+        }
+      : null;
+
     const newTransaction = {
       ...body,
+      identityVerification,
       createdAt: new Date().toISOString()
     };
     
