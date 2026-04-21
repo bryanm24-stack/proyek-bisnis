@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function CustomerChatsPage() {
+  const router = useRouter();
   const [user, setUser] = useState(null);
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,11 +22,7 @@ export default function CustomerChatsPage() {
       const parsedUser = JSON.parse(userData);
       setUser(parsedUser);
       
-      if (parsedUser.role === 'vendor') {
-        window.location.href = '/vendor/chats';
-        return;
-      }
-
+      // Fetch chats as customer - user yang adalah vendor juga bisa jadi customer saat chat dengan vendor lain
       fetchCustomerChats(parsedUser.id);
     } else {
       window.location.href = '/login';
@@ -168,6 +166,12 @@ export default function CustomerChatsPage() {
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           <Link href="/" style={{ color: '#666', textDecoration: 'none', fontWeight: '500', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.3s' }}>
             🏠 Home
+          </Link>
+          <Link href="/customer/chats" style={{ color: '#7c3aed', textDecoration: 'none', fontWeight: '600', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', background: '#f0e6ff', transition: 'all 0.3s' }}>
+            💬 Chat
+          </Link>
+          <Link href="/customer/ongoing" style={{ color: '#666', textDecoration: 'none', fontWeight: '500', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.3s' }}>
+            ⏳ Sedang Berlangsung
           </Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ 
@@ -323,7 +327,7 @@ export default function CustomerChatsPage() {
                 background: '#fff'
               }}>
                 <h2 style={{ margin: 0, fontSize: '18px' }}>
-                  {selectedChat.vendorName} 🏪
+                  {user.id === selectedChat.customerId ? selectedChat.vendorName : selectedChat.customerName} 🏪
                 </h2>
                 <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#666' }}>
                   {selectedChat.serviceTitle}
@@ -369,16 +373,36 @@ export default function CustomerChatsPage() {
                   ❌ Tolak Deal
                 </button>
                 {dealData?.status === 'agreed' && (
-                  <span style={{
-                    padding: '8px 12px',
-                    background: '#dbeafe',
-                    color: '#0284c7',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    fontWeight: '600'
-                  }}>
-                    ✓ Deal Diterima
-                  </span>
+                  <>
+                    <span style={{
+                      padding: '8px 12px',
+                      background: '#dbeafe',
+                      color: '#0284c7',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: '600'
+                    }}>
+                      ✓ Deal Diterima
+                    </span>
+                    <button
+                      onClick={() => router.push(`/transaction/identity-check?dealId=${dealData.id}`)}
+                      style={{
+                        padding: '10px 16px',
+                        border: 'none',
+                        borderRadius: '8px',
+                        background: '#f59e0b',
+                        color: 'white',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        marginLeft: '8px'
+                      }}
+                      onMouseEnter={(e) => e.target.style.background = '#d97706'}
+                      onMouseLeave={(e) => e.target.style.background = '#f59e0b'}
+                    >
+                      💳 Bayar Sekarang
+                    </button>
+                  </>
                 )}
                 {dealData?.status === 'cancelled' && (
                   <span style={{

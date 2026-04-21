@@ -50,5 +50,83 @@
     },
     "read": false,
     "createdAt": "2026-04-08T06:15:35.465Z"
+  },
+  {
+    "id": "notif_1775917475084",
+    "userId": "1775589203562",
+    "type": "deal_pending",
+    "message": "Ada penawaran baru dari customer",
+    "relatedId": "1775917472761",
+    "relatedData": {
+      "customerId": "1775917450950",
+      "serviceId": "1775628740028"
+    },
+    "read": false,
+    "createdAt": "2026-04-11T14:24:35.084Z"
+  },
+  {
+    "id": "notif_1775917490008",
+    "userId": "1775917450950",
+    "type": "deal_accepted",
+    "message": "Vendor menerima penawaran Anda!",
+    "relatedId": "1775917472761",
+    "relatedData": {
+      "vendorId": "1775589203562",
+      "serviceId": "1775628740028"
+    },
+    "read": false,
+    "createdAt": "2026-04-11T14:24:50.008Z"
+  },
+  {
+    "id": "notif_1775934693229",
+    "userId": "1",
+    "type": "deal_pending",
+    "message": "Ada penawaran baru dari customer",
+    "relatedId": "1775934661453",
+    "relatedData": {
+      "customerId": "4",
+      "serviceId": "s1"
+    },
+    "read": false,
+    "createdAt": "2026-04-11T19:11:33.229Z"
+  },
+  {
+    "id": "notif_1775934716445",
+    "userId": "4",
+    "type": "deal_accepted",
+    "message": "Vendor menerima penawaran Anda!",
+    "relatedId": "1775934661453",
+    "relatedData": {
+      "vendorId": "1",
+      "serviceId": "s1"
+    },
+    "read": false,
+    "createdAt": "2026-04-11T19:11:56.445Z"
+  },
+  {
+    "id": "notif_1775939911306",
+    "userId": "4",
+    "type": "deal_accepted",
+    "message": "Vendor menerima penawaran Anda!",
+    "relatedId": "1775934661453",
+    "relatedData": {
+      "vendorId": "1",
+      "serviceId": "s1"
+    },
+    "read": false,
+    "createdAt": "2026-04-11T20:38:31.306Z"
+  },
+  {
+    "id": "notif_1775940057495",
+    "userId": "2",
+    "type": "deal_pending",
+    "message": "Ada penawaran baru dari customer",
+    "relatedId": "1775939466935",
+    "relatedData": {
+      "customerId": "1775589203562",
+      "serviceId": "s2"
+    },
+    "read": false,
+    "createdAt": "2026-04-11T20:40:57.495Z"
   }
 ]

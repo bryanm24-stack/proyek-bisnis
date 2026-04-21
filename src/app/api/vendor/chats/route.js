@@ -19,8 +19,9 @@ export async function GET(request) {
     const chatsData = await fs.readFile(chatsPath, 'utf-8');
     const chats = JSON.parse(chatsData);
 
-    // Filter chats untuk vendor ini
-    const vendorChats = chats.filter(c => c.vendorId === vendorId);
+    // Filter chats untuk vendor ini - bisa sebagai vendor (vendorId) atau sebagai customer (customerId)
+    // Ini memungkinkan vendor menjalin hubungan dengan vendor lain dengan bertindak sebagai customer
+    const vendorChats = chats.filter(c => c.vendorId === vendorId || c.customerId === vendorId);
 
     return NextResponse.json({
       success: true,

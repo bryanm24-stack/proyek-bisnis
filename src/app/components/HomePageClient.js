@@ -10,6 +10,7 @@ export default function HomePageClient() {
   const [loading, setLoading] = useState(true);
   const [selectedService, setSelectedService] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState('information');
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [chatData, setChatData] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -87,6 +88,7 @@ export default function HomePageClient() {
 
   const openModal = (service) => {
     setSelectedService(service);
+    setDetailTab('information');
     setModalOpen(true);
   };
 
@@ -101,11 +103,7 @@ export default function HomePageClient() {
       return;
     }
 
-    if (user.role === 'vendor') {
-      alert('Vendor tidak bisa melakukan chat');
-      return;
-    }
-
+    // Vendor juga bisa melakukan chat sebagai customer saat membeli dari vendor lain
     setSelectedService(service);
     setMessages([]);
     setNewMessage('');
@@ -455,13 +453,14 @@ export default function HomePageClient() {
               
               const isPopular = rentCountNum >= 100;
               const shortDesc = service.detailDescription || service.shortDescription || (service.description ? service.description.substring(0, 80) + '...' : '');
+              const imageUrl = service.image || (service.images && service.images.length > 0 ? service.images[0] : 'https://via.placeholder.com/300x200?text=' + encodeURIComponent(service.title || 'Service'));
               
               return (
                 <div key={service.id} className="vendor-card">
                   {isPopular && <div className="popular-badge">🔥 Populer</div>}
                   
                   <div className="vendor-cover">
-                    <img src={service.image || service.images[0]} alt={service.title} />
+                    <img src={imageUrl} alt={service.title} />
                   </div>
                   
                   <div className="vendor-content">
@@ -513,49 +512,191 @@ export default function HomePageClient() {
 
             <div className="modal-body">
               <div className="modal-image">
-                <img src={selectedService.images[0]} alt={selectedService.title} />
+                <img src={selectedService.image || (selectedService.images && selectedService.images.length > 0 ? selectedService.images[0] : 'https://via.placeholder.com/400x300?text=' + encodeURIComponent(selectedService.title || 'Service'))} alt={selectedService.title} />
+              </div>
+
+              <div className="modal-price-block">
+                <div className="modal-price-title">Harga Sewa</div>
+                <div className="modal-price">
+                  <span className="modal-price-label">Rp</span>
+                  <span className="modal-price-amount">{formatPrice(selectedService.price ?? selectedService.harga)}</span>
+                  <span className="modal-price-period">/ hari</span>
+                </div>
               </div>
 
               <div className="modal-info">
-                <div className="info-section">
-                  <h4>📍 Vendor</h4>
-                  <p>{selectedService.vendorName}</p>
+                <div className="modal-tabs">
+                  <button
+                    className={`tab ${detailTab === 'information' ? 'active' : ''}`}
+                    onClick={() => setDetailTab('information')}
+                  >
+                    Informasi Penjual
+                  </button>
+                  <button
+                    className={`tab ${detailTab === 'description' ? 'active' : ''}`}
+                    onClick={() => setDetailTab('description')}
+                  >
+                    Deskripsi Produk
+                  </button>
+                  <button
+                    className={`tab ${detailTab === 'activation' ? 'active' : ''}`}
+                    onClick={() => setDetailTab('activation')}
+                  >
+                    Panduan Aktivasi
+                  </button>
                 </div>
 
-                <div className="info-section">
-                  <h4>⭐ Rating & Review</h4>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#5A45D1' }}>
-                      {selectedService.rating}
-                    </span>
-                    <span style={{ color: '#666' }}>{selectedService.rentCount} orang telah menyewa</span>
-                  </div>
-                </div>
+                <div className="tab-panel">
+                  {detailTab === 'information' && (
+                    <>
+                      <div className="info-section">
+                        <h4>📍 Vendor</h4>
+                        <p>{selectedService.vendorName}</p>
+                      </div>
 
-                <div className="info-section">
-                  <h4>💰 Harga</h4>
-                  <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#5A45D1' }}>
-                    Rp {formatPrice(selectedService.price)}
-                  </p>
-                </div>
+                      <div className="info-section">
+                        <h4>⭐ Rating & Review</h4>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#5A45D1' }}>
+                            {selectedService.rating?.toFixed?.(1) ?? selectedService.rating}
+                          </span>
+                          <span style={{ color: '#666' }}>{selectedService.rentCount} orang telah menyewa</span>
+                        </div>
+                      </div>
+                    
 
-                <div className="info-section">
-                  <h4>📝 Deskripsi Lengkap</h4>
-                  <p style={{ lineHeight: '1.6', color: '#555' }}>
-                    {selectedService.description}
-                  </p>
+                      <div className="info-section">
+                        <h4>📦 Stok</h4>
+                        <p>{selectedService.jumlahBarang ?? 'N/A'}</p>
+                      </div>
+
+                      <div className="info-section">
+                        <h4>📈 Terjual</h4>
+                        <p>{selectedService.rentCount ?? '0'}</p>
+                      </div>
+
+                      {selectedService.lokasi && (
+                        <div className="info-section">
+                          <h4>📍 Lokasi Penjemputan</h4>
+                          <p>{selectedService.lokasi}</p>
+                        </div>
+                      )}
+
+                      <div className="info-section">
+                        <h4>🕒 Status</h4>
+                        <p>Terakhir online baru-baru ini</p>
+                      </div>
+                    </>
+                  )}
+
+                  {detailTab === 'description' && (
+                    <>
+                      <div className="info-section">
+                        <h4>📝 Deskripsi Lengkap</h4>
+                        <p style={{ lineHeight: '1.6', color: '#555' }}>
+                          {selectedService.detailDescription || selectedService.description}
+                        </p>
+                      </div>
+
+                      {(selectedService.type === 'barang' || selectedService.category === 'barang') && (
+                        <>
+                          <div className="info-section">
+                            <h4>📦 Keterangan Barang</h4>
+                            <p>{selectedService.jenisBarang || selectedService.shortDescription || '-'}</p>
+                          </div>
+
+                          {selectedService.spesifikBarang && (
+                            <div className="info-section">
+                              <h4>🔎 Spesifik Barang</h4>
+                              <p>{selectedService.spesifikBarang}</p>
+                            </div>
+                          )}
+
+                          {selectedService.kebijakanKerusakan && (
+                            <div className="info-section">
+                              <h4>🛡️ Kebijakan Kerusakan</h4>
+                              <p>{selectedService.kebijakanKerusakan}</p>
+                            </div>
+                          )}
+
+                          {selectedService.dendaKeterlambatan && (
+                            <div className="info-section">
+                              <h4>⚠️ Denda Keterlambatan</h4>
+                              <p>{selectedService.dendaKeterlambatan}</p>
+                            </div>
+                          )}
+
+                          {selectedService.syaratKetentuan && (
+                            <div className="info-section">
+                              <h4>📋 Syarat & Ketentuan</h4>
+                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {(selectedService.type === 'jasa' || selectedService.category === 'jasa') && (
+                        <>
+                          {selectedService.spesifikBarang && (
+                            <div className="info-section">
+                              <h4>✨ Detail Layanan</h4>
+                              <p>{selectedService.spesifikBarang}</p>
+                            </div>
+                          )}
+
+                          {selectedService.dendaKeterlambatan && (
+                            <div className="info-section">
+                              <h4>⚠️ Denda Keterlambatan</h4>
+                              <p>{selectedService.dendaKeterlambatan}</p>
+                            </div>
+                          )}
+
+                          {selectedService.syaratKetentuan && (
+                            <div className="info-section">
+                              <h4>📋 Syarat & Ketentuan</h4>
+                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  {detailTab === 'activation' && (
+                    <>
+                      <div className="info-section">
+                        <h4>1. Pilih layanan</h4>
+                        <p>Pilih layanan yang Anda inginkan dan klik tombol Chat Vendor untuk negosiasi.</p>
+                      </div>
+                      <div className="info-section">
+                        <h4>2. Konfirmasi pesanan</h4>
+                        <p>Tunggu vendor mengonfirmasi dan setujui detail harga, jumlah, dan waktu pengambilan.</p>
+                      </div>
+                      <div className="info-section">
+                        <h4>3. Bayar atau ambil barang</h4>
+                        <p>Lakukan pembayaran jika diperlukan, lalu ambil barang sesuai jadwal atau minta vendor mengirim.</p>
+                      </div>
+                      <div className="info-section">
+                        <h4>4. Selesaikan transaksi</h4>
+                        <p>Pastikan kondisi barang sesuai, lalu berikan rating dan review setelah transaksi selesai.</p>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="modal-actions">
                   <button 
                     className="btn-primary-modal"
                     onClick={() => openChatModal(selectedService)}
+                    disabled={user && user.id === selectedService.vendorId}
+                    title={user && user.id === selectedService.vendorId ? "Anda tidak bisa chat dengan service sendiri" : "Chat dengan vendor"}
+                    style={user && user.id === selectedService.vendorId ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                   >
                     💬 Chat Vendor
                   </button>
                   <button className="btn-secondary-modal" onClick={closeModal}>Tutup</button>
                 </div>
-              </div>
+             </div>
             </div>
           </div>
         </div>
@@ -1077,25 +1218,25 @@ export default function HomePageClient() {
         }
 
         .vendor-title {
-          font-size: 16px;
+          font-size: 18px;
           font-weight: 700;
           color: #1a1a1a;
-          margin: 0 0 4px 0;
-          line-height: 1.4;
+          margin: 0 0 6px 0;
+          line-height: 1.35;
         }
 
         .vendor-vendor-name {
-          font-size: 13px;
+          font-size: 14px;
           color: #7c3aed;
-          margin: 0 0 10px 0;
-          font-weight: 500;
+          margin: 0 0 12px 0;
+          font-weight: 600;
         }
 
         .vendor-short-desc {
-          font-size: 13px;
-          color: #666;
-          margin: 0 0 12px 0;
-          line-height: 1.5;
+          font-size: 14px;
+          color: #525252;
+          margin: 0 0 14px 0;
+          line-height: 1.7;
           flex-grow: 1;
           display: -webkit-box;
           -webkit-line-clamp: 2;
@@ -1119,13 +1260,13 @@ export default function HomePageClient() {
         }
 
         .rating-stars {
-          font-size: 13px;
+          font-size: 14px;
           font-weight: 600;
           color: #1a1a1a;
         }
 
         .rating-count {
-          font-size: 12px;
+          font-size: 13px;
           color: #999;
         }
 
@@ -1337,6 +1478,48 @@ export default function HomePageClient() {
           gap: 20px;
         }
 
+        .modal-price-block {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding: 16px;
+          background: #f8f5ff;
+          border: 1px solid #e5e7eb;
+          border-radius: 16px;
+          margin-bottom: 20px;
+        }
+
+        .modal-price-title {
+          font-size: 14px;
+          font-weight: 700;
+          color: #4f46e5;
+        }
+
+        .modal-price {
+          display: flex;
+          align-items: baseline;
+          gap: 10px;
+        }
+
+        .modal-price-label {
+          font-size: 14px;
+          font-weight: 700;
+          color: #7c3aed;
+        }
+
+        .modal-price-amount {
+          font-size: 34px;
+          font-weight: 800;
+          color: #3b2b85;
+          line-height: 1;
+        }
+
+        .modal-price-period {
+          font-size: 14px;
+          color: #6b7280;
+          margin-bottom: 2px;
+        }
+
         .info-section {
           padding-bottom: 16px;
           border-bottom: 1px solid #eee;
@@ -1357,7 +1540,7 @@ export default function HomePageClient() {
           margin: 0;
           color: #555;
           line-height: 1.6;
-          font-size: 14px;
+          font-size: 16px;
         }
 
         .modal-actions {
@@ -1696,6 +1879,43 @@ export default function HomePageClient() {
         .btn-submit-rating:active {
           transform: translateY(0);
         }
+ 
+        .modal-tabs {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          margin-bottom: 20px;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .tab {
+          background: transparent;
+          border: none;
+          color: #6b7280;
+          padding: 12px 16px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 600;
+          border-radius: 10px 10px 0 0;
+          transition: all 0.2s ease;
+        }
+
+        .tab:hover {
+          background: #f8fafc;
+          color: #374151;
+        }
+
+        .tab.active {
+          background: white;
+          color: #1f2937;
+          box-shadow: inset 0 -2px 0 #7c3aed;
+        }
+
+        .tab-panel {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          padding-bottom: 12px;
         }
       `}</style>
     </div>
