@@ -192,13 +192,23 @@ export default function VendorPage() {
     let submitData = {};
 
     if (vendorType === 'barang') {
-      if (!formDataBarang.namaBarang || !formDataBarang.jenisBarang || 
-          !formDataBarang.spesifikBarang || !formDataBarang.jumlahBarang || 
-          !formDataBarang.hargaBarang || !formDataBarang.deskripsiProduk ||
-          !formDataBarang.lokasi || !formDataBarang.kebijakanKerusakan ||
-          !formDataBarang.denda || !formDataBarang.syaratSewa) {
-        validationError = 'Semua field barang wajib diisi!';
+      let missingFields = [];
+      
+      if (!formDataBarang.namaBarang) missingFields.push('Nama Barang');
+      if (!formDataBarang.jenisBarang) missingFields.push('Jenis Barang');
+      if (!formDataBarang.spesifikBarang) missingFields.push('Spesifikasi Barang');
+      if (!formDataBarang.jumlahBarang) missingFields.push('Jumlah Barang');
+      if (!formDataBarang.hargaBarang) missingFields.push('Harga Barang');
+      if (!formDataBarang.deskripsiProduk) missingFields.push('Deskripsi Produk');
+      if (!formDataBarang.lokasi) missingFields.push('Lokasi');
+      if (!formDataBarang.kebijakanKerusakan) missingFields.push('Kebijakan Kerusakan');
+      if (!formDataBarang.denda) missingFields.push('Denda');
+      if (!formDataBarang.syaratSewa) missingFields.push('Syarat Sewa');
+      
+      if (missingFields.length > 0) {
+        validationError = 'Bidang yang belum diisi:\n• ' + missingFields.join('\n• ');
       }
+      
       if (parseInt(formDataBarang.jumlahBarang) <= 0) {
         validationError = 'Jumlah barang harus lebih dari 0!';
       }
@@ -228,11 +238,23 @@ export default function VendorPage() {
         images: formDataBarang.images.length > 0 ? formDataBarang.images : undefined
       };
     } else if (vendorType === 'jasa') {
-      if (!formDataJasa.spesialisasi || !formDataJasa.deskripsi || 
-          !formDataJasa.benefit || !formDataJasa.tarif || formDataJasa.jangkauanWilayah.length === 0 ||
-          formDataJasa.jamOperasionalHari.length === 0 || !formDataJasa.jamOperasionalDari || !formDataJasa.jamOperasionalSampai || !formDataJasa.estimasiPengerjaan || !formDataJasa.garansiLayanan) {
-        validationError = 'Semua field jasa wajib diisi!';
+      let missingFields = [];
+      
+      if (!formDataJasa.spesialisasi) missingFields.push('Spesialisasi');
+      if (!formDataJasa.deskripsi) missingFields.push('Deskripsi Layanan');
+      if (!formDataJasa.benefit) missingFields.push('Benefit/Keuntungan');
+      if (!formDataJasa.tarif) missingFields.push('Tarif');
+      if (formDataJasa.jangkauanWilayah.length === 0) missingFields.push('Jangkauan Wilayah (minimal 1 kota)');
+      if (formDataJasa.jamOperasionalHari.length === 0) missingFields.push('Hari Operasional (minimal 1 hari)');
+      if (!formDataJasa.jamOperasionalDari) missingFields.push('Jam Buka');
+      if (!formDataJasa.jamOperasionalSampai) missingFields.push('Jam Tutup');
+      if (!formDataJasa.estimasiPengerjaan) missingFields.push('Estimasi Pengerjaan');
+      if (!formDataJasa.garansiLayanan) missingFields.push('SLA/Garansi Layanan');
+      
+      if (missingFields.length > 0) {
+        validationError = 'Bidang yang belum diisi:\n• ' + missingFields.join('\n• ');
       }
+      
       if (parseInt(formDataJasa.tarif) <= 0) {
         validationError = 'Tarif harus lebih dari 0!';
       }
@@ -311,6 +333,9 @@ export default function VendorPage() {
           <Link href="/vendor/chats" className="nav-link">
             💬 Pesan
           </Link>
+          <Link href="/vendor/ongoing" className="nav-link">
+            📦 Sedang Berlangsung
+          </Link>
           <Link href="/" className="nav-link">
             Kembali
           </Link>
@@ -334,7 +359,11 @@ export default function VendorPage() {
         </div>
 
         <div className="vendor-form-wrapper">
-          {errorMsg && <div className="alert alert-error">❌ {errorMsg}</div>}
+          {errorMsg && (
+            <div className="alert alert-error" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+              ❌ {errorMsg}
+            </div>
+          )}
           {successMsg && <div className="alert alert-success">✅ {successMsg}</div>}
 
           {!vendorType ? (
@@ -677,7 +706,13 @@ export default function VendorPage() {
                       <h3>Jangkauan & Operasional</h3>
                       
                       <div className="form-group">
-                        <label>Jangkauan Wilayah (Area Cover)</label>
+                        <label>
+                          Jangkauan Wilayah (Area Cover) 
+                          <span style={{ color: '#dc2626', fontSize: '16px', marginLeft: '4px' }}>*</span>
+                          {formDataJasa.jangkauanWilayah.length > 0 && (
+                            <span style={{ color: '#22c55e', marginLeft: '8px', fontSize: '14px' }}>✓ {formDataJasa.jangkauanWilayah.length} area dipilih</span>
+                          )}
+                        </label>
                         
                         {/* Tab Pulau */}
                         <div style={{ display: 'flex', gap: '8px', marginTop: '12px', marginBottom: '16px', borderBottom: '2px solid #e5e7eb', flexWrap: 'wrap' }}>
@@ -842,7 +877,13 @@ export default function VendorPage() {
                       </div>
 
                       <div className="form-group">
-                        <label>Jam Operasional (Waktu Ketersediaan)</label>
+                        <label>
+                          Jam Operasional (Waktu Ketersediaan)
+                          <span style={{ color: '#dc2626', fontSize: '16px', marginLeft: '4px' }}>*</span>
+                          {formDataJasa.jamOperasionalHari.length > 0 && (
+                            <span style={{ color: '#22c55e', marginLeft: '8px', fontSize: '14px' }}>✓ {formDataJasa.jamOperasionalHari.length} hari dipilih</span>
+                          )}
+                        </label>
                         
                         {/* Pemilihan Hari */}
                         <div style={{ marginTop: '12px', marginBottom: '16px' }}>
