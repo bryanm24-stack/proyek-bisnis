@@ -144,6 +144,7 @@ export default function CustomerOngoingPage() {
         <Link href="/">Home</Link>
         <Link href="/customer/chats">Chat</Link>
         <Link href="/customer/ongoing" className={styles.active}>Sedang Berlangsung</Link>
+        <Link href="/customer/invoices">📋 Invoice</Link>
       </div>
 
       <div className={styles.content}>
