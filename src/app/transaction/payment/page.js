@@ -1,16 +1,18 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import SharedNavbar from '../components/SharedNavbar';
 
-export default function PaymentPage() {
+function PaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const dealId = searchParams.get('dealId');
 
   const [user, setUser] = useState(null);
   const [deal, setDeal] = useState(null);
+  const [verificationData, setVerificationData] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [durationDays, setDurationDays] = useState(1);
   const [notes, setNotes] = useState('');
@@ -28,6 +30,12 @@ export default function PaymentPage() {
   });
   const [cardErrors, setCardErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoMessage, setPromoMessage] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState(null);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [paymentType, setPaymentType] = useState('full'); // 'full' or 'pay_after'
 
   const generateRandomQR = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -52,6 +60,22 @@ export default function PaymentPage() {
       alert('Hanya customer yang bisa mengakses halaman ini');
       router.push('/');
       return;
+    }
+
+    const verificationRaw = localStorage.getItem('verificationData');
+    if (!verificationRaw && dealId) {
+      alert('Silakan lengkapi verifikasi identitas terlebih dahulu');
+      router.push(`/transaction/identity-check?dealId=${dealId}`);
+      return;
+    }
+
+    if (verificationRaw) {
+      try {
+        const parsedVerification = JSON.parse(verificationRaw);
+        setVerificationData(parsedVerification);
+      } catch (error) {
+        console.error('Error parsing verification data:', error);
+      }
     }
 
     setUser(parsedUser);
@@ -129,6 +153,21 @@ export default function PaymentPage() {
     setIsSubmitting(true);
 
     try {
+      const identityVerification = verificationData ? {
+        fullName: verificationData.fullName || '',
+        phoneNumber: verificationData.phoneNumber || '',
+        email: verificationData.email || '',
+        idType: verificationData.idType || 'ktp',
+        idNumber: verificationData.idNumber || '',
+        idPhotoPreview: verificationData.idPhotoPreview || null,
+        selfiePhotoPreview: verificationData.selfiePhotoPreview || null,
+        notes: verificationData.notes || '',
+        status: 'pending',
+        reviewedAt: null,
+        reviewedBy: null,
+        adminNotes: ''
+      } : null;
+
       const transactionData = {
         id: `TRX-${Date.now()}`,
         dealId: dealId,
@@ -140,11 +179,25 @@ export default function PaymentPage() {
         durationDays: durationDays,
         notes: notes,
         startDate: startDate,
-        amount: totalPrice,
+        paymentType: paymentType,
+        amount: paymentType === 'pay_after' ? downPayment : discountedSubtotal,
+        downPayment: paymentType === 'pay_after' ? downPayment : null,
+        remainingPayment: paymentType === 'pay_after' ? remainingPayment : null,
+        discountAmount,
+        discountedSubtotal,
         serviceFee: serviceFee,
         totalAmount: totalAmount,
         status: 'success',
         timestamp: new Date().toISOString(),
+        identityVerification,
+        promo: appliedPromo
+          ? {
+              code: appliedPromo.code,
+              type: appliedPromo.type,
+              value: appliedPromo.value,
+              description: appliedPromo.description
+            }
+          : null,
         cardDetails: paymentMethod === 'card' ? {
           cardName: cardDetails.cardName,
           cardLast4: cardDetails.cardNumber.slice(-4),
@@ -160,6 +213,7 @@ export default function PaymentPage() {
       });
 
       if (response.ok) {
+        localStorage.removeItem('verificationData');
         router.push(`/transaction/success?transactionId=${transactionData.id}`);
       }
     } catch (error) {
@@ -169,6 +223,66 @@ export default function PaymentPage() {
       setIsSubmitting(false);
     }
   };
+
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) {
+      setPromoMessage('Masukkan kode promo terlebih dahulu.');
+      return;
+    }
+
+    setPromoLoading(true);
+    try {
+      const response = await fetch('/api/promos/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: promoCode.trim(),
+          subtotal: totalPrice
+        })
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        setAppliedPromo(null);
+        setDiscountAmount(0);
+        setPromoMessage(result.message || 'Promo tidak bisa digunakan.');
+        return;
+      }
+
+      setAppliedPromo(result.data);
+      setDiscountAmount(result.data.discountAmount || 0);
+      setPromoMessage(result.message || 'Promo berhasil diterapkan.');
+    } catch (error) {
+      console.error('Error applying promo:', error);
+      setPromoMessage('Terjadi kesalahan saat memvalidasi promo.');
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setDiscountAmount(0);
+    setPromoMessage('Promo dihapus.');
+  };
+
+  const serviceFee = 25000;
+  const basePrice = deal?.totalPrice || 0;
+  const totalPrice = basePrice * quantity * durationDays;
+  const discountedSubtotal = Math.max(0, totalPrice - discountAmount);
+  const totalAmount = discountedSubtotal + serviceFee;
+  const downPayment = Math.round(totalAmount * 0.2); // 20% down payment
+  const remainingPayment = totalAmount - downPayment; // 80% remaining
+  const isService = deal?.itemName?.toLowerCase().includes('jasa') || false;
+  const quantityLabel = isService ? 'Hari' : 'Unit';
+
+  useEffect(() => {
+    if (appliedPromo) {
+      setAppliedPromo(null);
+      setDiscountAmount(0);
+      setPromoMessage('Subtotal berubah, silakan terapkan ulang kode promo.');
+    }
+  }, [quantity, durationDays, basePrice]);
 
   if (isLoading) {
     return <div style={{ padding: '40px', textAlign: 'center', minHeight: '100vh', background: '#f5f3ff' }}>⏳ Loading...</div>;
@@ -188,20 +302,14 @@ export default function PaymentPage() {
     );
   }
 
-  const serviceFee = 25000;
-  const basePrice = deal?.totalPrice || 0;
-  const totalPrice = basePrice * quantity * durationDays;
-  const totalAmount = totalPrice + serviceFee;
-  const isService = deal?.itemName?.toLowerCase().includes('jasa') || false;
-  const quantityLabel = isService ? 'Hari' : 'Unit';
-
   return (
     <div style={{ minHeight: '100vh', background: '#f5f3ff' }}>
       {/* Navbar */}
       <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', padding: '16px 24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link href="/" style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            🛍️ RentGuard
+            <span style={{ fontSize: '24px', lineHeight: '1' }}>🛡️</span>
+            RentGuard
           </Link>
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', color: '#666' }}>
             ← Kembali
@@ -212,9 +320,9 @@ export default function PaymentPage() {
       {/* Main Content */}
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '40px 20px' }}>
         {/* Debug Info - Remove later */}
-        {process.env.NODE_ENV === 'development' && (
-          <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '12px', marginBottom: '20px', fontSize: '12px', fontFamily: 'monospace', color: '#b91c1c', display: 'none' }}>
-            Deal: {JSON.stringify(deal).substring(0, 200)}...
+        {deal && (
+          <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '12px', marginBottom: '20px', fontSize: '12px', fontFamily: 'monospace', color: '#b91c1c' }}>
+            <strong>DEBUG DEAL:</strong> ID={deal.id} | Price={deal.totalPrice} | Vendor={deal.vendorName} | Item={deal.itemName}
           </div>
         )}
 
@@ -234,8 +342,8 @@ export default function PaymentPage() {
               <div style={{ background: 'white', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                   <span style={{ fontSize: '20px' }}>⭐</span>
-                  <span style={{ fontSize: '16px', fontWeight: '700', color: '#1f2937' }}>4.7</span>
-                  <span style={{ fontSize: '14px', color: '#6b7280' }}>→ 1.3K disewa</span>
+                  <span style={{ fontSize: '16px', fontWeight: '700', color: '#1f2937' }}>{deal?.rating?.toFixed(1) || '4.7'}</span>
+                  <span style={{ fontSize: '14px', color: '#6b7280' }}>→ {deal?.rentCount || '1.3K'} disewa</span>
                 </div>
 
                 <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1f2937', marginBottom: '12px', lineHeight: '1.3' }}>
@@ -243,7 +351,7 @@ export default function PaymentPage() {
                 </h1>
 
                 <p style={{ fontSize: '14px', color: '#6b7280', lineHeight: '1.6', marginBottom: '24px' }}>
-                  Menyediakan berbagai alat konstruksi berkualitas tinggi dengan teknologi terkini. Kami melayani sewa alat berat dengan profesional berpengalaman dan harga kompetitif.
+                  {deal?.detailDescription || deal?.description || 'Menyediakan berbagai alat konstruksi berkualitas tinggi dengan teknologi terkini. Kami melayani sewa alat berat dengan profesional berpengalaman dan harga kompetitif.'}
                 </p>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', paddingTop: '24px', borderTop: '1px solid #e5e7eb' }}>
@@ -264,6 +372,39 @@ export default function PaymentPage() {
               <div style={{ background: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                 <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#1f2937', marginBottom: '24px' }}>Detail Pesanan</h2>
                 <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>Tentukan jumlah dan durasi sewa</p>
+
+                <div style={{ marginBottom: '20px', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', background: '#fafafa' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Kode Promo</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                      placeholder="Contoh: DEAL10"
+                      style={{ flex: 1, border: '1px solid #ddd', borderRadius: '8px', padding: '10px', fontSize: '14px' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyPromo}
+                      disabled={promoLoading}
+                      style={{ padding: '10px 14px', border: 'none', borderRadius: '8px', background: '#2563eb', color: 'white', fontWeight: '600', cursor: 'pointer' }}
+                    >
+                      {promoLoading ? 'Cek...' : 'Pakai'}
+                    </button>
+                    {appliedPromo && (
+                      <button
+                        type="button"
+                        onClick={handleRemovePromo}
+                        style={{ padding: '10px 14px', border: 'none', borderRadius: '8px', background: '#dc2626', color: 'white', fontWeight: '600', cursor: 'pointer' }}
+                      >
+                        Hapus
+                      </button>
+                    )}
+                  </div>
+                  {promoMessage && (
+                    <p style={{ margin: '8px 0 0', fontSize: '12px', color: appliedPromo ? '#166534' : '#b91c1c' }}>{promoMessage}</p>
+                  )}
+                </div>
 
                 {/* Jumlah Item */}
                 <div style={{ marginBottom: '20px' }}>
@@ -326,6 +467,12 @@ export default function PaymentPage() {
                     <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>Subtotal</span>
                     <span style={{ fontSize: '14px', fontWeight: '700', color: '#22c55e' }}>Rp {totalPrice.toLocaleString('id-ID')}</span>
                   </div>
+                  {discountAmount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '13px', color: '#2563eb' }}>Diskon ({appliedPromo?.code})</span>
+                      <span style={{ fontSize: '14px', fontWeight: '700', color: '#2563eb' }}>- Rp {discountAmount.toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '13px', color: '#6b7280' }}>Biaya layanan (5%)</span>
                     <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>Rp {serviceFee.toLocaleString('id-ID')}</span>
@@ -359,6 +506,39 @@ export default function PaymentPage() {
               <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '24px', color: '#1f2937' }}>Pilih Metode Pembayaran</h1>
 
               <form onSubmit={handlePayment}>
+                {/* Payment Type Selection */}
+                <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '2px solid #e5e7eb' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px', color: '#1f2937' }}>Tipe Pembayaran</h3>
+                  
+                  {/* Full Payment Option */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', border: paymentType === 'full' ? '2px solid #7c3aed' : '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', background: paymentType === 'full' ? '#f3f4f6' : 'transparent', transition: 'all 0.2s' }}>
+                      <input type="radio" name="paymentType" value="full" checked={paymentType === 'full'} onChange={(e) => setPaymentType(e.target.value)} style={{ marginTop: '4px', cursor: 'pointer' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '600', color: '#1f2937' }}>💰 Bayar Penuh</div>
+                        <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>Bayar 100% sekarang</p>
+                        <p style={{ fontSize: '14px', fontWeight: '700', color: '#22c55e', marginTop: '8px', marginBottom: 0 }}>Rp {totalAmount.toLocaleString('id-ID')}</p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Pay After Option */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', border: paymentType === 'pay_after' ? '2px solid #7c3aed' : '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', background: paymentType === 'pay_after' ? '#f3f4f6' : 'transparent', transition: 'all 0.2s' }}>
+                      <input type="radio" name="paymentType" value="pay_after" checked={paymentType === 'pay_after'} onChange={(e) => setPaymentType(e.target.value)} style={{ marginTop: '4px', cursor: 'pointer' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '600', color: '#1f2937' }}>🔄 Bayar Kemudian (Pay After)</div>
+                        <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>Bayar 20% sekarang, sisa 80% dalam 2 hari setelah kedua belah pihak setuju</p>
+                        <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: '600', color: '#666' }}>
+                          <p style={{ margin: '4px 0' }}>📌 Uang muka (20%): <span style={{ color: '#22c55e', fontWeight: '700' }}>Rp {downPayment.toLocaleString('id-ID')}</span></p>
+                          <p style={{ margin: '4px 0' }}>📋 Sisa pembayaran (80%): <span style={{ color: '#2563eb', fontWeight: '700' }}>Rp {remainingPayment.toLocaleString('id-ID')}</span></p>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Payment Method Selection */}
                 {/* QRIS Option */}
                 <div style={{ marginBottom: '16px' }}>
                   <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', border: paymentMethod === 'qris' ? '2px solid #7c3aed' : '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', background: paymentMethod === 'qris' ? '#f3f4f6' : 'transparent', transition: 'all 0.2s' }}>
@@ -479,6 +659,12 @@ export default function PaymentPage() {
                   <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>Subtotal</span>
                   <span style={{ fontSize: '14px', fontWeight: '700', color: '#22c55e' }}>Rp {totalPrice.toLocaleString('id-ID')}</span>
                 </div>
+                {discountAmount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+                    <span style={{ fontSize: '13px', color: '#2563eb' }}>Diskon ({appliedPromo?.code})</span>
+                    <span style={{ fontSize: '14px', fontWeight: '700', color: '#2563eb' }}>- Rp {discountAmount.toLocaleString('id-ID')}</span>
+                  </div>
+                )}
               </div>
 
               <div style={{ marginBottom: '16px', paddingBottom: '16px' }}>
@@ -490,14 +676,27 @@ export default function PaymentPage() {
 
               <div style={{ padding: '16px', background: '#fef3c7', borderRadius: '8px', border: '1px solid #fcd34d' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <span style={{ fontWeight: '700', color: '#92400e', fontSize: '16px' }}>Total</span>
-                  <span style={{ fontWeight: '700', color: '#ca8a04', fontSize: '20px' }}>Rp {totalAmount.toLocaleString('id-ID')}</span>
+                  <span style={{ fontWeight: '700', color: '#92400e', fontSize: '16px' }}>{paymentType === 'pay_after' ? 'Pembayaran Sekarang (20%)' : 'Total'}</span>
+                  <span style={{ fontWeight: '700', color: '#ca8a04', fontSize: '20px' }}>Rp {(paymentType === 'pay_after' ? downPayment : totalAmount).toLocaleString('id-ID')}</span>
                 </div>
+                {paymentType === 'pay_after' && (
+                  <p style={{ fontSize: '12px', color: '#92400e', marginTop: '8px', marginBottom: 0, fontWeight: '500' }}>
+                    Sisa pembayaran Rp {remainingPayment.toLocaleString('id-ID')} jatuh tempo dalam 2 hari setelah deal disepakati
+                  </p>
+                )}
               </div>
             </div>
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+export default function PaymentPage() {
+  return (
+    <Suspense fallback={<div>Loading payment...</div>}>
+      <PaymentContent />
+    </Suspense>
   );
 }

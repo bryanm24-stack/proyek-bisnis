@@ -8,6 +8,7 @@ export default function RegisterPage() {
   const router = useRouter(); 
   
   const [formData, setFormData] = useState({
+    username: '',
     name: '',
     email: '',
     password: ''
@@ -24,7 +25,7 @@ const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (!formData.name || !formData.email || !formData.password) {
+    if (!formData.username || !formData.name || !formData.email || !formData.password) {
       setErrorMsg('Semua kolom wajib diisi!');
       return;
     }
@@ -60,8 +61,8 @@ const handleSubmit = async (e) => {
       <div className="login-left">
         <div className="login-branding">
           <div className="logo">🛡️</div>
-          <h1>RentGuard</h1>
-          <h2>Mulai perjalanan sewa kamu bersama RentGuard</h2>
+          <h1>🛡️ RentGuard</h1>
+          <h2>Mulai perjalanan sewa kamu bersama 🛡️ RentGuard</h2>
           <p>Bergabunglah dengan ribuan pengguna yang sudah mempercayai kami</p>
           
           <div className="benefits">
@@ -86,7 +87,7 @@ const handleSubmit = async (e) => {
         <div className="login-card">
           <div className="form-header">
             <h2>Daftar Akun Baru</h2>
-            <p>Mulai perjalanan sewa kamu bersama RentGuard</p>
+            <p>Mulai perjalanan sewa kamu bersama 🛡️ RentGuard</p>
           </div>
 
           {errorMsg && (
@@ -96,6 +97,21 @@ const handleSubmit = async (e) => {
           )}
 
           <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label>Username</label>
+              <div className="input-wrapper">
+                <span className="input-icon">🎫</span>
+                <input 
+                  type="text" 
+                  name="username" 
+                  value={formData.username} 
+                  onChange={handleChange} 
+                  placeholder="Masukkan username unik"
+                  required
+                />
+              </div>
+            </div>
+
             <div className="form-group">
               <label>Nama Lengkap</label>
               <div className="input-wrapper">

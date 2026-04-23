@@ -6,12 +6,56 @@ export default function SearchBar({ services, onSearch, onCategoryChange }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [categories, setCategories] = useState([]);
 
-  const categories = [
-    { id: 'all', label: 'Semua Kategori', icon: '📦' },
-    { id: 'barang', label: 'Vendor Penyedia Barang', icon: '📦' },
-    { id: 'jasa', label: 'Vendor Layanan Jasa', icon: '🛠️' }
-  ];
+  // Extract unique categories from services data (dynamic)
+  useEffect(() => {
+    const uniqueCategories = new Set();
+    
+    if (services && services.length > 0) {
+      services.forEach(service => {
+        if (service.mainCategory) {
+          uniqueCategories.add(service.mainCategory);
+        } else if (service.category) {
+          // Fallback untuk kompatibilitas
+          uniqueCategories.add(service.category);
+        }
+      });
+    }
+
+    const categoryList = [
+      { id: 'all', label: 'Semua Kategori', icon: '📦' }
+    ];
+
+    // Map kategori dengan icon yang sesuai
+    const categoryIcons = {
+      'Elektronik': '💻',
+      'Alat Olahraga': '⚽',
+      'Furniture': '🪑',
+      'Peralatan Acara': '🎉',
+      'Peralatan Rumah Tangga': '🏠',
+      'Peralatan Konstruksi': '🏗️',
+      'Kendaraan': '🚗',
+      'Peralatan Dapur': '🍳',
+      'Kostum & Fashion': '👗',
+      'Peralatan Fotografi': '📷',
+      'Peralatan Musik': '🎸',
+      'Mainan & Anak': '🎨',
+      'Jasa Profesional': '🛠️',
+      'Peralatan Outdoor': '⛰️',
+      'Lainnya': '✨'
+    };
+
+    Array.from(uniqueCategories).sort().forEach(category => {
+      categoryList.push({
+        id: category,
+        label: category,
+        icon: categoryIcons[category] || '📦'
+      });
+    });
+
+    setCategories(categoryList);
+  }, [services]);
 
   useEffect(() => {
     if (onSearch) {

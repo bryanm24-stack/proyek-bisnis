@@ -1,47 +1,58 @@
 .container {
   display: flex;
-  height: 100vh;
-  background-color: #f5f5f5;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f5f3ff;
 }
 
 .navbar {
-  width: 200px;
-  background-color: #2c3e50;
-  color: white;
-  padding: 20px;
+  width: 100%;
+  background-color: white;
+  color: #2c3e50;
+  padding: 16px 24px;
   display: flex;
-  flex-direction: column;
-  gap: 15px;
+  flex-direction: row;
+  gap: 0;
+  border-bottom: 1px solid #e5e7eb;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .navbar a {
-  color: #ecf0f1;
+  color: #666;
   text-decoration: none;
-  padding: 10px 15px;
-  border-radius: 5px;
+  padding: 6px 12px;
+  border-radius: 6px;
   transition: all 0.3s ease;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .navbar a:hover {
-  background-color: #34495e;
-  color: #3498db;
+  background-color: #f0f0f0;
+  color: #7c3aed;
 }
 
 .navbar a.active {
-  background-color: #3498db;
-  color: white;
+  background-color: #f0e6ff;
+  color: #7c3aed;
+  font-weight: 600;
 }
 
 .content {
   flex: 1;
-  padding: 40px;
+  padding: 40px 20px;
   overflow-y: auto;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .content h1 {
-  color: #2c3e50;
-  margin-bottom: 30px;
+  color: #1f2937;
+  margin-bottom: 12px;
   font-size: 28px;
+  font-weight: 700;
 }
 
 .emptyState {
@@ -240,6 +251,27 @@
 
 .complainButton:hover {
   background-color: #c0392b;
+}
+
+.inspectButton {
+  flex: 1;
+  min-width: 120px;
+  padding: 10px;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inspectButton:hover {
+  background-color: #2980b9;
 }
 
 /* Modal Styles */

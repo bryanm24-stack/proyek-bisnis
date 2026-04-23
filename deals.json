@@ -1,26 +1,9 @@
 [
   {
-    "id": "1775628912040",
-    "chatId": "1775628806493",
-    "customerId": "1775590828434",
-    "vendorId": "1775589203562",
-    "serviceId": "1775628740028",
-    "customerAccepted": true,
-    "vendorAccepted": true,
-    "status": "agreed",
-    "createdAt": "2026-04-08T06:15:12.040Z",
-    "agreedAt": "2026-04-08T06:15:35.459Z"
-  },
-  {
-    "id": "1775917475078",
-    "chatId": "1775917472761",
-    "customerId": "1775917450950",
-    "vendorId": "1775589203562",
-    "serviceId": "1775628740028",
-    "customerAccepted": true,
-    "vendorAccepted": true,
-    "status": "agreed",
-    "createdAt": "2026-04-11T14:24:35.078Z",
-    "agreedAt": "2026-04-11T14:24:50.001Z"
+    "id": "1775934693221",
+    "chatId": "1775934661453",
+    "customerId": "4",
+    "vendorId": "1",
+    "serviceId": "s1"
   }
 ]

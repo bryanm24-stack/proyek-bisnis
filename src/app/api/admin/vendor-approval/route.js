@@ -74,8 +74,8 @@ export async function POST(request) {
       }
 
       users[userIndex].role = 'vendor';
-      users[userIndex].vendorName = registration.vendorName;
-      users[userIndex].phoneNumber = registration.phoneNumber;
+      users[userIndex].name = registration.vendorName;
+      users[userIndex].phone = registration.phoneNumber;
 
       // Update registration status
       registration.status = 'approved';

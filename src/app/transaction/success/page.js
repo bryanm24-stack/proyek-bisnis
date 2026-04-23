@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import SharedNavbar from '../components/SharedNavbar';
 
-export default function TransactionSuccessPage() {
+function SuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const transactionId = searchParams.get('transactionId');
@@ -58,14 +59,7 @@ export default function TransactionSuccessPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f3ff 0%, #f0f4ff 100%)' }}>
-      {/* Navbar */}
-      <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', padding: '16px 24px' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Link href="/" style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            🛍️ RentGuard
-          </Link>
-        </div>
-      </div>
+      <SharedNavbar />
 
       {/* Main Content */}
       <div style={{ maxWidth: '800px', margin: '40px auto', padding: '20px' }}>
@@ -77,7 +71,7 @@ export default function TransactionSuccessPage() {
           </div>
 
           <h1 style={{ fontSize: '32px', fontWeight: '700', color: '#22c55e', marginBottom: '12px' }}>Pembayaran Berhasil!</h1>
-          <p style={{ fontSize: '16px', color: '#6b7280', marginBottom: '32px' }}>Terima kasih telah melakukan transaksi di RentGuard</p>
+          <p style={{ fontSize: '16px', color: '#6b7280', marginBottom: '32px' }}>Terima kasih telah melakukan transaksi di 🛡️ RentGuard</p>
 
           {/* Transaction ID */}
           <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '8px', marginBottom: '24px', border: '2px solid #86efac' }}>
@@ -194,5 +188,13 @@ export default function TransactionSuccessPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function TransactionSuccessPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SuccessContent />
+    </Suspense>
   );
 }

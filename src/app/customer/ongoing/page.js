@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import styles from './page.module.css';
+import SharedNavbar from '../../components/SharedNavbar';
 
 export default function CustomerOngoingPage() {
   const [user, setUser] = useState(null);
@@ -125,12 +126,8 @@ export default function CustomerOngoingPage() {
 
   if (loading) {
     return (
-      <div className={styles.container}>
-        <div className={styles.navbar}>
-          <Link href="/customer">Dashboard</Link>
-          <Link href="/customer/chats">Chat</Link>
-          <Link href="/customer/ongoing" className={styles.active}>Sedang Berlangsung</Link>
-        </div>
+      <div>
+        <SharedNavbar />
         <div className={styles.content}>
           <p>Memuat data...</p>
         </div>
@@ -139,12 +136,8 @@ export default function CustomerOngoingPage() {
   }
 
   return (
-    <div className={styles.container}>
-      <div className={styles.navbar}>
-        <Link href="/customer">Dashboard</Link>
-        <Link href="/customer/chats">Chat</Link>
-        <Link href="/customer/ongoing" className={styles.active}>Sedang Berlangsung</Link>
-      </div>
+    <div>
+      <SharedNavbar />
 
       <div className={styles.content}>
         <h1>Pesanan Sedang Berlangsung</h1>
@@ -158,16 +151,17 @@ export default function CustomerOngoingPage() {
           </div>
         ) : (
           <div className={styles.dealsList}>
-            {ongoingDeals.map(deal => (
+            {ongoingDeals.map(deal => {
+              const imageUrl = deal.service?.image || (deal.service?.images && deal.service.images.length > 0 ? deal.service.images[0] : 'https://via.placeholder.com/300x200?text=' + encodeURIComponent(deal.service?.title || 'Service'));
+              
+              return (
               <div key={deal.id} className={styles.dealCard}>
                 <div className={styles.dealHeader}>
-                  {deal.service?.images[0] && (
-                    <img 
-                      src={deal.service.images[0]} 
-                      alt={deal.service?.title}
-                      className={styles.vendorImage}
-                    />
-                  )}
+                  <img 
+                    src={imageUrl}
+                    alt={deal.service?.title}
+                    className={styles.vendorImage}
+                  />
                   <div className={styles.vendorInfo}>
                     <h3>{deal.otherUser?.name || 'Vendor'}</h3>
                     <p className={styles.serviceTitle}>{deal.service?.title}</p>
@@ -202,6 +196,25 @@ export default function CustomerOngoingPage() {
                 )}
 
                 <div className={styles.dealActions}>
+                  {deal.customerConfirmed && deal.vendorConfirmed && (
+                    <>
+                      <Link 
+                        href={`/customer/orders/inspect?orderId=${deal.id}`}
+                        className={styles.inspectButton}
+                      >
+                        Cek Barang & Inspeksi
+                      </Link>
+                      <button 
+                        className={styles.complainButton}
+                        onClick={() => {
+                          setSelectedDeal(deal);
+                          setComplainModalOpen(true);
+                        }}
+                      >
+                        Komplain
+                      </button>
+                    </>
+                  )}
                   {!deal.customerConfirmed && (
                     <button 
                       className={styles.confirmButton}
@@ -218,18 +231,10 @@ export default function CustomerOngoingPage() {
                       Menunggu Vendor Confirm
                     </button>
                   )}
-                  <button 
-                    className={styles.complainButton}
-                    onClick={() => {
-                      setSelectedDeal(deal);
-                      setComplainModalOpen(true);
-                    }}
-                  >
-                    Complain
-                  </button>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>

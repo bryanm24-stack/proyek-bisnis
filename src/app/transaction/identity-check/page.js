@@ -1,27 +1,33 @@
-'use client';
+﻿'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
 
-export default function IdentityCheckPage() {
+function IdentityCheckContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const dealId = searchParams.get('dealId');
 
   const [user, setUser] = useState(null);
+  const [deal, setDeal] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [formData, setFormData] = useState({
-    ktpPhoto: null,
-    ktpPhotoPreview: null,
-    profilePhoto: null,
-    profilePhotoPreview: null,
-    noTelp: '',
-    email: '',
-    instagram: ''
-  });
-  const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [formData, setFormData] = useState({
+    fullName: '',
+    phoneNumber: '',
+    email: '',
+    idType: 'ktp', // ktp, sim, passport
+    idNumber: '',
+    idPhoto: null,
+    idPhotoPreview: null,
+    selfiePhoto: null,
+    selfiePhotoPreview: null,
+    notes: ''
+  });
+
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -31,37 +37,102 @@ export default function IdentityCheckPage() {
     }
 
     const parsedUser = JSON.parse(userData);
-    if (parsedUser.role !== 'customer' && parsedUser.role !== 'member') {
-      alert('Hanya customer yang bisa mengakses halaman ini');
-      router.push('/');
-      return;
-    }
-
     setUser(parsedUser);
     setFormData(prev => ({
       ...prev,
+      fullName: parsedUser.name || '',
       email: parsedUser.email || '',
-      noTelp: parsedUser.phone || ''
+      phoneNumber: parsedUser.phone || ''
     }));
-    setIsLoading(false);
-  }, [router]);
 
-  const handlePhotoUpload = (e, type) => {
+    // Fetch deal data
+    const fetchDealData = async () => {
+      try {
+        const response = await fetch('/api/deals/all');
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+        const deals = await response.json();
+        const currentDeal = deals.find(d => d.id === dealId);
+        setDeal(currentDeal);
+      } catch (error) {
+        console.error('Error fetching deal:', error);
+        setDeal(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (dealId) {
+      fetchDealData();
+    }
+  }, [router, dealId]);
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!formData.fullName.trim()) newErrors.fullName = 'Nama lengkap harus diisi';
+    if (!formData.phoneNumber.trim()) newErrors.phoneNumber = 'Nomor telepon harus diisi';
+    if (!formData.email.trim()) newErrors.email = 'Email harus diisi';
+    if (!formData.idNumber.trim()) newErrors.idNumber = 'Nomor identitas harus diisi';
+    if (!formData.idPhoto) newErrors.idPhoto = 'Foto identitas harus diunggah';
+    if (!formData.selfiePhoto) newErrors.selfiePhoto = 'Foto selfie harus diunggah untuk verifikasi wajah';
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      newErrors.email = 'Email tidak valid';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
+
+  const handlePhotoUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setErrors(prev => ({
+          ...prev,
+          idPhoto: 'Ukuran file maksimal 5MB'
+        }));
+        return;
+      }
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setErrors(prev => ({
+          ...prev,
+          idPhoto: 'File harus berupa gambar'
+        }));
+        return;
+      }
+
       const reader = new FileReader();
       reader.onloadend = () => {
-        if (type === 'ktp') {
-          setFormData(prev => ({
+        setFormData(prev => ({
+          ...prev,
+          idPhoto: file,
+          idPhotoPreview: reader.result
+        }));
+        if (errors.idPhoto) {
+          setErrors(prev => ({
             ...prev,
-            ktpPhoto: file,
-            ktpPhotoPreview: reader.result
-          }));
-        } else if (type === 'profile') {
-          setFormData(prev => ({
-            ...prev,
-            profilePhoto: file,
-            profilePhotoPreview: reader.result
+            idPhoto: ''
           }));
         }
       };
@@ -69,27 +140,43 @@ export default function IdentityCheckPage() {
     }
   };
 
-  const validateForm = () => {
-    const newErrors = {};
+  const handleSelfieUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setErrors(prev => ({
+          ...prev,
+          selfiePhoto: 'Ukuran file maksimal 5MB'
+        }));
+        return;
+      }
 
-    if (!formData.ktpPhotoPreview) {
-      newErrors.ktpPhoto = 'Foto KTP wajib diunggah';
-    }
-    if (!formData.profilePhotoPreview) {
-      newErrors.profilePhoto = 'Foto profil wajib diunggah';
-    }
-    if (!formData.noTelp || !/^(\+62|0)[0-9]{9,12}$/.test(formData.noTelp.replace(/\D/g, ''))) {
-      newErrors.noTelp = 'Nomor telepon tidak valid';
-    }
-    if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Email tidak valid';
-    }
-    if (!formData.instagram) {
-      newErrors.instagram = 'Instagram wajib diisi';
-    }
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setErrors(prev => ({
+          ...prev,
+          selfiePhoto: 'File harus berupa gambar'
+        }));
+        return;
+      }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({
+          ...prev,
+          selfiePhoto: file,
+          selfiePhotoPreview: reader.result
+        }));
+        if (errors.selfiePhoto) {
+          setErrors(prev => ({
+            ...prev,
+            selfiePhoto: ''
+          }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -102,247 +189,512 @@ export default function IdentityCheckPage() {
     setIsSubmitting(true);
 
     try {
-      // Simpan data identitas ke localStorage untuk saat ini
-      const identityData = {
-        userId: user.id,
-        ktpPhoto: formData.ktpPhotoPreview,
-        profilePhoto: formData.profilePhotoPreview,
-        noTelp: formData.noTelp,
-        email: formData.email,
-        instagram: formData.instagram,
-        verifiedAt: new Date().toISOString()
-      };
-
-      localStorage.setItem(`identity_${user.id}`, JSON.stringify(identityData));
-
-      // Redirect ke halaman pembayaran
+      // Save verification data to localStorage for payment page
+      localStorage.setItem('verificationData', JSON.stringify(formData));
+      
+      // Redirect to payment page
       router.push(`/transaction/payment?dealId=${dealId}`);
     } catch (error) {
       console.error('Error:', error);
-      alert('Terjadi kesalahan saat menyimpan data identitas');
+      alert('Terjadi kesalahan. Silakan coba lagi.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   if (isLoading) {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>;
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+        Memuat data...
+      </div>
+    );
+  }
+
+  if (!deal) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+        Data transaksi tidak ditemukan
+      </div>
+    );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f3ff 0%, #f0f4ff 100%)' }}>
-      {/* Navbar */}
-      <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', padding: '16px 24px' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Link href="/" style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            🛍️ RentGuard
-          </Link>
+    <div className="payment-container">
+      <div className="payment-content">
+        <div className="payment-header">
+          <h1>Verifikasi Data Diri</h1>
+          <p>Silakan lengkapi data berikut sebelum melanjutkan ke pembayaran</p>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div style={{ maxWidth: '600px', margin: '40px auto', padding: '20px' }}>
-        <div style={{ background: 'white', borderRadius: '12px', padding: '32px', boxShadow: '0 4px 6px rgba(0, 0, 0, 0.07)' }}>
-          <h1 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '8px', color: '#1f2937' }}>Verifikasi Identitas</h1>
-          <p style={{ color: '#6b7280', marginBottom: '32px' }}>Kami memerlukan informasi pribadi Anda untuk melanjutkan transaksi</p>
-
-          <form onSubmit={handleSubmit}>
-            {/* Foto KTP */}
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#1f2937' }}>
-                📋 Foto KTP
-              </label>
-              <div style={{ position: 'relative' }}>
+        <form onSubmit={handleSubmit} className="verification-form">
+          <div className="form-section">
+            <h3>📋 Data Pribadi</h3>
+            
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="fullName">Nama Lengkap *</label>
                 <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handlePhotoUpload(e, 'ktp')}
-                  style={{ display: 'none' }}
-                  id="ktpInput"
+                  type="text"
+                  id="fullName"
+                  name="fullName"
+                  value={formData.fullName}
+                  onChange={handleInputChange}
+                  placeholder="Masukkan nama lengkap"
+                  className={errors.fullName ? 'input-error' : ''}
                 />
-                <label
-                  htmlFor="ktpInput"
-                  style={{
-                    display: 'block',
-                    padding: '24px',
-                    border: '2px dashed #ddd',
-                    borderRadius: '8px',
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    background: errors.ktpPhoto ? '#fee2e2' : '#f9fafb'
-                  }}
-                >
-                  {formData.ktpPhotoPreview ? (
-                    <img
-                      src={formData.ktpPhotoPreview}
-                      alt="KTP Preview"
-                      style={{ maxHeight: '200px', maxWidth: '100%', borderRadius: '8px' }}
-                    />
-                  ) : (
-                    <div>
-                      <div style={{ fontSize: '32px', marginBottom: '8px' }}>📷</div>
-                      <p style={{ color: '#6b7280', fontSize: '14px' }}>Klik untuk upload foto KTP</p>
-                    </div>
-                  )}
-                </label>
+                {errors.fullName && <span className="error-text">{errors.fullName}</span>}
               </div>
-              {errors.ktpPhoto && <p style={{ color: '#dc2626', fontSize: '13px', marginTop: '6px' }}>{errors.ktpPhoto}</p>}
-            </div>
 
-            {/* Foto Profil */}
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#1f2937' }}>
-                👤 Foto Profil
-              </label>
-              <div style={{ position: 'relative' }}>
+              <div className="form-group">
+                <label htmlFor="phoneNumber">Nomor Telepon *</label>
                 <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handlePhotoUpload(e, 'profile')}
-                  style={{ display: 'none' }}
-                  id="profileInput"
+                  type="tel"
+                  id="phoneNumber"
+                  name="phoneNumber"
+                  value={formData.phoneNumber}
+                  onChange={handleInputChange}
+                  placeholder="08xx xxxx xxxx"
+                  className={errors.phoneNumber ? 'input-error' : ''}
                 />
-                <label
-                  htmlFor="profileInput"
-                  style={{
-                    display: 'block',
-                    padding: '24px',
-                    border: '2px dashed #ddd',
-                    borderRadius: '8px',
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    background: errors.profilePhoto ? '#fee2e2' : '#f9fafb'
-                  }}
-                >
-                  {formData.profilePhotoPreview ? (
-                    <img
-                      src={formData.profilePhotoPreview}
-                      alt="Profile Preview"
-                      style={{ maxHeight: '200px', maxWidth: '100%', borderRadius: '50%', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <div>
-                      <div style={{ fontSize: '32px', marginBottom: '8px' }}>📱</div>
-                      <p style={{ color: '#6b7280', fontSize: '14px' }}>Klik untuk upload foto profil</p>
-                    </div>
-                  )}
-                </label>
+                {errors.phoneNumber && <span className="error-text">{errors.phoneNumber}</span>}
               </div>
-              {errors.profilePhoto && <p style={{ color: '#dc2626', fontSize: '13px', marginTop: '6px' }}>{errors.profilePhoto}</p>}
             </div>
 
-            {/* Nomor Telepon */}
-            <div style={{ marginBottom: '24px' }}>
-              <label htmlFor="noTelp" style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#1f2937' }}>
-                📱 Nomor Telepon
-              </label>
-              <input
-                type="tel"
-                id="noTelp"
-                value={formData.noTelp}
-                onChange={(e) => setFormData(prev => ({ ...prev, noTelp: e.target.value }))}
-                placeholder="Contoh: 08123456789"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: errors.noTelp ? '2px solid #dc2626' : '1px solid #ddd',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontFamily: 'inherit',
-                  boxSizing: 'border-box'
-                }}
-              />
-              {errors.noTelp && <p style={{ color: '#dc2626', fontSize: '13px', marginTop: '6px' }}>{errors.noTelp}</p>}
-            </div>
-
-            {/* Email */}
-            <div style={{ marginBottom: '24px' }}>
-              <label htmlFor="email" style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#1f2937' }}>
-                ✉️ Email
-              </label>
+            <div className="form-group">
+              <label htmlFor="email">Email *</label>
               <input
                 type="email"
                 id="email"
+                name="email"
                 value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="Contoh: user@email.com"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: errors.email ? '2px solid #dc2626' : '1px solid #ddd',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontFamily: 'inherit',
-                  boxSizing: 'border-box'
-                }}
+                onChange={handleInputChange}
+                placeholder="nama@email.com"
+                className={errors.email ? 'input-error' : ''}
               />
-              {errors.email && <p style={{ color: '#dc2626', fontSize: '13px', marginTop: '6px' }}>{errors.email}</p>}
+              {errors.email && <span className="error-text">{errors.email}</span>}
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h3>🪪 Identitas</h3>
+            
+            <div className="form-group">
+              <label htmlFor="idType">Jenis Identitas *</label>
+              <select
+                id="idType"
+                name="idType"
+                value={formData.idType}
+                onChange={handleInputChange}
+              >
+                <option value="ktp">KTP (Kartu Tanda Penduduk)</option>
+                <option value="sim">SIM (Surat Izin Mengemudi)</option>
+                <option value="passport">Paspor</option>
+              </select>
             </div>
 
-            {/* Instagram */}
-            <div style={{ marginBottom: '32px' }}>
-              <label htmlFor="instagram" style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#1f2937' }}>
-                📸 Username Instagram
-              </label>
+            <div className="form-group">
+              <label htmlFor="idNumber">Nomor Identitas *</label>
               <input
                 type="text"
-                id="instagram"
-                value={formData.instagram}
-                onChange={(e) => setFormData(prev => ({ ...prev, instagram: e.target.value }))}
-                placeholder="Contoh: @myinstagram"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: errors.instagram ? '2px solid #dc2626' : '1px solid #ddd',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontFamily: 'inherit',
-                  boxSizing: 'border-box'
-                }}
+                id="idNumber"
+                name="idNumber"
+                value={formData.idNumber}
+                onChange={handleInputChange}
+                placeholder="Nomor KTP/SIM/Paspor"
+                className={errors.idNumber ? 'input-error' : ''}
               />
-              {errors.instagram && <p style={{ color: '#dc2626', fontSize: '13px', marginTop: '6px' }}>{errors.instagram}</p>}
+              {errors.idNumber && <span className="error-text">{errors.idNumber}</span>}
             </div>
 
-            {/* Buttons */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <button
-                type="button"
-                onClick={() => router.back()}
-                style={{
-                  padding: '12px 16px',
-                  background: '#f3f4f6',
-                  color: '#333',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                ← Kembali
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                style={{
-                  padding: '12px 16px',
-                  background: isSubmitting ? '#ccc' : '#7c3aed',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: '600',
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {isSubmitting ? '⏳ Memproses...' : '✓ Lanjut ke Pembayaran'}
-              </button>
+            <div className="form-group">
+              <label htmlFor="idPhoto">Foto {formData.idType === 'ktp' ? 'KTP' : formData.idType === 'sim' ? 'SIM' : 'Paspor'} *</label>
+              <div className="file-upload-wrapper">
+                <input
+                  type="file"
+                  id="idPhoto"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  style={{ display: 'none' }}
+                />
+                <label htmlFor="idPhoto" className="file-upload-label">
+                  {formData.idPhotoPreview ? (
+                    <>
+                      <img src={formData.idPhotoPreview} alt="Preview" className="photo-preview" />
+                      <span className="photo-change">Ubah Foto</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="upload-icon">📷</div>
+                      <span>Klik untuk unggah foto</span>
+                      <small>atau drag & drop</small>
+                    </>
+                  )}
+                </label>
+              </div>
+              {errors.idPhoto && <span className="error-text">{errors.idPhoto}</span>}
             </div>
-          </form>
+
+            <div className="form-group">
+              <label htmlFor="selfiePhoto">Foto Selfie (Wajah) *</label>
+              <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#666' }}>
+                📸 Ambil foto selfie untuk verifikasi wajah sesuai dengan foto KTP/identitas Anda
+              </p>
+              <div className="file-upload-wrapper">
+                <input
+                  type="file"
+                  id="selfiePhoto"
+                  accept="image/*"
+                  onChange={handleSelfieUpload}
+                  style={{ display: 'none' }}
+                />
+                <label htmlFor="selfiePhoto" className="file-upload-label">
+                  {formData.selfiePhotoPreview ? (
+                    <>
+                      <img src={formData.selfiePhotoPreview} alt="Selfie Preview" className="photo-preview" />
+                      <span className="photo-change">Ubah Selfie</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="upload-icon">🤳</div>
+                      <span>Klik untuk unggah selfie</span>
+                      <small>atau drag & drop</small>
+                    </>
+                  )}
+                </label>
+              </div>
+              {errors.selfiePhoto && <span className="error-text">{errors.selfiePhoto}</span>}
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h3>📝 Catatan Tambahan</h3>
+            
+            <div className="form-group">
+              <label htmlFor="notes">Catatan (Opsional)</label>
+              <textarea
+                id="notes"
+                name="notes"
+                value={formData.notes}
+                onChange={handleInputChange}
+                placeholder="Tulis catatan khusus untuk vendor (opsional)"
+                rows="3"
+              />
+            </div>
+          </div>
+
+          <div className="form-actions">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => router.back()}
+              disabled={isSubmitting}
+            >
+              ← Kembali
+            </button>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Memproses...' : 'Lanjut ke Pembayaran →'}
+            </button>
+          </div>
+        </form>
+
+        <div className="deal-summary">
+          <h3>Ringkasan Transaksi</h3>
+          <div className="summary-item">
+            <span>Layanan:</span>
+            <strong>{deal.serviceTitle}</strong>
+          </div>
+          <div className="summary-item">
+            <span>Vendor:</span>
+            <strong>{deal.vendorName}</strong>
+          </div>
+          {deal.totalPrice && (
+            <div className="summary-item total">
+              <span>Total Pembayaran:</span>
+              <strong>Rp {deal.totalPrice.toLocaleString('id-ID')}</strong>
+            </div>
+          )}
         </div>
       </div>
+
+      <style jsx>{`
+        .payment-container {
+          min-height: 100vh;
+          background: #f5f5f5;
+          padding: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .payment-content {
+          background: white;
+          border-radius: 12px;
+          padding: 40px;
+          max-width: 600px;
+          width: 100%;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .payment-header {
+          margin-bottom: 40px;
+          text-align: center;
+        }
+
+        .payment-header h1 {
+          margin: 0;
+          font-size: 28px;
+          color: #333;
+          margin-bottom: 10px;
+        }
+
+        .payment-header p {
+          margin: 0;
+          color: #666;
+          font-size: 14px;
+        }
+
+        .verification-form {
+          margin-bottom: 40px;
+        }
+
+        .form-section {
+          margin-bottom: 30px;
+          padding-bottom: 20px;
+          border-bottom: 1px solid #eee;
+        }
+
+        .form-section:last-of-type {
+          border-bottom: none;
+        }
+
+        .form-section h3 {
+          margin: 0 0 20px 0;
+          font-size: 16px;
+          color: #333;
+        }
+
+        .form-group {
+          margin-bottom: 15px;
+        }
+
+        .form-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 15px;
+        }
+
+        .form-group label {
+          display: block;
+          margin-bottom: 8px;
+          font-weight: 500;
+          color: #333;
+          font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+          width: 100%;
+          padding: 10px 12px;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          font-size: 14px;
+          font-family: inherit;
+          transition: border-color 0.3s;
+          box-sizing: border-box;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+          outline: none;
+          border-color: #5A45D1;
+          box-shadow: 0 0 0 3px rgba(90, 69, 209, 0.1);
+        }
+
+        .form-group input.input-error,
+        .form-group textarea.input-error {
+          border-color: #dc3545;
+        }
+
+        .error-text {
+          display: block;
+          color: #dc3545;
+          font-size: 12px;
+          margin-top: 5px;
+        }
+
+        .file-upload-wrapper {
+          margin-top: 8px;
+        }
+
+        .file-upload-label {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 30px 20px;
+          border: 2px dashed #ddd;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.3s;
+          background: #f9f9f9;
+          min-height: 150px;
+        }
+
+        .file-upload-label:hover {
+          border-color: #5A45D1;
+          background: #f5f0ff;
+        }
+
+        .file-upload-label.has-image {
+          border: none;
+          padding: 0;
+          background: transparent;
+        }
+
+        .upload-icon {
+          font-size: 32px;
+          margin-bottom: 8px;
+        }
+
+        .file-upload-label span {
+          font-size: 14px;
+          font-weight: 500;
+          color: #333;
+          margin-bottom: 4px;
+        }
+
+        .file-upload-label small {
+          font-size: 12px;
+          color: #999;
+        }
+
+        .photo-preview {
+          max-width: 100%;
+          max-height: 300px;
+          border-radius: 8px;
+          object-fit: cover;
+        }
+
+        .photo-change {
+          margin-top: 12px;
+          padding: 8px 16px;
+          background: #5A45D1;
+          color: white;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .form-actions {
+          display: flex;
+          gap: 10px;
+          margin-top: 30px;
+        }
+
+        .btn-secondary,
+        .btn-primary {
+          flex: 1;
+          padding: 12px 20px;
+          border: none;
+          border-radius: 6px;
+          font-weight: 600;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+
+        .btn-secondary {
+          background: #f0f0f0;
+          color: #333;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+          background: #e0e0e0;
+        }
+
+        .btn-primary {
+          background: #5A45D1;
+          color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+          background: #4a38b0;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(90, 69, 209, 0.3);
+        }
+
+        .btn-primary:disabled,
+        .btn-secondary:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .deal-summary {
+          background: #f9f9f9;
+          border: 1px solid #eee;
+          border-radius: 8px;
+          padding: 20px;
+          margin-top: 20px;
+        }
+
+        .deal-summary h3 {
+          margin: 0 0 15px 0;
+          font-size: 14px;
+          color: #333;
+        }
+
+        .summary-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 8px 0;
+          font-size: 14px;
+          color: #666;
+        }
+
+        .summary-item strong {
+          color: #333;
+        }
+
+        .summary-item.total {
+          padding-top: 12px;
+          border-top: 1px solid #ddd;
+          color: #5A45D1;
+        }
+
+        .summary-item.total strong {
+          color: #5A45D1;
+          font-size: 16px;
+        }
+
+        @media (max-width: 600px) {
+          .payment-content {
+            padding: 20px;
+          }
+
+          .form-row {
+            grid-template-columns: 1fr;
+          }
+
+          .payment-header h1 {
+            font-size: 22px;
+          }
+        }
+      `}</style>
     </div>
+  );
+}
+
+export default function IdentityCheckPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>}>
+      <IdentityCheckContent />
+    </Suspense>
   );
 }

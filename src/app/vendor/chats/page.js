@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import SharedNavbar from '../../components/SharedNavbar';
 
 export default function VendorChatsPage() {
   const [user, setUser] = useState(null);
@@ -11,6 +12,10 @@ export default function VendorChatsPage() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [dealData, setDealData] = useState(null);
+  const [discountMode, setDiscountMode] = useState(null); // null | 'prompt' | 'yes' | 'no'
+  const [discountType, setDiscountType] = useState('percent');
+  const [discountValue, setDiscountValue] = useState('10');
+  const [discountPreview, setDiscountPreview] = useState(null);
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -20,12 +25,8 @@ export default function VendorChatsPage() {
       const parsedUser = JSON.parse(userData);
       setUser(parsedUser);
       
-      // Fetch vendor chats - hanya fetch jika user adalah vendor
-      if (parsedUser.role === 'vendor') {
-        fetchVendorChats(parsedUser.id);
-      } else {
-        setLoading(false);
-      }
+      // Fetch vendor chats untuk semua role
+      fetchVendorChats(parsedUser.id);
     } else {
       window.location.href = '/login';
     }
@@ -69,6 +70,11 @@ export default function VendorChatsPage() {
       const dealDataResp = await dealResponse.json();
       if (dealDataResp.success && dealDataResp.data) {
         setDealData(dealDataResp.data);
+        // reset discount ui state
+        setDiscountMode(null);
+        setDiscountType('percent');
+        setDiscountValue('10');
+        setDiscountPreview(null);
       }
     } catch (error) {
       console.error('Error loading deal:', error);
@@ -140,10 +146,68 @@ export default function VendorChatsPage() {
         setDealData(data.data.deal);
         setSelectedChat(data.data.chat);
         alert(data.message);
+        // if vendor accepted, prompt for discount choice
+        if (action === 'accept' && data.data.deal?.status === 'agreed') {
+          setDiscountMode('prompt');
+        }
       }
     } catch (error) {
       console.error('Error processing deal:', error);
       alert('Gagal memproses deal');
+    }
+  };
+
+  const computePreview = () => {
+    const original = dealData?.originalPrice ?? null;
+    if (original == null) {
+      setDiscountPreview(null);
+      return;
+    }
+    const val = Number(discountValue) || 0;
+    let amount = 0;
+    if (discountType === 'percent') {
+      amount = Math.round((val / 100) * original);
+    } else {
+      amount = Number(val) || 0;
+    }
+    if (amount < 0) amount = 0;
+    let finalP = original - amount;
+    if (finalP < 0) finalP = 0;
+    setDiscountPreview({ amount, finalPrice: finalP, original });
+  };
+
+  useEffect(() => {
+    computePreview();
+  }, [discountType, discountValue, dealData]);
+
+  const applyDiscount = async () => {
+    if (!dealData || !selectedChat) return;
+    try {
+      const body = {
+        action: 'apply-discount',
+        chatId: selectedChat.id,
+        vendorId: user.id,
+        discountType,
+        discountValue: Number(discountValue)
+      };
+
+      const res = await fetch('/api/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setDealData(data.data.deal);
+        setDiscountMode(null);
+        alert('Diskon berhasil diterapkan');
+      } else {
+        alert(data.message || 'Gagal menerapkan diskon');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Terjadi kesalahan saat menerapkan diskon');
     }
   };
 
@@ -161,55 +225,10 @@ export default function VendorChatsPage() {
 
   return (
     <div>
-      {/* Navbar */}
-      <nav style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '20px 40px',
-        borderBottom: '1px solid #eee',
-        background: 'white'
-      }}>
-        <Link href="/" style={{ fontSize: '24px', fontWeight: 'bold', color: '#7c3aed', textDecoration: 'none' }}>
-          RentGuard
-        </Link>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <Link href="/" style={{ color: '#666', textDecoration: 'none', fontWeight: '500', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.3s' }}>
-            🏠 Home
-          </Link>
-          <Link href="/vendor" style={{ color: '#666', textDecoration: 'none', fontWeight: '500', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.3s' }}>
-            Dashboard
-          </Link>
-          <Link href="/vendor/chats" style={{ color: '#7c3aed', textDecoration: 'none', fontWeight: '600', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', background: '#f0e6ff', transition: 'all 0.3s' }}>
-            💬 Chat
-          </Link>
-          <Link href="/vendor/ongoing" style={{ color: '#666', textDecoration: 'none', fontWeight: '500', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.3s' }}>
-            ⏳ Sedang Berlangsung
-          </Link>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ 
-              background: '#ec4899', 
-              color: 'white', 
-              padding: '6px 12px', 
-              borderRadius: '50%', 
-              fontWeight: 'bold',
-              minWidth: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{user.name}</div>
-              <div style={{ fontSize: '12px', color: '#666' }}>Vendor</div>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <SharedNavbar />
 
       {/* Main Content */}
-      <div style={{ display: 'flex', height: 'calc(100vh - 80px)' }}>
+      <div style={{ display: 'flex', height: 'calc(100vh - 70px)' }}>
         {/* Chat List */}
         <div style={{
           width: '300px',
@@ -410,6 +429,70 @@ export default function VendorChatsPage() {
                   </span>
                 )}
               </div>
+
+              {/* Discount prompt modal (small) */}
+              {discountMode === 'prompt' && (
+                <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 80 }}>
+                  <div style={{ background: 'rgba(0,0,0,0.35)', position: 'absolute', inset: 0 }} onClick={() => setDiscountMode(null)} />
+                  <div style={{ position: 'relative', background: 'white', padding: '18px', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.15)', width: '420px', maxWidth: '92%', textAlign: 'left', zIndex: 90 }}>
+                    <div style={{ fontWeight: 800, fontSize: '16px', marginBottom: '6px' }}>Berikan diskon untuk pesanan ini?</div>
+                    <div style={{ color: '#666', fontSize: '13px', marginBottom: '12px' }}>Pilih "Ya" untuk menetapkan potongan harga sekarang atau "Tidak" untuk melewati.</div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                      <button onClick={() => setDiscountMode(null)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #ddd', background: 'white' }}>Tidak</button>
+                      <button onClick={() => setDiscountMode('yes')} style={{ padding: '8px 12px', borderRadius: '8px', border: 'none', background: '#5A45D1', color: 'white', fontWeight: 700 }}>Ya, beri diskon</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Discount editor modal (centered) */}
+              {discountMode === 'yes' && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 80 }}>
+                  <div style={{ width: '520px', maxWidth: '92%', background: 'white', borderRadius: '12px', padding: '20px', boxShadow: '0 10px 30px rgba(0,0,0,0.15)', transform: 'translateY(0)', transition: 'all 220ms ease' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '16px' }}>Preview Diskon</div>
+                        <div style={{ fontSize: '13px', color: '#666' }}>Periksa sebelum menyimpan harga akhir</div>
+                      </div>
+                      <button onClick={() => setDiscountMode(null)} style={{ border: 'none', background: 'transparent', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap' }}>
+                      <select value={discountType} onChange={(e) => setDiscountType(e.target.value)} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #eee' }}>
+                        <option value="percent">Persen (%)</option>
+                        <option value="amount">Jumlah (Rp)</option>
+                      </select>
+                      <input value={discountValue} onChange={(e) => setDiscountValue(e.target.value)} style={{ padding: '10px', borderRadius: '8px', border: '1px solid #eee', width: '160px' }} />
+                      <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+                        {discountPreview ? (
+                          <>
+                            <div style={{ fontSize: '12px', color: '#888' }}>Harga asli</div>
+                            <div style={{ fontWeight: 800, fontSize: '18px' }}>Rp {discountPreview.original.toLocaleString('id-ID')}</div>
+                          </>
+                        ) : (
+                          <div style={{ color: '#999' }}>Harga tidak tersedia</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', marginBottom: '12px' }}>
+                      <div>
+                        <div style={{ fontSize: '13px', color: '#666' }}>Potongan</div>
+                        <div style={{ fontWeight: 700, fontSize: '16px' }}>{discountPreview ? `Rp ${discountPreview.amount.toLocaleString('id-ID')}` : '-'}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '13px', color: '#666' }}>Harga akhir</div>
+                        <div style={{ fontWeight: 900, fontSize: '18px', color: '#111' }}>{discountPreview ? `Rp ${discountPreview.finalPrice.toLocaleString('id-ID')}` : '-'} </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                      <button onClick={() => setDiscountMode(null)} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #ddd', background: 'white' }}>Batal</button>
+                      <button onClick={async () => { await applyDiscount(); }} style={{ padding: '10px 14px', borderRadius: '8px', border: 'none', background: '#5A45D1', color: 'white', fontWeight: 800 }}>Simpan Harga</button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Messages */}
               <div style={{

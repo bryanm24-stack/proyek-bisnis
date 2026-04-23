@@ -139,6 +139,7 @@ export default function VendorApprovalPage() {
         </div>
         <div className="nav-right">
           <span className="user-info">Admin: {user?.name}</span>
+          <Link href="/admin/transaction-verification" className="nav-link">Verifikasi Transaksi</Link>
           <Link href="/" className="nav-link">Home</Link>
           <button className="btn-logout" onClick={handleLogout}>
             Logout

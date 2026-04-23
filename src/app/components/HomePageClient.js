@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import SearchBar from './SearchBar';
+import SharedNavbar from './SharedNavbar';
 
 export default function HomePageClient() {
   const [services, setServices] = useState([]);
@@ -21,8 +22,23 @@ export default function HomePageClient() {
   const [ratingReview, setRatingReview] = useState('');
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [serviceReviews, setServiceReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState('all');
+  const [reviewPage, setReviewPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+
+  const fetchNotifications = async (currentUser) => {
+    if (!currentUser) return;
+    try {
+      const response = await fetch(`/api/notifications?userId=${currentUser.id}`);
+      const data = await response.json();
+      setNotifications(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -55,20 +71,10 @@ export default function HomePageClient() {
   useEffect(() => {
     if (!user) return;
 
-    const fetchNotifications = async () => {
-      try {
-        const response = await fetch(`/api/notifications?userId=${user.id}`);
-        const data = await response.json();
-        setNotifications(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error('Error fetching notifications:', error);
-      }
-    };
-
-    fetchNotifications();
+    fetchNotifications(user);
 
     // Polling every 5 seconds untuk check notifikasi baru
-    const interval = setInterval(fetchNotifications, 5000);
+    const interval = setInterval(() => fetchNotifications(user), 5000);
     return () => clearInterval(interval);
   }, [user]);
 
@@ -89,12 +95,54 @@ export default function HomePageClient() {
   const openModal = (service) => {
     setSelectedService(service);
     setDetailTab('information');
+    setServiceReviews([]);
+    setReviewsLoading(true);
+    setReviewFilter('all');
+    setReviewPage(1);
     setModalOpen(true);
+
+    fetch(`/api/ratings?serviceId=${service.id}`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) {
+          setServiceReviews(data.data || []);
+        }
+      })
+      .catch((error) => {
+        console.error('Error fetching service reviews:', error);
+        setServiceReviews([]);
+      })
+      .finally(() => {
+        setReviewsLoading(false);
+      });
   };
 
   const closeModal = () => {
     setModalOpen(false);
     setSelectedService(null);
+    setServiceReviews([]);
+    setReviewsLoading(false);
+    setReviewFilter('all');
+    setReviewPage(1);
+  };
+
+  const handleDeleteNotification = async (notificationId) => {
+    if (!user || !notificationId) return;
+
+    try {
+      const response = await fetch(`/api/notifications?id=${notificationId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        throw new Error('Gagal menghapus notifikasi');
+      }
+
+      setNotifications((prev) => prev.filter((notif) => notif.id !== notificationId));
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      alert('Gagal menghapus notifikasi');
+    }
   };
 
   const openChatModal = async (service) => {
@@ -124,7 +172,7 @@ export default function HomePageClient() {
         const dealDataResp = await dealResponse.json();
         if (dealDataResp.success && dealDataResp.data) {
           setDealData(dealDataResp.data);
-          if (dealDataResp.data.status === 'agreed') {
+          if (dealDataResp.data.status === 'completed') {
             setShowRatingForm(true);
           }
         }
@@ -272,19 +320,21 @@ export default function HomePageClient() {
   const getFilteredServices = () => {
     let filtered = services;
 
-    // Filter by category
+    // Filter by category (support both mainCategory dan category untuk kompatibilitas)
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter(service => service.category === selectedCategory);
+      filtered = filtered.filter(service => 
+        (service.mainCategory === selectedCategory) || (service.category === selectedCategory)
+      );
     }
 
     // Filter by search term
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(service =>
-        service.title.toLowerCase().includes(term) ||
-        service.vendorName.toLowerCase().includes(term) ||
-        service.shortDescription.toLowerCase().includes(term) ||
-        service.description.toLowerCase().includes(term)
+        service.title?.toLowerCase().includes(term) ||
+        service.vendorName?.toLowerCase().includes(term) ||
+        service.shortDescription?.toLowerCase().includes(term) ||
+        service.description?.toLowerCase().includes(term)
       );
     }
 
@@ -292,87 +342,27 @@ export default function HomePageClient() {
   };
 
   const filteredServices = getFilteredServices();
+  const REVIEWS_PER_PAGE = 5;
+  const filteredReviews = serviceReviews.filter((review) =>
+    reviewFilter === 'all' ? true : Number(review.rating) === Number(reviewFilter)
+  );
+  const totalReviewPages = Math.max(1, Math.ceil(filteredReviews.length / REVIEWS_PER_PAGE));
+  const currentReviewPage = Math.min(reviewPage, totalReviewPages);
+  const paginatedReviews = filteredReviews.slice(
+    (currentReviewPage - 1) * REVIEWS_PER_PAGE,
+    currentReviewPage * REVIEWS_PER_PAGE
+  );
+  const reviewAverage =
+    serviceReviews.length > 0
+      ? (
+          serviceReviews.reduce((sum, item) => sum + Number(item.rating || 0), 0) /
+          serviceReviews.length
+        ).toFixed(1)
+      : '0.0';
 
   return (
     <div>
-      {/* Navbar */}
-      <nav className="navbar">
-        <div className="nav-left">
-          <Link href="/" className="nav-logo">
-            🛡️ RentGuard
-          </Link>
-        </div>
-
-        <div className="nav-right">
-          {/* Dashboard Vendor Button - hanya untuk vendor */}
-          {user && user.role === 'vendor' && (
-            <Link href="/vendor" className="btn-nav-vendor" title="Dashboard Vendor">
-              📊 Dashboard
-            </Link>
-          )}
-
-          {/* Admin Verification Button - hanya untuk admin */}
-          {user && user.role === 'admin' && (
-            <Link href="/admin/vendor-approval" className="btn-nav-admin" title="Verifikasi Vendor">
-              ✓ Verifikasi
-            </Link>
-          )}
-
-          {/* Notification Bell */}
-          <button className="nav-icon-btn" onClick={handleNotificationClick} title="Notifikasi">
-            🔔
-            {notifications.length > 0 && (
-              <span className="notification-badge">{notifications.length}</span>
-            )}
-            {showNotifications && (
-              <div className="notification-dropdown">
-                {notifications.length === 0 ? (
-                  <div className="notification-empty">Tidak ada notifikasi</div>
-                ) : (
-                  notifications.map((notif) => (
-                    <div key={notif.id} className={`notification-item ${notif.read ? 'read' : 'unread'}`}>
-                      <div className="notif-message">{notif.message}</div>
-                      <div className="notif-time">
-                        {new Date(notif.createdAt).toLocaleTimeString('id-ID')}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </button>
-
-          {/* Chat Button */}
-          <button className="nav-icon-btn" onClick={handleChatClick} title="Chat">
-            💬
-          </button>
-
-          {/* User Menu */}
-          {user ? (
-            <div className="user-menu-wrapper">
-              <div className="user-menu">
-                <button className="user-button">
-                  <div className="user-avatar">{user.name.charAt(0).toUpperCase()}</div>
-                  <span>{user.name}</span>
-                </button>
-              </div>
-              <button 
-                onClick={handleLogout}
-                className="btn-logout"
-                title="Logout"
-              >
-                🚪 Logout
-              </button>
-            </div>
-          ) : (
-            <div className="user-menu-guest">
-              <Link href="/login" className="btn-login">
-                Masuk
-              </Link>
-            </div>
-          )}
-        </div>
-      </nav>
+      <SharedNavbar />
 
       {/* Hero Section */}
       <div className="hero-section">
@@ -391,7 +381,7 @@ export default function HomePageClient() {
                 </Link>
               </>
             )}
-            {user && user.role === 'member' && (
+            {user && user.role === 'customer' && (
               <Link href="/vendor/register" className="btn-outline" style={{textDecoration: 'none', display: 'inline-block'}}>
                 Menjadi Vendor
               </Link>
@@ -408,7 +398,7 @@ export default function HomePageClient() {
         </div>
         <div className="badge">
           <h4>Sewa Aman</h4>
-          <p>Dilindungi RentGuard Protection</p>
+          <p>Dilindungi 🛡️ RentGuard Protection</p>
         </div>
         <div className="badge">
           <h4>Fleksibel & Cepat</h4>
@@ -453,13 +443,14 @@ export default function HomePageClient() {
               
               const isPopular = rentCountNum >= 100;
               const shortDesc = service.detailDescription || service.shortDescription || (service.description ? service.description.substring(0, 80) + '...' : '');
+              const imageUrl = service.image || (service.images && service.images.length > 0 ? service.images[0] : 'https://via.placeholder.com/300x200?text=' + encodeURIComponent(service.title || 'Service'));
               
               return (
                 <div key={service.id} className="vendor-card">
                   {isPopular && <div className="popular-badge">🔥 Populer</div>}
                   
                   <div className="vendor-cover">
-                    <img src={service.image || service.images[0]} alt={service.title} />
+                    <img src={imageUrl} alt={service.title} />
                   </div>
                   
                   <div className="vendor-content">
@@ -511,7 +502,7 @@ export default function HomePageClient() {
 
             <div className="modal-body">
               <div className="modal-image">
-                <img src={selectedService.images[0]} alt={selectedService.title} />
+                <img src={selectedService.image || (selectedService.images && selectedService.images.length > 0 ? selectedService.images[0] : 'https://via.placeholder.com/400x300?text=' + encodeURIComponent(selectedService.title || 'Service'))} alt={selectedService.title} />
               </div>
 
               <div className="modal-price-block">
@@ -561,13 +552,79 @@ export default function HomePageClient() {
                           </span>
                           <span style={{ color: '#666' }}>{selectedService.rentCount} orang telah menyewa</span>
                         </div>
+                        {!reviewsLoading && serviceReviews.length > 0 && (
+                          <div className="review-summary-row">
+                            <span className="review-summary-chip">Rata-rata ulasan: ⭐ {reviewAverage}</span>
+                            <span className="review-summary-chip">Total review: {serviceReviews.length}</span>
+                          </div>
+                        )}
+                        <div className="review-filter-row">
+                          <label htmlFor="review-filter" className="review-filter-label">Filter bintang</label>
+                          <select
+                            id="review-filter"
+                            className="review-filter-select"
+                            value={reviewFilter}
+                            onChange={(e) => {
+                              setReviewFilter(e.target.value);
+                              setReviewPage(1);
+                            }}
+                          >
+                            <option value="all">Semua</option>
+                            <option value="5">5 bintang</option>
+                            <option value="4">4 bintang</option>
+                            <option value="3">3 bintang</option>
+                            <option value="2">2 bintang</option>
+                            <option value="1">1 bintang</option>
+                          </select>
+                        </div>
+                        <div className="reviews-list">
+                          {reviewsLoading ? (
+                            <p className="review-empty">Memuat review...</p>
+                          ) : filteredReviews.length === 0 ? (
+                            <p className="review-empty">Belum ada review customer.</p>
+                          ) : (
+                            paginatedReviews.map((review) => (
+                              <div key={review.id} className="review-item">
+                                <div className="review-header">
+                                  <span className="review-rating">⭐ {review.rating}/5</span>
+                                  <span className="review-date">{new Date(review.createdAt).toLocaleDateString('id-ID')}</span>
+                                </div>
+                                <p className="review-author">{review.customerName || 'Customer'}</p>
+                                <p className="review-text">{review.review?.trim() || 'Customer tidak menulis komentar.'}</p>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        {!reviewsLoading && filteredReviews.length > REVIEWS_PER_PAGE && (
+                          <div className="review-pagination">
+                            <button
+                              type="button"
+                              className="review-page-btn"
+                              disabled={currentReviewPage <= 1}
+                              onClick={() => setReviewPage((prev) => Math.max(1, prev - 1))}
+                            >
+                              Sebelumnya
+                            </button>
+                            <span className="review-page-info">Halaman {currentReviewPage} / {totalReviewPages}</span>
+                            <button
+                              type="button"
+                              className="review-page-btn"
+                              disabled={currentReviewPage >= totalReviewPages}
+                              onClick={() => setReviewPage((prev) => Math.min(totalReviewPages, prev + 1))}
+                            >
+                              Berikutnya
+                            </button>
+                          </div>
+                        )}
                       </div>
                     
 
-                      <div className="info-section">
-                        <h4>📦 Stok</h4>
-                        <p>{selectedService.jumlahBarang ?? 'N/A'}</p>
-                      </div>
+                      {(selectedService.category === 'barang' || selectedService.type === 'barang') && (
+                        <div className="info-section">
+                          <h4>📦 Stok</h4>
+                          <p>{selectedService.jumlahBarang ?? 'N/A'}</p>
+                        </div>
+                      )}
 
                       <div className="info-section">
                         <h4>📈 Terjual</h4>
@@ -593,7 +650,7 @@ export default function HomePageClient() {
                       <div className="info-section">
                         <h4>📝 Deskripsi Lengkap</h4>
                         <p style={{ lineHeight: '1.6', color: '#555' }}>
-                          {selectedService.description}
+                          {selectedService.detailDescription || selectedService.description}
                         </p>
                       </div>
 
@@ -618,17 +675,17 @@ export default function HomePageClient() {
                             </div>
                           )}
 
-                          {selectedService.denda && (
+                          {selectedService.dendaKeterlambatan && (
                             <div className="info-section">
                               <h4>⚠️ Denda Keterlambatan</h4>
-                              <p>Rp {formatPrice(Number(selectedService.denda))} / hari</p>
+                              <p>{selectedService.dendaKeterlambatan}</p>
                             </div>
                           )}
 
-                          {selectedService.syaratSewa && (
+                          {selectedService.syaratKetentuan && (
                             <div className="info-section">
-                              <h4>📝 Syarat & Ketentuan</h4>
-                              <p>{selectedService.syaratSewa}</p>
+                              <h4>📋 Syarat & Ketentuan</h4>
+                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
                             </div>
                           )}
                         </>
@@ -636,38 +693,24 @@ export default function HomePageClient() {
 
                       {(selectedService.type === 'jasa' || selectedService.category === 'jasa') && (
                         <>
-                          {selectedService.benefit && (
+                          {selectedService.spesifikBarang && (
                             <div className="info-section">
-                              <h4>✨ Benefit</h4>
-                              <p>{selectedService.benefit}</p>
+                              <h4>✨ Detail Layanan</h4>
+                              <p>{selectedService.spesifikBarang}</p>
                             </div>
                           )}
 
-                          {selectedService.jangkauanWilayah && selectedService.jangkauanWilayah.length > 0 && (
+                          {selectedService.dendaKeterlambatan && (
                             <div className="info-section">
-                              <h4>🌍 Jangkauan Wilayah</h4>
-                              <p>{selectedService.jangkauanWilayah.join(', ')}</p>
+                              <h4>⚠️ Denda Keterlambatan</h4>
+                              <p>{selectedService.dendaKeterlambatan}</p>
                             </div>
                           )}
 
-                          {selectedService.jamOperasional && (
+                          {selectedService.syaratKetentuan && (
                             <div className="info-section">
-                              <h4>🕒 Jam Operasional</h4>
-                              <p>{selectedService.jamOperasional.hari?.join(', ')} | {selectedService.jamOperasional.dari} - {selectedService.jamOperasional.sampai}</p>
-                            </div>
-                          )}
-
-                          {selectedService.estimasiPengerjaan && (
-                            <div className="info-section">
-                              <h4>⏱️ Estimasi Pengerjaan</h4>
-                              <p>{selectedService.estimasiPengerjaan}</p>
-                            </div>
-                          )}
-
-                          {selectedService.garansiLayanan && (
-                            <div className="info-section">
-                              <h4>🛡️ Garansi Layanan</h4>
-                              <p>{selectedService.garansiLayanan}</p>
+                              <h4>📋 Syarat & Ketentuan</h4>
+                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
                             </div>
                           )}
                         </>
@@ -784,7 +827,7 @@ export default function HomePageClient() {
             </div>
 
             {/* Rating Form */}
-            {showRatingForm && dealData?.status === 'agreed' && (
+            {showRatingForm && dealData?.status === 'completed' && (
               <div className="rating-form">
                 <h3>Berikan Rating &amp; Review</h3>
                 <div className="rating-stars">
@@ -889,6 +932,10 @@ export default function HomePageClient() {
           transition: transform 0.2s;
         }
 
+        .notification-wrapper {
+          position: relative;
+        }
+
         .nav-icon-btn:hover {
           transform: scale(1.1);
         }
@@ -952,6 +999,33 @@ export default function HomePageClient() {
           border-bottom: none;
         }
 
+        .notification-content {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .notification-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .notif-delete-btn {
+          border: none;
+          background: #fee2e2;
+          color: #b91c1c;
+          border-radius: 6px;
+          padding: 6px 10px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          flex-shrink: 0;
+        }
+
+        .notif-delete-btn:hover {
+          background: #fecaca;
+        }
+
         .notif-message {
           font-size: 14px;
           color: #1a1a1a;
@@ -962,6 +1036,127 @@ export default function HomePageClient() {
         .notif-time {
           font-size: 12px;
           color: #999;
+        }
+
+        .reviews-list {
+          margin-top: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .review-summary-row {
+          margin-top: 10px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .review-summary-chip {
+          font-size: 12px;
+          color: #334155;
+          background: #e2e8f0;
+          border-radius: 999px;
+          padding: 4px 10px;
+          font-weight: 600;
+        }
+
+        .review-filter-row {
+          margin-top: 10px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .review-filter-label {
+          font-size: 12px;
+          color: #475569;
+          font-weight: 600;
+        }
+
+        .review-filter-select {
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+          padding: 6px 8px;
+          font-size: 12px;
+          color: #1f2937;
+          background: #fff;
+        }
+
+        .review-item {
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 10px 12px;
+          background: #fafafa;
+        }
+
+        .review-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-bottom: 6px;
+        }
+
+        .review-rating {
+          font-size: 13px;
+          font-weight: 700;
+          color: #111827;
+        }
+
+        .review-date {
+          font-size: 12px;
+          color: #6b7280;
+        }
+
+        .review-author {
+          font-size: 12px;
+          color: #4b5563;
+          margin: 0 0 4px 0;
+          font-weight: 600;
+        }
+
+        .review-text {
+          margin: 0;
+          font-size: 13px;
+          color: #374151;
+          line-height: 1.5;
+        }
+
+        .review-empty {
+          margin: 8px 0 0;
+          font-size: 13px;
+          color: #6b7280;
+        }
+
+        .review-pagination {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-top: 10px;
+        }
+
+        .review-page-btn {
+          border: none;
+          background: #1d4ed8;
+          color: #fff;
+          border-radius: 6px;
+          padding: 6px 10px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .review-page-btn:disabled {
+          background: #cbd5e1;
+          cursor: not-allowed;
+        }
+
+        .review-page-info {
+          font-size: 12px;
+          color: #475569;
+          font-weight: 600;
         }
 
         .btn-nav-vendor {
