@@ -96,7 +96,7 @@ export default function SharedNavbar() {
         </Link>
 
         <Link 
-          href="/customer/chats" 
+          href={user.role === 'vendor' ? '/vendor/chats' : '/customer/chats'} 
           style={{ 
             fontSize: '14px', 
             color: isActive('/customer/chats') || isActive('/vendor/chats') ? '#7c3aed' : '#666', 
@@ -111,20 +111,6 @@ export default function SharedNavbar() {
 
         {user.role === 'customer' && (
           <>
-            <Link 
-              href="/customer/ongoing" 
-              style={{ 
-                fontSize: '14px', 
-                color: isActive('/customer/ongoing') ? '#7c3aed' : '#666', 
-                textDecoration: 'none', 
-                fontWeight: isActive('/customer/ongoing') ? '600' : '500',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                background: isActive('/customer/ongoing') ? '#f0e6ff' : 'transparent'
-              }}>
-              ⏳ Sedang Berlangsung
-            </Link>
-
             <Link 
               href="/customer/invoices" 
               style={{ 
@@ -143,20 +129,6 @@ export default function SharedNavbar() {
 
         {user.role === 'vendor' && (
           <>
-            <Link 
-              href="/vendor/ongoing" 
-              style={{ 
-                fontSize: '14px', 
-                color: isActive('/vendor/ongoing') ? '#7c3aed' : '#666', 
-                textDecoration: 'none', 
-                fontWeight: isActive('/vendor/ongoing') ? '600' : '500',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                background: isActive('/vendor/ongoing') ? '#f0e6ff' : 'transparent'
-              }}>
-              ⏳ Sedang Berlangsung
-            </Link>
-
             <Link 
               href="/vendor/invoices" 
               style={{ 

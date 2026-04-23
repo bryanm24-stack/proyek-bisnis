@@ -42,10 +42,10 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    if (!['accept', 'cancel'].includes(action)) {
+    if (!['accept', 'cancel', 'apply-discount'].includes(action)) {
       return NextResponse.json({
         success: false,
-        message: 'Action harus berisi accept atau cancel'
+        message: 'Action harus berisi accept, cancel, atau apply-discount'
       }, { status: 400 });
     }
 
@@ -99,9 +99,9 @@ export async function POST(request) {
           customerId,
           vendorId,
           serviceId,
-          customerAccepted: customerId === customerId ? true : false,
+          customerAccepted: true,
           vendorAccepted: false,
-          status: 'pending', // pending, agreed, cancelled
+          status: 'pending',
           createdAt: new Date().toISOString(),
           agreedAt: null
         };
@@ -150,6 +150,69 @@ export async function POST(request) {
           data: { deal: existingDeal, chat: chatRoom, readyForRating: false }
         }, { status: 200 });
       }
+    }
+
+    if (action === 'apply-discount') {
+      // Read services to get original price
+      const servicesPath = path.join(process.cwd(), 'services.json');
+      const servicesData = await fs.readFile(servicesPath, 'utf-8');
+      const services = JSON.parse(servicesData);
+
+      // Find deal
+      const deal = deals.find(d => d.chatId === chatId);
+      if (!deal) {
+        return NextResponse.json({
+          success: false,
+          message: 'Deal tidak ditemukan'
+        }, { status: 404 });
+      }
+
+      // Get service price
+      const service = services[deal.serviceId];
+      if (!service) {
+        return NextResponse.json({
+          success: false,
+          message: 'Service tidak ditemukan'
+        }, { status: 404 });
+      }
+
+      const { discountType, discountValue } = body;
+      const originalPrice = service.price || 0;
+
+      // Calculate final price
+      let discountAmount = 0;
+      if (discountType === 'percent') {
+        discountAmount = Math.round((discountValue / 100) * originalPrice);
+      } else if (discountType === 'fixed') {
+        discountAmount = discountValue;
+      }
+
+      const finalPrice = Math.max(0, originalPrice - discountAmount);
+
+      // Update deal with discount info
+      deal.originalPrice = originalPrice;
+      deal.discountType = discountType;
+      deal.discountValue = discountValue;
+      deal.discountAmount = discountAmount;
+      deal.finalPrice = finalPrice;
+      deal.discountAppliedAt = new Date().toISOString();
+
+      await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+
+      // Create notification untuk customer
+      await createNotification(
+        deal.customerId,
+        'discount_applied',
+        `Vendor memberikan diskon ${discountValue}${discountType === 'percent' ? '%' : 'Rp'}!`,
+        chatId,
+        { discountAmount, finalPrice }
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: 'Diskon berhasil diterapkan',
+        data: { deal }
+      }, { status: 200 });
     }
   } catch (error) {
     console.error('Error processing deal:', error);

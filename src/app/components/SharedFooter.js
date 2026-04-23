@@ -128,7 +128,7 @@ export default function SharedFooter() {
                   { label: '📝 Daftar Vendor', href: '/vendor/register' },
                   { label: '📊 Dashboard', href: '/vendor' },
                   { label: '📦 Kelola Item', href: '/vendor' },
-                  { label: '💬 Chat Customer', href: '/vendor/chats' },
+                { label: '💬 Chat', href: '/vendor/chats' },
                   { label: '📋 Invoice Penjualan', href: '/vendor/invoices' }
                 ].map((link, idx) => (
                   <Link
@@ -164,7 +164,7 @@ export default function SharedFooter() {
                 {[
                   { label: '📊 Dashboard', href: '/vendor' },
                   { label: '📦 Kelola Item', href: '/vendor' },
-                  { label: '💬 Chat Customer', href: '/vendor/chats' },
+                  { label: '💬 Chat', href: '/vendor/chats' },
                   { label: '📋 Invoice Penjualan', href: '/vendor/invoices' }
                 ].map((link, idx) => (
                   <Link

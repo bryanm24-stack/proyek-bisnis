@@ -2,7 +2,31 @@ import fs from 'fs/promises';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
-// GET - Get chat conversation between customer and vendor
+const CHATS_FILE = path.join(process.cwd(), 'chats.json');
+
+// HELPER: Baca chats.json
+async function readChatsFile() {
+  try {
+    const data = await fs.readFile(CHATS_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('[chat] Failed to read chats file:', error.message);
+    return [];
+  }
+}
+
+// HELPER: Simpan chats.json
+async function writeChatsFile(chats) {
+  try {
+    await fs.writeFile(CHATS_FILE, JSON.stringify(chats, null, 2));
+    return true;
+  } catch (error) {
+    console.error('[chat] Failed to write chats file:', error.message);
+    throw error;
+  }
+}
+
+// GET - Load existing chat or return null if not found
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -10,93 +34,98 @@ export async function GET(request) {
     const customerId = searchParams.get('customerId');
 
     if (!serviceId || !customerId) {
-      return NextResponse.json({
-        success: false,
-        message: 'serviceId dan customerId diperlukan'
-      }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: 'serviceId dan customerId required' },
+        { status: 400 }
+      );
     }
 
-    const chatsPath = path.join(process.cwd(), 'chats.json');
-    const chatsData = await fs.readFile(chatsPath, 'utf-8');
-    const chats = JSON.parse(chatsData);
-
-    const chatRoom = chats.find(
-      c => c.serviceId === serviceId && c.customerId === customerId
-    );
+    const chats = await readChatsFile();
+    const chat = chats.find(c => c.serviceId === serviceId && c.customerId === customerId);
 
     return NextResponse.json({
       success: true,
-      data: chatRoom || null
-    }, { status: 200 });
+      data: chat || null
+    });
   } catch (error) {
-    console.error('Error getting chat:', error);
-    return NextResponse.json({
-      success: false,
-      message: 'Terjadi kesalahan server.'
-    }, { status: 500 });
+    console.error('[chat] GET error:', error);
+    return NextResponse.json(
+      { success: false, message: error.message },
+      { status: 500 }
+    );
   }
 }
 
-// POST - Send chat message or create new chat room
+// POST - Send message
 export async function POST(request) {
   try {
-    const body = await request.json();
-    const { serviceId, serviceTitle, vendorId, vendorName, customerId, customerName, message, senderId, senderName } = body;
-
-    if (!serviceId || !vendorId || !customerId || !message) {
-      return NextResponse.json({
-        success: false,
-        message: 'Semua field wajib diisi!'
-      }, { status: 400 });
+    // 1. Parse request body
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid JSON body' },
+        { status: 400 }
+      );
     }
 
-    const chatsPath = path.join(process.cwd(), 'chats.json');
-    const chatsData = await fs.readFile(chatsPath, 'utf-8');
-    const chats = JSON.parse(chatsData);
+    // 2. Extract fields
+    const { serviceId, serviceTitle, vendorId, vendorName, customerId, customerName, message } = body;
 
-    // Cari chat room yang sudah ada
-    let chatRoom = chats.find(
-      c => c.serviceId === serviceId && c.customerId === customerId
-    );
+    // 3. Validate required fields
+    if (!serviceId || !vendorId || !customerId || !message) {
+      return NextResponse.json(
+        { success: false, message: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    // 4. Read chats
+    const chats = await readChatsFile();
+
+    // 5. Find or create chat room
+    let chatRoom = chats.find(c => c.serviceId === serviceId && c.customerId === customerId);
 
     if (!chatRoom) {
-      // Buat chat room baru
       chatRoom = {
         id: Date.now().toString(),
         serviceId,
-        serviceTitle,
+        serviceTitle: serviceTitle || 'Unknown',
         vendorId,
-        vendorName,
+        vendorName: vendorName || 'Unknown',
         customerId,
-        customerName,
+        customerName: customerName || 'Unknown',
         messages: [],
         createdAt: new Date().toISOString(),
-        dealStatus: null // pending, approved, rejected
+        dealStatus: null
       };
       chats.push(chatRoom);
     }
 
-    // Tambah pesan baru - gunakan senderId & senderName yang dikirim (bisa dari customer atau vendor)
+    // 6. Add message
     chatRoom.messages.push({
       id: Date.now().toString(),
-      senderId: senderId || customerId,
-      senderName: senderName || customerName,
+      senderId: customerId,
+      senderName: customerName || 'You',
       message,
       timestamp: new Date().toISOString()
     });
 
-    await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
+    // 7. Save to file
+    await writeChatsFile(chats);
 
+    // 8. Return response
     return NextResponse.json({
       success: true,
-      message: 'Pesan berhasil dikirim',
+      message: 'Pesan terkirim',
       data: chatRoom
-    }, { status: 201 });
+    });
   } catch (error) {
-    console.error('Error sending chat:', error);
-    return NextResponse.json({
-      success: false,
-      message: 'Terjadi kesalahan server.'
-    }, { status: 500 });
+    console.error('[chat] POST error:', error);
+    return NextResponse.json(
+      { success: false, message: 'Server error: ' + error.message },
+      { status: 500 }
+    );
   }
 }

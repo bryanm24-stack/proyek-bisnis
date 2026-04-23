@@ -1,59 +1,56 @@
 [
   {
-    "id": "1775934661453",
+    "id": "1776960623812",
     "serviceId": "s1",
     "serviceTitle": "Laptop Rental",
     "vendorId": "1",
+    "vendorName": "Apple Vendor",
     "customerId": "4",
     "customerName": "Strawberry Customer",
     "messages": [
       {
-        "id": "1775934661454",
+        "id": "1776960623812",
         "senderId": "4",
         "senderName": "Strawberry Customer",
-        "message": "halo",
-        "timestamp": "2026-04-11T19:11:01.454Z"
+        "message": "p",
+        "timestamp": "2026-04-23T16:10:23.812Z"
       }
     ],
-    "createdAt": "2026-04-11T19:11:01.454Z",
-    "dealStatus": "agreed"
+    "createdAt": "2026-04-23T16:10:23.812Z",
+    "dealStatus": null
   },
   {
-    "id": "1775939466935",
+    "id": "1776960700001",
     "serviceId": "s2",
     "serviceTitle": "Catering Service",
     "vendorId": "2",
-    "customerId": "1775589203562",
-    "customerName": "Jeje",
+    "vendorName": "Banana Vendor",
+    "customerId": "4",
+    "customerName": "Strawberry Customer",
     "messages": [
       {
-        "id": "1775939466935",
-        "senderId": "1775589203562",
-        "senderName": "Jeje",
-        "message": "test",
-        "timestamp": "2026-04-11T20:31:06.935Z"
-      }
-    ],
-    "createdAt": "2026-04-11T20:31:06.935Z",
-    "dealStatus": "pending"
-  },
-  {
-    "id": "1775939986634",
-    "serviceId": "s1",
-    "serviceTitle": "Laptop Rental",
-    "vendorId": "1",
-    "customerId": "5",
-    "customerName": "Grape Customer",
-    "messages": [
+        "id": "1776960700001",
+        "senderId": "4",
+        "senderName": "Strawberry Customer",
+        "message": "Halo, saya mau order catering untuk acara minggu depan. Bisa 100 orang?",
+        "timestamp": "2026-04-23T16:11:40.001Z"
+      },
       {
-        "id": "1775939986634",
-        "senderId": "5",
-        "senderName": "Grape Customer",
-        "message": "p",
-        "timestamp": "2026-04-11T20:39:46.634Z"
+        "id": "1776960700002",
+        "senderId": "2",
+        "senderName": "Banana Vendor",
+        "message": "Halo! Terima kasih sudah menghubungi kami. Ya, kami bisa melayani untuk 100 orang. Anda sudah punya konsep menu?",
+        "timestamp": "2026-04-23T16:12:15.001Z"
+      },
+      {
+        "id": "1776960700003",
+        "senderId": "4",
+        "senderName": "Strawberry Customer",
+        "message": "Boleh standar aja dulu. Harganya berapa untuk 100 orang?",
+        "timestamp": "2026-04-23T16:13:00.001Z"
       }
     ],
-    "createdAt": "2026-04-11T20:39:46.634Z",
+    "createdAt": "2026-04-23T16:11:40.001Z",
     "dealStatus": null
   }
 ]

@@ -89,5 +89,18 @@
     },
     "read": false,
     "createdAt": "2026-04-11T19:11:33.229Z"
+  },
+  {
+    "id": "notif_1776954699589",
+    "userId": "1775589203562",
+    "type": "deal_accepted",
+    "message": "Vendor menerima penawaran Anda!",
+    "relatedId": "1775939466935",
+    "relatedData": {
+      "vendorId": "2",
+      "serviceId": "s2"
+    },
+    "read": false,
+    "createdAt": "2026-04-23T14:31:39.589Z"
   }
 ]

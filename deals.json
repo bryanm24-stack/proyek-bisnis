@@ -5,5 +5,17 @@
     "customerId": "4",
     "vendorId": "1",
     "serviceId": "s1"
+  },
+  {
+    "id": "1776954691440",
+    "chatId": "1775939466935",
+    "customerId": "1775589203562",
+    "vendorId": "2",
+    "serviceId": "s2",
+    "customerAccepted": true,
+    "vendorAccepted": true,
+    "status": "agreed",
+    "createdAt": "2026-04-23T14:31:31.440Z",
+    "agreedAt": "2026-04-23T14:31:39.581Z"
   }
 ]
