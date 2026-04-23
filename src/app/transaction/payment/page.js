@@ -34,6 +34,7 @@ function PaymentContent() {
   const [promoMessage, setPromoMessage] = useState('');
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [paymentType, setPaymentType] = useState('full'); // 'full' or 'pay_after'
 
   const generateRandomQR = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -177,7 +178,10 @@ function PaymentContent() {
         durationDays: durationDays,
         notes: notes,
         startDate: startDate,
-        amount: discountedSubtotal,
+        paymentType: paymentType,
+        amount: paymentType === 'pay_after' ? downPayment : discountedSubtotal,
+        downPayment: paymentType === 'pay_after' ? downPayment : null,
+        remainingPayment: paymentType === 'pay_after' ? remainingPayment : null,
         discountAmount,
         discountedSubtotal,
         serviceFee: serviceFee,
@@ -266,6 +270,8 @@ function PaymentContent() {
   const totalPrice = basePrice * quantity * durationDays;
   const discountedSubtotal = Math.max(0, totalPrice - discountAmount);
   const totalAmount = discountedSubtotal + serviceFee;
+  const downPayment = Math.round(totalAmount * 0.2); // 20% down payment
+  const remainingPayment = totalAmount - downPayment; // 80% remaining
   const isService = deal?.itemName?.toLowerCase().includes('jasa') || false;
   const quantityLabel = isService ? 'Hari' : 'Unit';
 
@@ -498,6 +504,39 @@ function PaymentContent() {
               <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '24px', color: '#1f2937' }}>Pilih Metode Pembayaran</h1>
 
               <form onSubmit={handlePayment}>
+                {/* Payment Type Selection */}
+                <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '2px solid #e5e7eb' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px', color: '#1f2937' }}>Tipe Pembayaran</h3>
+                  
+                  {/* Full Payment Option */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', border: paymentType === 'full' ? '2px solid #7c3aed' : '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', background: paymentType === 'full' ? '#f3f4f6' : 'transparent', transition: 'all 0.2s' }}>
+                      <input type="radio" name="paymentType" value="full" checked={paymentType === 'full'} onChange={(e) => setPaymentType(e.target.value)} style={{ marginTop: '4px', cursor: 'pointer' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '600', color: '#1f2937' }}>💰 Bayar Penuh</div>
+                        <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>Bayar 100% sekarang</p>
+                        <p style={{ fontSize: '14px', fontWeight: '700', color: '#22c55e', marginTop: '8px', marginBottom: 0 }}>Rp {totalAmount.toLocaleString('id-ID')}</p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Pay After Option */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', border: paymentType === 'pay_after' ? '2px solid #7c3aed' : '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', background: paymentType === 'pay_after' ? '#f3f4f6' : 'transparent', transition: 'all 0.2s' }}>
+                      <input type="radio" name="paymentType" value="pay_after" checked={paymentType === 'pay_after'} onChange={(e) => setPaymentType(e.target.value)} style={{ marginTop: '4px', cursor: 'pointer' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '600', color: '#1f2937' }}>🔄 Bayar Kemudian (Pay After)</div>
+                        <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>Bayar 20% sekarang, sisa 80% dalam 2 hari setelah kedua belah pihak setuju</p>
+                        <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: '600', color: '#666' }}>
+                          <p style={{ margin: '4px 0' }}>📌 Uang muka (20%): <span style={{ color: '#22c55e', fontWeight: '700' }}>Rp {downPayment.toLocaleString('id-ID')}</span></p>
+                          <p style={{ margin: '4px 0' }}>📋 Sisa pembayaran (80%): <span style={{ color: '#2563eb', fontWeight: '700' }}>Rp {remainingPayment.toLocaleString('id-ID')}</span></p>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Payment Method Selection */}
                 {/* QRIS Option */}
                 <div style={{ marginBottom: '16px' }}>
                   <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', border: paymentMethod === 'qris' ? '2px solid #7c3aed' : '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', background: paymentMethod === 'qris' ? '#f3f4f6' : 'transparent', transition: 'all 0.2s' }}>
@@ -635,9 +674,14 @@ function PaymentContent() {
 
               <div style={{ padding: '16px', background: '#fef3c7', borderRadius: '8px', border: '1px solid #fcd34d' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <span style={{ fontWeight: '700', color: '#92400e', fontSize: '16px' }}>Total</span>
-                  <span style={{ fontWeight: '700', color: '#ca8a04', fontSize: '20px' }}>Rp {totalAmount.toLocaleString('id-ID')}</span>
+                  <span style={{ fontWeight: '700', color: '#92400e', fontSize: '16px' }}>{paymentType === 'pay_after' ? 'Pembayaran Sekarang (20%)' : 'Total'}</span>
+                  <span style={{ fontWeight: '700', color: '#ca8a04', fontSize: '20px' }}>Rp {(paymentType === 'pay_after' ? downPayment : totalAmount).toLocaleString('id-ID')}</span>
                 </div>
+                {paymentType === 'pay_after' && (
+                  <p style={{ fontSize: '12px', color: '#92400e', marginTop: '8px', marginBottom: 0, fontWeight: '500' }}>
+                    Sisa pembayaran Rp {remainingPayment.toLocaleString('id-ID')} jatuh tempo dalam 2 hari setelah deal disepakati
+                  </p>
+                )}
               </div>
             </div>
           </div>
