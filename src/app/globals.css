@@ -7,9 +7,14 @@
   font-family: 'Inter', sans-serif;
 }
 
+html {
+  height: 100%;
+}
+
 body {
   background-color: #f9fafb;
   color: #333;
+  min-height: 100vh;
 }
 
 a,

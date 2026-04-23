@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import SharedNavbar from '../components/SharedNavbar';
+import SharedNavbar from '../../components/SharedNavbar';
 
 export default function VendorChatsPage() {
   const [user, setUser] = useState(null);
@@ -25,12 +25,8 @@ export default function VendorChatsPage() {
       const parsedUser = JSON.parse(userData);
       setUser(parsedUser);
       
-      // Fetch vendor chats - hanya fetch jika user adalah vendor
-      if (parsedUser.role === 'vendor') {
-        fetchVendorChats(parsedUser.id);
-      } else {
-        setLoading(false);
-      }
+      // Fetch vendor chats untuk semua role
+      fetchVendorChats(parsedUser.id);
     } else {
       window.location.href = '/login';
     }
