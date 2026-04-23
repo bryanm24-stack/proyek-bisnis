@@ -201,7 +201,7 @@ Background: Light red background
 ### Mobile Payment Page
 ```
 ┌──────────────────────────────┐
-│ 🛍️ RentGuard          ← Back │
+│ �️ RentGuard          ← Back │
 ├──────────────────────────────┤
 │ Pilih Metode Pembayaran      │
 ├──────────────────────────────┤

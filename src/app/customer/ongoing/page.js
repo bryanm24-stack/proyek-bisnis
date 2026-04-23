@@ -126,10 +126,23 @@ export default function CustomerOngoingPage() {
   if (loading) {
     return (
       <div className={styles.container}>
+        {/* Navbar */}
         <div className={styles.navbar}>
-          <Link href="/customer">Dashboard</Link>
-          <Link href="/customer/chats">Chat</Link>
-          <Link href="/customer/ongoing" className={styles.active}>Sedang Berlangsung</Link>
+          <Link href="/" style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '24px', lineHeight: '1' }}>🛡️</span>
+            RentGuard
+          </Link>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <Link href="/customer/chats" style={{ fontSize: '14px', color: '#666', textDecoration: 'none', fontWeight: '500' }}>
+              💬 Chat
+            </Link>
+            <Link href="/customer/ongoing" className={styles.active} style={{ fontSize: '14px', fontWeight: '600', padding: '6px 12px', background: '#f0e6ff' }}>
+              ⏳ Sedang Berlangsung
+            </Link>
+            <Link href="/customer/invoices" style={{ fontSize: '14px', color: '#666', textDecoration: 'none', fontWeight: '500' }}>
+              📋 Invoice
+            </Link>
+          </div>
         </div>
         <div className={styles.content}>
           <p>Memuat data...</p>
@@ -140,11 +153,23 @@ export default function CustomerOngoingPage() {
 
   return (
     <div className={styles.container}>
+      {/* Navbar */}
       <div className={styles.navbar}>
-        <Link href="/">Home</Link>
-        <Link href="/customer/chats">Chat</Link>
-        <Link href="/customer/ongoing" className={styles.active}>Sedang Berlangsung</Link>
-        <Link href="/customer/invoices">📋 Invoice</Link>
+        <Link href="/" style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '24px', lineHeight: '1' }}>🛡️</span>
+          RentGuard
+        </Link>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <Link href="/customer/chats" style={{ fontSize: '14px', color: '#666', textDecoration: 'none', fontWeight: '500' }}>
+            💬 Chat
+          </Link>
+          <Link href="/customer/ongoing" className={styles.active} style={{ fontSize: '14px', fontWeight: '600', padding: '6px 12px', background: '#f0e6ff' }}>
+            ⏳ Sedang Berlangsung
+          </Link>
+          <Link href="/customer/invoices" style={{ fontSize: '14px', color: '#666', textDecoration: 'none', fontWeight: '500' }}>
+            📋 Invoice
+          </Link>
+        </div>
       </div>
 
       <div className={styles.content}>

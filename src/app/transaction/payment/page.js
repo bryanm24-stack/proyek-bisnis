@@ -307,7 +307,8 @@ function PaymentContent() {
       <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', padding: '16px 24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link href="/" style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            🛍️ RentGuard
+            <span style={{ fontSize: '24px', lineHeight: '1' }}>🛡️</span>
+            RentGuard
           </Link>
           <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', color: '#666' }}>
             ← Kembali

@@ -2,6 +2,7 @@
   {
     "id": "s1",
     "vendorId": "1",
+    "vendorName": "Apple Vendor",
     "title": "Laptop Rental",
     "category": "barang",
     "description": "Premium laptop for business",
@@ -20,6 +21,7 @@
   {
     "id": "s2",
     "vendorId": "2",
+    "vendorName": "Banana Vendor",
     "title": "Catering Service",
     "category": "jasa",
     "description": "Full meal catering for events",
@@ -38,6 +40,7 @@
   {
     "id": "s3",
     "vendorId": "3",
+    "vendorName": "Orange Vendor",
     "title": "Photography Package",
     "category": "jasa",
     "description": "Professional photo session",
@@ -53,4 +56,5 @@
     "jumlahBarang": "1 Tim (2 Fotografer)",
     "lokasi": "Jakarta Barat"
   }
+  
 ]

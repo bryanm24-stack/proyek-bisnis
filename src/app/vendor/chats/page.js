@@ -238,7 +238,7 @@ export default function VendorChatsPage() {
         background: 'white'
       }}>
         <Link href="/" style={{ fontSize: '24px', fontWeight: 'bold', color: '#7c3aed', textDecoration: 'none' }}>
-          RentGuard
+          🛡️ RentGuard
         </Link>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           <Link href="/" style={{ color: '#666', textDecoration: 'none', fontWeight: '500', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.3s' }}>
