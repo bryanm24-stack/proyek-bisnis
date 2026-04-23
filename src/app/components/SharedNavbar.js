@@ -144,17 +144,31 @@ export default function SharedNavbar() {
             </Link>
 
             <Link 
-              href="/vendor" 
+              href="/vendor/produk" 
               style={{ 
                 fontSize: '14px', 
-                color: isActive('/vendor') && pathname !== '/vendor/chats' && pathname !== '/vendor/ongoing' && pathname !== '/vendor/invoices' ? '#7c3aed' : '#666', 
+                color: isActive('/vendor/produk') ? '#7c3aed' : '#666', 
                 textDecoration: 'none', 
-                fontWeight: isActive('/vendor') && pathname !== '/vendor/chats' && pathname !== '/vendor/ongoing' && pathname !== '/vendor/invoices' ? '600' : '500',
+                fontWeight: isActive('/vendor/produk') ? '600' : '500',
                 padding: '6px 12px',
                 borderRadius: '6px',
-                background: isActive('/vendor') && pathname !== '/vendor/chats' && pathname !== '/vendor/ongoing' && pathname !== '/vendor/invoices' ? '#f0e6ff' : 'transparent'
+                background: isActive('/vendor/produk') ? '#f0e6ff' : 'transparent'
               }}>
-              📊 Dashboard
+              📦 Barang/Jasa Saya
+            </Link>
+
+            <Link 
+              href="/vendor/tambah-produk" 
+              style={{ 
+                fontSize: '14px', 
+                color: isActive('/vendor/tambah-produk') ? '#7c3aed' : '#666', 
+                textDecoration: 'none', 
+                fontWeight: isActive('/vendor/tambah-produk') ? '600' : '500',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                background: isActive('/vendor/tambah-produk') ? '#f0e6ff' : 'transparent'
+              }}>
+              ➕ Tambahkan Barang/Jasa
             </Link>
           </>
         )}

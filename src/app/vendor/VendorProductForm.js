@@ -27,10 +27,15 @@ export default function VendorProductForm({
   onSubmit,
   isSubmitting,
   errorMsg,
-  successMsg
+  successMsg,
+  categories = null,
+  isEditing = false
 }) {
   const [selectedMainCategory, setSelectedMainCategory] = useState(formData.mainCategory || '');
   const [showImagePreview, setShowImagePreview] = useState(false);
+
+  // Gunakan categories dari props atau default RENTAL_CATEGORIES
+  const CATEGORIES = categories || RENTAL_CATEGORIES;
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -62,12 +67,12 @@ export default function VendorProductForm({
     }
   };
 
-  const subCategories = selectedMainCategory ? (RENTAL_CATEGORIES[selectedMainCategory] || []) : [];
+  const subCategories = selectedMainCategory ? (CATEGORIES[selectedMainCategory] || []) : [];
 
   return (
     <div style={{ background: 'white', padding: '40px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
       <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '32px', color: '#1f2937' }}>
-        ➕ Tambah Item Sewa Baru
+        {isEditing ? '✏️ Edit Item Sewa' : '➕ Tambah Item Sewa Baru'}
       </h2>
 
       {errorMsg && (
@@ -118,7 +123,7 @@ export default function VendorProductForm({
             required
           >
             <option value="">Pilih Kategori...</option>
-            {Object.keys(RENTAL_CATEGORIES).map(category => (
+            {Object.keys(CATEGORIES).map(category => (
               <option key={category} value={category}>{category}</option>
             ))}
           </select>
@@ -391,7 +396,7 @@ export default function VendorProductForm({
             transition: 'all 0.2s'
           }}
         >
-          {isSubmitting ? '⏳ Memproses...' : '✅ Tambah Item Sewa'}
+          {isSubmitting ? '⏳ Memproses...' : isEditing ? '💾 Update Item Sewa' : '✅ Tambah Item Sewa'}
         </button>
       </form>
     </div>

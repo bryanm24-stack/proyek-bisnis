@@ -2,12 +2,21 @@ import fs from 'fs/promises';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
-// GET - Mengambil semua services
-export async function GET() {
+// GET - Mengambil services dengan filter vendorId
+export async function GET(request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const vendorId = searchParams.get('vendorId');
+
     const filePath = path.join(process.cwd(), 'services.json');
     const fileData = await fs.readFile(filePath, 'utf-8');
-    const services = JSON.parse(fileData);
+    let services = JSON.parse(fileData);
+
+    // Filter berdasarkan vendorId jika diberikan
+    if (vendorId) {
+      services = services.filter(service => service.vendorId === vendorId);
+    }
+
     return NextResponse.json({ success: true, data: services }, { status: 200 });
   } catch (error) {
     console.error('Error in GET /api/vendor/services:', error.message);
@@ -141,6 +150,128 @@ export async function POST(request) {
     }, { status: 201 });
   } catch (error) {
     console.error('Error di API Vendor Services:', error);
+    return NextResponse.json({
+      success: false,
+      message: 'Terjadi kesalahan server: ' + error.message
+    }, { status: 500 });
+  }
+}
+
+// PUT - Update service
+export async function PUT(request) {
+  try {
+    const body = await request.json();
+    const {
+      id,
+      vendorId,
+      mainCategory,
+      subCategory,
+      title,
+      shortDescription,
+      description,
+      price,
+      minimumDays,
+      quantity,
+      rentalPolicy,
+      location,
+      images,
+      category
+    } = body;
+
+    if (!id || !vendorId) {
+      return NextResponse.json({
+        success: false,
+        message: 'ID dan Vendor ID diperlukan'
+      }, { status: 400 });
+    }
+
+    const filePath = path.join(process.cwd(), 'services.json');
+    const fileData = await fs.readFile(filePath, 'utf-8');
+    let services = JSON.parse(fileData);
+
+    // Cari dan update service
+    const serviceIndex = services.findIndex(s => s.id === id && s.vendorId === vendorId);
+    
+    if (serviceIndex === -1) {
+      return NextResponse.json({
+        success: false,
+        message: 'Service tidak ditemukan'
+      }, { status: 404 });
+    }
+
+    // Update service
+    services[serviceIndex] = {
+      ...services[serviceIndex],
+      mainCategory: mainCategory || services[serviceIndex].mainCategory,
+      subCategory: subCategory || services[serviceIndex].subCategory,
+      title: title || services[serviceIndex].title,
+      shortDescription: shortDescription || services[serviceIndex].shortDescription,
+      description: description || services[serviceIndex].description,
+      price: price !== undefined ? price : services[serviceIndex].price,
+      minimumDays: minimumDays || services[serviceIndex].minimumDays,
+      quantity: quantity !== undefined ? quantity : services[serviceIndex].quantity,
+      rentalPolicy: rentalPolicy || services[serviceIndex].rentalPolicy,
+      location: location || services[serviceIndex].location,
+      images: images && images.length > 0 ? images : services[serviceIndex].images,
+      category: category || services[serviceIndex].category
+    };
+
+    await fs.writeFile(filePath, JSON.stringify(services, null, 2));
+
+    return NextResponse.json({
+      success: true,
+      message: 'Service berhasil diperbarui!',
+      data: services[serviceIndex]
+    }, { status: 200 });
+  } catch (error) {
+    console.error('Error di API PUT Vendor Services:', error);
+    return NextResponse.json({
+      success: false,
+      message: 'Terjadi kesalahan server: ' + error.message
+    }, { status: 500 });
+  }
+}
+
+// DELETE - Hapus service
+export async function DELETE(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    
+    const body = await request.json();
+    const { vendorId } = body;
+
+    if (!id || !vendorId) {
+      return NextResponse.json({
+        success: false,
+        message: 'ID dan Vendor ID diperlukan'
+      }, { status: 400 });
+    }
+
+    const filePath = path.join(process.cwd(), 'services.json');
+    const fileData = await fs.readFile(filePath, 'utf-8');
+    let services = JSON.parse(fileData);
+
+    // Cari service
+    const serviceIndex = services.findIndex(s => s.id === id && s.vendorId === vendorId);
+    
+    if (serviceIndex === -1) {
+      return NextResponse.json({
+        success: false,
+        message: 'Service tidak ditemukan'
+      }, { status: 404 });
+    }
+
+    // Hapus service
+    services.splice(serviceIndex, 1);
+    await fs.writeFile(filePath, JSON.stringify(services, null, 2));
+
+    return NextResponse.json({
+      success: true,
+      message: 'Service berhasil dihapus!'
+    }, { status: 200 });
+  } catch (error) {
+    console.error('Error di API DELETE Vendor Services:', error);
     return NextResponse.json({
       success: false,
       message: 'Terjadi kesalahan server: ' + error.message
