@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="id">
+    <html lang="id" suppressHydrationWarning>
       <body>
         {/* 'children' di sini otomatis akan diisi oleh page.js (Login, Register, Home) */}
         {children}

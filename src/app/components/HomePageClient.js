@@ -328,10 +328,10 @@ export default function HomePageClient() {
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(service =>
-        service.title.toLowerCase().includes(term) ||
-        service.vendorName.toLowerCase().includes(term) ||
-        service.shortDescription.toLowerCase().includes(term) ||
-        service.description.toLowerCase().includes(term)
+        service.title?.toLowerCase().includes(term) ||
+        service.vendorName?.toLowerCase().includes(term) ||
+        service.shortDescription?.toLowerCase().includes(term) ||
+        service.description?.toLowerCase().includes(term)
       );
     }
 
@@ -713,10 +713,12 @@ export default function HomePageClient() {
                       </div>
                     
 
-                      <div className="info-section">
-                        <h4>📦 Stok</h4>
-                        <p>{selectedService.jumlahBarang ?? 'N/A'}</p>
-                      </div>
+                      {(selectedService.category === 'barang' || selectedService.type === 'barang') && (
+                        <div className="info-section">
+                          <h4>📦 Stok</h4>
+                          <p>{selectedService.jumlahBarang ?? 'N/A'}</p>
+                        </div>
+                      )}
 
                       <div className="info-section">
                         <h4>📈 Terjual</h4>
