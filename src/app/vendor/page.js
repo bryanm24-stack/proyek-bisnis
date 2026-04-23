@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import SharedNavbar from './components/SharedNavbar';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -322,33 +323,7 @@ export default function VendorPage() {
 
   return (
     <div className="vendor-page">
-      {/* Navbar */}
-      <nav className="navbar">
-        <div className="nav-left">
-          <Link href="/" className="nav-logo">
-            🛡️ RentGuard
-          </Link>
-        </div>
-        <div className="nav-right">
-          <Link href="/vendor/chats" className="nav-link">
-            💬 Pesan
-          </Link>
-          <Link href="/vendor/ongoing" className="nav-link">
-            📦 Sedang Berlangsung
-          </Link>
-          <Link href="/" className="nav-link">
-            Kembali
-          </Link>
-          {user && (
-            <button 
-              className="btn-logout"
-              onClick={handleLogout}
-            >
-              Logout
-            </button>
-          )}
-        </div>
-      </nav>
+      <SharedNavbar />
 
       {/* Main Content */}
       <div className="vendor-content">

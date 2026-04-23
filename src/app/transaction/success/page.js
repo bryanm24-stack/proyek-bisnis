@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import SharedNavbar from '../components/SharedNavbar';
 
 function SuccessContent() {
   const router = useRouter();
@@ -58,15 +59,7 @@ function SuccessContent() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f3ff 0%, #f0f4ff 100%)' }}>
-      {/* Navbar */}
-      <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', padding: '16px 24px' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Link href="/" style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '24px', lineHeight: '1' }}>🛡️</span>
-            RentGuard
-          </Link>
-        </div>
-      </div>
+      <SharedNavbar />
 
       {/* Main Content */}
       <div style={{ maxWidth: '800px', margin: '40px auto', padding: '20px' }}>

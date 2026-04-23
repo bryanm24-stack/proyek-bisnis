@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import SharedNavbar from '../../components/SharedNavbar';
 
 export default function CustomerChatsPage() {
   const router = useRouter();
@@ -151,52 +152,10 @@ export default function CustomerChatsPage() {
 
   return (
     <div>
-      {/* Navbar */}
-      <nav style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '20px 40px',
-        borderBottom: '1px solid #eee',
-        background: 'white'
-      }}>
-        <Link href="/" style={{ fontSize: '24px', fontWeight: 'bold', color: '#7c3aed', textDecoration: 'none' }}>
-          🛡️ RentGuard
-        </Link>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <Link href="/" style={{ color: '#666', textDecoration: 'none', fontWeight: '500', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.3s' }}>
-            🏠 Home
-          </Link>
-          <Link href="/customer/chats" style={{ color: '#7c3aed', textDecoration: 'none', fontWeight: '600', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', background: '#f0e6ff', transition: 'all 0.3s' }}>
-            💬 Chat
-          </Link>
-          <Link href="/customer/ongoing" style={{ color: '#666', textDecoration: 'none', fontWeight: '500', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.3s' }}>
-            ⏳ Sedang Berlangsung
-          </Link>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ 
-              background: 'linear-gradient(135deg, #7c3aed, #a855f7)', 
-              color: 'white', 
-              padding: '6px 12px', 
-              borderRadius: '50%', 
-              fontWeight: 'bold',
-              minWidth: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{user.name}</div>
-              <div style={{ fontSize: '12px', color: '#666' }}>Customer</div>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <SharedNavbar />
 
       {/* Main Content */}
-      <div style={{ display: 'flex', height: 'calc(100vh - 80px)' }}>
+      <div style={{ display: 'flex', height: 'calc(100vh - 70px)' }}>
         {/* Chat List */}
         <div style={{
           width: '300px',
