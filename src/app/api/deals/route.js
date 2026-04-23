@@ -151,16 +151,8 @@ export async function POST(request) {
         // Create notification untuk customer
         await createNotification(customerId, 'deal_accepted', 'Vendor menerima penawaran Anda!', chatId, { vendorId, serviceId });
 
-<<<<<<< HEAD
         // Note: rating prompt will be handled later in UI; keep message short
         return NextResponse.json({ success: true, message: 'Deal diterima.', data: { deal: existingDeal, chat: chatRoom, readyForRating: true } }, { status: 200 });
-=======
-        return NextResponse.json({
-          success: true,
-          message: 'Deal diterima! Lanjutkan ke proses transaksi.',
-          data: { deal: existingDeal, chat: chatRoom, readyForRating: false }
-        }, { status: 200 });
->>>>>>> 6fb1e006c02a91b9c8f947daa6b569ae10ff5d5e
       }
     }
   } catch (error) {

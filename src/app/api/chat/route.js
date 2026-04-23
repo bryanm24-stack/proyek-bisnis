@@ -71,10 +71,10 @@ export async function POST(request) {
     }
 
     // 2. Extract fields
-    const { serviceId, serviceTitle, vendorId, vendorName, customerId, customerName, message } = body;
+    const { serviceId, serviceTitle, vendorId, vendorName, customerId, customerName, message, senderId, senderName } = body;
 
     // 3. Validate required fields
-    if (!serviceId || !vendorId || !customerId || !message) {
+    if (!serviceId || !vendorId || !customerId || !message || !senderId) {
       return NextResponse.json(
         { success: false, message: 'Missing required fields' },
         { status: 400 }
@@ -106,8 +106,8 @@ export async function POST(request) {
     // 6. Add message
     chatRoom.messages.push({
       id: Date.now().toString(),
-      senderId: customerId,
-      senderName: customerName || 'You',
+      senderId: senderId,
+      senderName: senderName || 'Unknown',
       message,
       timestamp: new Date().toISOString()
     });

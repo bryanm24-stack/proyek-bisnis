@@ -1,6 +1,6 @@
 [
   {
-    "id": "1776960623812",
+    "id": "1776963273496",
     "serviceId": "s1",
     "serviceTitle": "Laptop Rental",
     "vendorId": "1",
@@ -9,58 +9,42 @@
     "customerName": "Strawberry Customer",
     "messages": [
       {
-        "id": "1776960623812",
+        "id": "1776963273496",
         "senderId": "4",
         "senderName": "Strawberry Customer",
-        "message": "p",
-        "timestamp": "2026-04-23T16:10:23.812Z"
-      }
-    ],
-<<<<<<< HEAD
-    "createdAt": "2026-04-07T19:41:10.211Z",
-=======
-    "createdAt": "2026-04-11T19:11:01.454Z",
->>>>>>> 6fb1e006c02a91b9c8f947daa6b569ae10ff5d5e
-    "dealStatus": "agreed"
-  },
-  {
-    "id": "1776960700001",
-    "serviceId": "s2",
-    "serviceTitle": "Catering Service",
-    "vendorId": "2",
-    "vendorName": "Banana Vendor",
-    "customerId": "4",
-    "customerName": "Strawberry Customer",
-    "messages": [
+        "message": "halo",
+        "timestamp": "2026-04-23T16:54:33.496Z"
+      },
       {
-        "id": "1775939466935",
-        "senderId": "1775589203562",
-        "senderName": "Jeje",
-        "message": "test",
-        "timestamp": "2026-04-11T20:31:06.935Z"
-      }
-    ],
-    "createdAt": "2026-04-11T20:31:06.935Z",
-    "dealStatus": "pending"
-  },
-  {
-    "id": "1775939986634",
-    "serviceId": "s1",
-    "serviceTitle": "Laptop Rental",
-    "vendorId": "1",
-    "customerId": "5",
-    "customerName": "Grape Customer",
-    "messages": [
-      {
-        "id": "1776960700003",
+        "id": "1776963473195",
         "senderId": "4",
         "senderName": "Strawberry Customer",
-        "message": "Boleh standar aja dulu. Harganya berapa untuk 100 orang?",
-        "timestamp": "2026-04-23T16:13:00.001Z"
+        "message": "tes",
+        "timestamp": "2026-04-23T16:57:53.195Z"
+      },
+      {
+        "id": "1776963487422",
+        "senderId": "4",
+        "senderName": "Strawberry Customer",
+        "message": "coki",
+        "timestamp": "2026-04-23T16:58:07.422Z"
+      },
+      {
+        "id": "1776963660320",
+        "senderId": "1",
+        "senderName": "Apple Vendor",
+        "message": "tes",
+        "timestamp": "2026-04-23T17:01:00.320Z"
+      },
+      {
+        "id": "1776963678492",
+        "senderId": "4",
+        "senderName": "Strawberry Customer",
+        "message": "tes 3",
+        "timestamp": "2026-04-23T17:01:18.492Z"
       }
     ],
-    "createdAt": "2026-04-23T16:11:40.001Z",
+    "createdAt": "2026-04-23T16:54:33.496Z",
     "dealStatus": null
->>>>>>> 6fb1e006c02a91b9c8f947daa6b569ae10ff5d5e
   }
 ]
