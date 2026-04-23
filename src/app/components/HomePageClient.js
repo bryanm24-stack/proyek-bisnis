@@ -492,7 +492,7 @@ export default function HomePageClient() {
         </div>
         <div className="badge">
           <h4>Sewa Aman</h4>
-          <p>Dilindungi RentGuard Protection</p>
+          <p>Dilindungi 🛡️ RentGuard Protection</p>
         </div>
         <div className="badge">
           <h4>Fleksibel & Cepat</h4>

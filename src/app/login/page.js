@@ -55,7 +55,7 @@ export default function LoginPage() {
       <div className="login-left">
         <div className="login-branding">
           <div className="logo">🛡️</div>
-          <h1>RentGuard</h1>
+          <h1>🛡️ RentGuard</h1>
           <h2>Platform penyewaan terpercaya</h2>
           <p>Temukan vendor terbaik untuk semua kebutuhan sewa kamu</p>
           
@@ -81,7 +81,7 @@ export default function LoginPage() {
         <div className="login-card">
           <div className="form-header">
             <h2>Selamat Datang!</h2>
-            <p>Masuk ke akun RentGuard kamu</p>
+            <p>Masuk ke akun 🛡️ RentGuard kamu</p>
           </div>
 
           {errorMsg && (

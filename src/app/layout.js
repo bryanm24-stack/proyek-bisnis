@@ -2,7 +2,7 @@
 import './globals.css'; 
 
 export const metadata = {
-  title: 'RentGuard - Platform Sewa',
+  title: '🛡️ RentGuard - Platform Sewa',
   description: 'Temukan vendor terbaik untuk semua kebutuhan sewa kamu',
 };
 

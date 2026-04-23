@@ -178,7 +178,8 @@ export default function InvoicesPage() {
       <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', padding: '16px 24px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link href="/" style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            🛍️ RentGuard
+            <span style={{ fontSize: '24px', lineHeight: '1' }}>🛡️</span>
+            RentGuard
           </Link>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <Link href="/customer/ongoing" style={{ fontSize: '14px', color: '#666', textDecoration: 'none', fontWeight: '500' }}>

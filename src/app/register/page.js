@@ -60,8 +60,8 @@ const handleSubmit = async (e) => {
       <div className="login-left">
         <div className="login-branding">
           <div className="logo">🛡️</div>
-          <h1>RentGuard</h1>
-          <h2>Mulai perjalanan sewa kamu bersama RentGuard</h2>
+          <h1>🛡️ RentGuard</h1>
+          <h2>Mulai perjalanan sewa kamu bersama 🛡️ RentGuard</h2>
           <p>Bergabunglah dengan ribuan pengguna yang sudah mempercayai kami</p>
           
           <div className="benefits">
@@ -86,7 +86,7 @@ const handleSubmit = async (e) => {
         <div className="login-card">
           <div className="form-header">
             <h2>Daftar Akun Baru</h2>
-            <p>Mulai perjalanan sewa kamu bersama RentGuard</p>
+            <p>Mulai perjalanan sewa kamu bersama 🛡️ RentGuard</p>
           </div>
 
           {errorMsg && (

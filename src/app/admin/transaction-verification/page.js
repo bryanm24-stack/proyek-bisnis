@@ -91,7 +91,7 @@ export default function TransactionVerificationPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
       <nav style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Link href='/' style={{ fontWeight: '700', color: '#1f2937', textDecoration: 'none' }}>RentGuard Admin</Link>
+        <Link href='/' style={{ fontWeight: '700', color: '#1f2937', textDecoration: 'none' }}>🛡️ RentGuard Admin</Link>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <Link href='/admin/vendor-approval' style={{ textDecoration: 'none', color: '#0369a1', fontWeight: '600' }}>Verifikasi Vendor</Link>
           <span style={{ color: '#6b7280' }}>Admin: {user?.name}</span>

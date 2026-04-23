@@ -143,7 +143,7 @@ export default function VendorRegisterPage() {
       {/* Navbar */}
       <nav className="navbar">
         <div className="nav-brand">
-          <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>RentGuard</Link>
+          <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>🛡️ RentGuard</Link>
         </div>
         <div className="nav-actions">
           <Link href="/" className="btn-link">Kembali ke Home</Link>
@@ -154,7 +154,7 @@ export default function VendorRegisterPage() {
       <div className="vendor-register-main">
         <div className="register-form-container">
           <h1>Registrasi Sebagai Vendor</h1>
-          <p style={{ marginBottom: '10px', color: '#666' }}>Isi data diri Anda untuk mendaftar sebagai vendor di RentGuard</p>
+          <p style={{ marginBottom: '10px', color: '#666' }}>Isi data diri Anda untuk mendaftar sebagai vendor di 🛡️ RentGuard</p>
           <p style={{ marginBottom: '30px', color: '#999', fontSize: '14px' }}>Permohonan Anda akan diverifikasi oleh admin</p>
 
           {registrationStatus && (
