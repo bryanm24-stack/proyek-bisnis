@@ -16,8 +16,12 @@
         "timestamp": "2026-04-23T16:10:23.812Z"
       }
     ],
-    "createdAt": "2026-04-23T16:10:23.812Z",
-    "dealStatus": null
+<<<<<<< HEAD
+    "createdAt": "2026-04-07T19:41:10.211Z",
+=======
+    "createdAt": "2026-04-11T19:11:01.454Z",
+>>>>>>> 6fb1e006c02a91b9c8f947daa6b569ae10ff5d5e
+    "dealStatus": "agreed"
   },
   {
     "id": "1776960700001",
@@ -29,19 +33,24 @@
     "customerName": "Strawberry Customer",
     "messages": [
       {
-        "id": "1776960700001",
-        "senderId": "4",
-        "senderName": "Strawberry Customer",
-        "message": "Halo, saya mau order catering untuk acara minggu depan. Bisa 100 orang?",
-        "timestamp": "2026-04-23T16:11:40.001Z"
-      },
-      {
-        "id": "1776960700002",
-        "senderId": "2",
-        "senderName": "Banana Vendor",
-        "message": "Halo! Terima kasih sudah menghubungi kami. Ya, kami bisa melayani untuk 100 orang. Anda sudah punya konsep menu?",
-        "timestamp": "2026-04-23T16:12:15.001Z"
-      },
+        "id": "1775939466935",
+        "senderId": "1775589203562",
+        "senderName": "Jeje",
+        "message": "test",
+        "timestamp": "2026-04-11T20:31:06.935Z"
+      }
+    ],
+    "createdAt": "2026-04-11T20:31:06.935Z",
+    "dealStatus": "pending"
+  },
+  {
+    "id": "1775939986634",
+    "serviceId": "s1",
+    "serviceTitle": "Laptop Rental",
+    "vendorId": "1",
+    "customerId": "5",
+    "customerName": "Grape Customer",
+    "messages": [
       {
         "id": "1776960700003",
         "senderId": "4",
@@ -52,5 +61,6 @@
     ],
     "createdAt": "2026-04-23T16:11:40.001Z",
     "dealStatus": null
+>>>>>>> 6fb1e006c02a91b9c8f947daa6b569ae10ff5d5e
   }
 ]
