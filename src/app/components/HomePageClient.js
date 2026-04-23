@@ -320,9 +320,11 @@ export default function HomePageClient() {
   const getFilteredServices = () => {
     let filtered = services;
 
-    // Filter by category
+    // Filter by category (support both mainCategory dan category untuk kompatibilitas)
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter(service => service.category === selectedCategory);
+      filtered = filtered.filter(service => 
+        (service.mainCategory === selectedCategory) || (service.category === selectedCategory)
+      );
     }
 
     // Filter by search term
@@ -379,7 +381,7 @@ export default function HomePageClient() {
                 </Link>
               </>
             )}
-            {user && user.role === 'member' && (
+            {user && user.role === 'customer' && (
               <Link href="/vendor/register" className="btn-outline" style={{textDecoration: 'none', display: 'inline-block'}}>
                 Menjadi Vendor
               </Link>

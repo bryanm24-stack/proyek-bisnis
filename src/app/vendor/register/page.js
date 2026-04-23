@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import SharedNavbar from '../components/SharedNavbar';
+import SharedNavbar from '../../components/SharedNavbar';
 
 export default function VendorRegisterPage() {
   const router = useRouter();

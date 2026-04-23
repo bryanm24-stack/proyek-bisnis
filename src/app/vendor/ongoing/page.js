@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import styles from './page.module.css';
-import SharedNavbar from '../components/SharedNavbar';
+import SharedNavbar from '../../components/SharedNavbar';
 
 export default function VendorOngoingPage() {
   const [user, setUser] = useState(null);

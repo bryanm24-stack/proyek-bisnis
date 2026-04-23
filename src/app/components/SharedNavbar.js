@@ -158,15 +158,29 @@ export default function SharedNavbar() {
             </Link>
 
             <Link 
+              href="/vendor/invoices" 
+              style={{ 
+                fontSize: '14px', 
+                color: isActive('/vendor/invoices') ? '#7c3aed' : '#666', 
+                textDecoration: 'none', 
+                fontWeight: isActive('/vendor/invoices') ? '600' : '500',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                background: isActive('/vendor/invoices') ? '#f0e6ff' : 'transparent'
+              }}>
+              📋 Invoice
+            </Link>
+
+            <Link 
               href="/vendor" 
               style={{ 
                 fontSize: '14px', 
-                color: isActive('/vendor') && pathname !== '/vendor/chats' && pathname !== '/vendor/ongoing' ? '#7c3aed' : '#666', 
+                color: isActive('/vendor') && pathname !== '/vendor/chats' && pathname !== '/vendor/ongoing' && pathname !== '/vendor/invoices' ? '#7c3aed' : '#666', 
                 textDecoration: 'none', 
-                fontWeight: isActive('/vendor') && pathname !== '/vendor/chats' && pathname !== '/vendor/ongoing' ? '600' : '500',
+                fontWeight: isActive('/vendor') && pathname !== '/vendor/chats' && pathname !== '/vendor/ongoing' && pathname !== '/vendor/invoices' ? '600' : '500',
                 padding: '6px 12px',
                 borderRadius: '6px',
-                background: isActive('/vendor') && pathname !== '/vendor/chats' && pathname !== '/vendor/ongoing' ? '#f0e6ff' : 'transparent'
+                background: isActive('/vendor') && pathname !== '/vendor/chats' && pathname !== '/vendor/ongoing' && pathname !== '/vendor/invoices' ? '#f0e6ff' : 'transparent'
               }}>
               📊 Dashboard
             </Link>
