@@ -146,8 +146,8 @@ export async function POST(request) {
 
         return NextResponse.json({
           success: true,
-          message: 'Deal diterima! Silakan lakukan rating.',
-          data: { deal: existingDeal, chat: chatRoom, readyForRating: true }
+          message: 'Deal diterima! Lanjutkan ke proses transaksi.',
+          data: { deal: existingDeal, chat: chatRoom, readyForRating: false }
         }, { status: 200 });
       }
     }

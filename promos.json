@@ -1,0 +1,20 @@
+[
+  {
+    "code": "DEAL10",
+    "type": "percent",
+    "value": 10,
+    "maxDiscount": 100000,
+    "minSubtotal": 100000,
+    "active": true,
+    "description": "Diskon 10% maksimal Rp100.000"
+  },
+  {
+    "code": "HEMAT50K",
+    "type": "fixed",
+    "value": 50000,
+    "maxDiscount": 50000,
+    "minSubtotal": 300000,
+    "active": true,
+    "description": "Potongan langsung Rp50.000"
+  }
+]

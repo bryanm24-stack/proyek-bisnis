@@ -29,7 +29,17 @@ const writeJsonFile = async (filePath, data) => {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { orderId, action, complaintDescription, complaintPhoto } = body;
+    const {
+      orderId,
+      action,
+      complaintDescription,
+      complaintPhoto,
+      complaintCategory,
+      complaintSeverity,
+      resolutionNotes,
+      penaltyAmount,
+      refundAmount
+    } = body;
 
     if (!orderId || !action) {
       return NextResponse.json(
@@ -66,7 +76,13 @@ export async function POST(request) {
       deal.inspectionStatus = 'complaint';
       deal.complaintDescription = complaintDescription;
       deal.complaintPhoto = complaintPhoto || null;
+      deal.complaintCategory = complaintCategory || 'damage';
+      deal.complaintSeverity = complaintSeverity || 'major';
       deal.complaintDate = new Date().toISOString();
+      deal.complaintResolution = null;
+      deal.complaintResolutionNotes = null;
+      deal.penaltyAmount = 0;
+      deal.refundAmount = 0;
     } else if (action === 'confirm-complaint') {
       // Vendor setuju komplain - trigger refund
       if (deal.inspectionStatus !== 'complaint') {
@@ -82,6 +98,71 @@ export async function POST(request) {
       // Catat refund
       deal.refundAmount = deal.totalPrice || 0;
       deal.refundReason = 'Komplain customer disetujui vendor';
+      deal.complaintResolution = 'full_refund';
+      deal.complaintResolutionNotes = resolutionNotes || '';
+      deal.penaltyAmount = 0;
+    } else if (action === 'resolve-partial-refund') {
+      if (deal.inspectionStatus !== 'complaint') {
+        return NextResponse.json(
+          { success: false, message: 'Hanya komplain yang bisa diselesaikan dengan partial refund' },
+          { status: 400 }
+        );
+      }
+
+      const safePenalty = Number(penaltyAmount || 0);
+      const basePrice = Number(deal.totalPrice || 0);
+      let calculatedRefund = Number(refundAmount || 0);
+
+      if (calculatedRefund <= 0) {
+        calculatedRefund = Math.max(0, basePrice - safePenalty);
+      }
+
+      deal.inspectionStatus = 'partially_refunded';
+      deal.status = 'partially_refunded';
+      deal.refundedAt = new Date().toISOString();
+      deal.penaltyAmount = safePenalty;
+      deal.refundAmount = Math.max(0, Math.min(calculatedRefund, basePrice));
+      deal.refundReason = 'Partial refund sesuai hasil investigasi komplain';
+      deal.complaintResolution = 'partial_refund';
+      deal.complaintResolutionNotes = resolutionNotes || '';
+    } else if (action === 'apply-penalty') {
+      if (deal.inspectionStatus !== 'complaint') {
+        return NextResponse.json(
+          { success: false, message: 'Hanya komplain yang bisa diberi denda' },
+          { status: 400 }
+        );
+      }
+
+      const safePenalty = Number(penaltyAmount || 0);
+      if (safePenalty <= 0) {
+        return NextResponse.json(
+          { success: false, message: 'Nominal denda harus lebih dari 0' },
+          { status: 400 }
+        );
+      }
+
+      deal.inspectionStatus = 'penalty_applied';
+      deal.status = 'penalty_applied';
+      deal.penaltyAmount = safePenalty;
+      deal.penaltyAppliedAt = new Date().toISOString();
+      deal.refundAmount = 0;
+      deal.complaintResolution = 'penalty';
+      deal.complaintResolutionNotes = resolutionNotes || 'Denda diberlakukan karena pelanggaran ketentuan sewa';
+    } else if (action === 'reject-complaint') {
+      if (deal.inspectionStatus !== 'complaint') {
+        return NextResponse.json(
+          { success: false, message: 'Hanya komplain yang bisa ditolak' },
+          { status: 400 }
+        );
+      }
+
+      deal.inspectionStatus = 'complaint_rejected';
+      deal.status = 'completed';
+      deal.complaintResolution = 'rejected';
+      deal.complaintResolutionNotes = resolutionNotes || 'Komplain tidak dapat diproses karena bukti tidak cukup';
+      deal.penaltyAmount = 0;
+      deal.refundAmount = 0;
+      deal.complaintRejectedAt = new Date().toISOString();
     } else {
       return NextResponse.json(
         { success: false, message: 'Action tidak valid' },

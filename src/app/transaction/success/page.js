@@ -62,7 +62,8 @@ function SuccessContent() {
       <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', padding: '16px 24px' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link href="/" style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            🛍️ RentGuard
+            <span style={{ fontSize: '24px', lineHeight: '1' }}>🛡️</span>
+            RentGuard
           </Link>
         </div>
       </div>
@@ -77,7 +78,7 @@ function SuccessContent() {
           </div>
 
           <h1 style={{ fontSize: '32px', fontWeight: '700', color: '#22c55e', marginBottom: '12px' }}>Pembayaran Berhasil!</h1>
-          <p style={{ fontSize: '16px', color: '#6b7280', marginBottom: '32px' }}>Terima kasih telah melakukan transaksi di RentGuard</p>
+          <p style={{ fontSize: '16px', color: '#6b7280', marginBottom: '32px' }}>Terima kasih telah melakukan transaksi di 🛡️ RentGuard</p>
 
           {/* Transaction ID */}
           <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '8px', marginBottom: '24px', border: '2px solid #86efac' }}>
