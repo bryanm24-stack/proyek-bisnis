@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import SearchBar from './SearchBar';
+import SharedNavbar from './SharedNavbar';
 
 export default function HomePageClient() {
   const [services, setServices] = useState([]);
@@ -319,9 +320,11 @@ export default function HomePageClient() {
   const getFilteredServices = () => {
     let filtered = services;
 
-    // Filter by category
+    // Filter by category (support both mainCategory dan category untuk kompatibilitas)
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter(service => service.category === selectedCategory);
+      filtered = filtered.filter(service => 
+        (service.mainCategory === selectedCategory) || (service.category === selectedCategory)
+      );
     }
 
     // Filter by search term
@@ -359,104 +362,7 @@ export default function HomePageClient() {
 
   return (
     <div>
-      {/* Navbar */}
-      <nav className="navbar">
-        <div className="nav-left">
-          <Link href="/" className="nav-logo">
-            🛡️ RentGuard
-          </Link>
-        </div>
-
-        <div className="nav-right">
-          {/* Dashboard Vendor Button - hanya untuk vendor */}
-          {user && user.role === 'vendor' && (
-            <Link href="/vendor" className="btn-nav-vendor" title="Dashboard Vendor" style={{ textDecoration: 'none', color: 'inherit' }}>
-              📊 Dashboard
-            </Link>
-          )}
-
-          {/* Admin Verification Button - hanya untuk admin */}
-          {user && user.role === 'admin' && (
-            <>
-              <Link href="/admin/vendor-approval" className="btn-nav-admin" title="Verifikasi Vendor">
-                ✓ Verifikasi Vendor
-              </Link>
-              <Link href="/admin/transaction-verification" className="btn-nav-admin" title="Verifikasi Identitas Transaksi">
-                🪪 Verifikasi Transaksi
-              </Link>
-            </>
-          )}
-
-          {/* Notification Bell */}
-          <div className="notification-wrapper">
-            <button className="nav-icon-btn" onClick={handleNotificationClick} title="Notifikasi">
-              🔔
-              {notifications.length > 0 && (
-                <span className="notification-badge">{notifications.length}</span>
-              )}
-            </button>
-            {showNotifications && (
-              <div className="notification-dropdown">
-                {notifications.length === 0 ? (
-                  <div className="notification-empty">Tidak ada notifikasi</div>
-                ) : (
-                  notifications.map((notif) => (
-                    <div key={notif.id} className={`notification-item ${notif.read ? 'read' : 'unread'}`}>
-                      <div className="notification-content">
-                        <div className="notif-message">{notif.message}</div>
-                        <div className="notif-time">
-                          {new Date(notif.createdAt).toLocaleTimeString('id-ID')}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="notif-delete-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteNotification(notif.id);
-                        }}
-                        title="Hapus notifikasi"
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Chat Button */}
-          <button className="nav-icon-btn" onClick={handleChatClick} title="Chat">
-            💬
-          </button>
-
-          {/* User Menu */}
-          {user ? (
-            <div className="user-menu-wrapper">
-              <div className="user-menu">
-                <button className="user-button">
-                  <div className="user-avatar">{user.name.charAt(0).toUpperCase()}</div>
-                  <span>{user.name}</span>
-                </button>
-              </div>
-              <button 
-                onClick={handleLogout}
-                className="btn-logout"
-                title="Logout"
-              >
-                🚪 Logout
-              </button>
-            </div>
-          ) : (
-            <div className="user-menu-guest">
-              <Link href="/login" className="btn-login">
-                Masuk
-              </Link>
-            </div>
-          )}
-        </div>
-      </nav>
+      <SharedNavbar />
 
       {/* Hero Section */}
       <div className="hero-section">
@@ -475,7 +381,7 @@ export default function HomePageClient() {
                 </Link>
               </>
             )}
-            {user && user.role === 'member' && (
+            {user && user.role === 'customer' && (
               <Link href="/vendor/register" className="btn-outline" style={{textDecoration: 'none', display: 'inline-block'}}>
                 Menjadi Vendor
               </Link>

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import SharedNavbar from '../../components/SharedNavbar';
 
 export default function VendorRegisterPage() {
   const router = useRouter();
@@ -140,15 +141,7 @@ export default function VendorRegisterPage() {
 
   return (
     <div className="vendor-register-container">
-      {/* Navbar */}
-      <nav className="navbar">
-        <div className="nav-brand">
-          <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>🛡️ RentGuard</Link>
-        </div>
-        <div className="nav-actions">
-          <Link href="/" className="btn-link">Kembali ke Home</Link>
-        </div>
-      </nav>
+      <SharedNavbar />
 
       {/* Main Content */}
       <div className="vendor-register-main">
