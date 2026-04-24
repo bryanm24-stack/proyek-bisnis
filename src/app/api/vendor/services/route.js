@@ -31,6 +31,19 @@ export async function POST(request) {
     const {
       vendorId,
       vendorName,
+      // Modern payload fields (used by VendorProductForm)
+      mainCategory,
+      subCategory,
+      title,
+      shortDescription,
+      description,
+      detailDescription,
+      price,
+      minimumDays,
+      quantity,
+      rentalPolicy,
+      location,
+      category,
       type, // 'barang' atau 'jasa'
       // Fields untuk barang
       namaBarang,
@@ -60,10 +73,80 @@ export async function POST(request) {
     } = body;
 
     // Validasi input
-    if (!vendorId || !vendorName || !type) {
+    if (!vendorId || !vendorName) {
       return NextResponse.json({
         success: false,
-        message: 'Semua field wajib diisi!'
+        message: 'vendorId dan vendorName wajib diisi!'
+      }, { status: 400 });
+    }
+
+    const hasModernPayload = Boolean(title || mainCategory || shortDescription || location);
+
+    const filePath = path.join(process.cwd(), 'services.json');
+    const fileData = await fs.readFile(filePath, 'utf-8');
+    const services = JSON.parse(fileData);
+
+    // Support payload baru dari halaman /vendor/tambah-produk dan /vendor
+    if (hasModernPayload) {
+      const missingFields = [];
+      if (!mainCategory) missingFields.push('mainCategory');
+      if (!subCategory) missingFields.push('subCategory');
+      if (!title) missingFields.push('title');
+      if (!shortDescription) missingFields.push('shortDescription');
+      if (price === undefined || price === null || price === '') missingFields.push('price');
+      if (quantity === undefined || quantity === null || quantity === '') missingFields.push('quantity');
+      if (!location) missingFields.push('location');
+
+      if (missingFields.length > 0) {
+        return NextResponse.json({
+          success: false,
+          message: `Field wajib belum lengkap: ${missingFields.join(', ')}`
+        }, { status: 400 });
+      }
+
+      const resolvedType = type || (mainCategory === 'Jasa Profesional' ? 'jasa' : 'barang');
+      const parsedPrice = Number.parseInt(price, 10);
+      const parsedMinimumDays = Number.parseInt(minimumDays, 10);
+      const parsedQuantity = Number.parseInt(quantity, 10);
+
+      const newService = {
+        id: Date.now().toString(),
+        vendorId,
+        vendorName,
+        mainCategory,
+        subCategory,
+        category: category || mainCategory,
+        title,
+        shortDescription,
+        description: description || detailDescription || '',
+        detailDescription: detailDescription || description || '',
+        price: Number.isNaN(parsedPrice) ? 0 : parsedPrice,
+        minimumDays: Number.isNaN(parsedMinimumDays) ? 1 : parsedMinimumDays,
+        quantity: Number.isNaN(parsedQuantity) ? 0 : parsedQuantity,
+        rentalPolicy: rentalPolicy || '',
+        location,
+        type: resolvedType,
+        rating: 0,
+        rentCount: 0,
+        images: images && images.length > 0
+          ? images
+          : ['https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=150&q=80']
+      };
+
+      services.push(newService);
+      await fs.writeFile(filePath, JSON.stringify(services, null, 2));
+
+      return NextResponse.json({
+        success: true,
+        message: 'Item berhasil ditambahkan!',
+        data: newService
+      }, { status: 201 });
+    }
+
+    if (!type) {
+      return NextResponse.json({
+        success: false,
+        message: 'type wajib diisi untuk format payload lama'
       }, { status: 400 });
     }
 
@@ -87,10 +170,6 @@ export async function POST(request) {
         }, { status: 400 });
       }
     }
-
-    const filePath = path.join(process.cwd(), 'services.json');
-    const fileData = await fs.readFile(filePath, 'utf-8');
-    const services = JSON.parse(fileData);
 
     // Buat service baru berdasarkan tipe
     let newService;

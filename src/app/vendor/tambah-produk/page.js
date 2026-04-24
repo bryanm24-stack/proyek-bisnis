@@ -88,6 +88,7 @@ export default function TambahProdukPage() {
       const submitData = {
         vendorId: user.id,
         vendorName: user.name,
+        type: selectedType,
         mainCategory: formData.mainCategory,
         subCategory: formData.subCategory,
         category: formData.mainCategory,
