@@ -3,8 +3,8 @@
     "id": "s1",
     "vendorId": "1",
     "vendorName": "Apple Vendor",
-    "title": "Laptop Rental",
-    "category": "barang",
+    "title": "Laptop Rental mantap",
+    "category": "Elektronik",
     "description": "Premium laptop for business",
     "price": 150000,
     "rating": 4.8,
@@ -16,14 +16,21 @@
     "dendaKeterlambatan": "Rp 50.000 / hari",
     "syaratKetentuan": "1. Barang harus dikembalikan sesuai jadwal\n2. Dilarang modifikasi atau upgrade hardware\n3. Garansi tidak berlaku jika ada kerusakan fisik\n4. Pembatalan hanya berlaku 24 jam sebelumnya",
     "jumlahBarang": "5",
-    "lokasi": "Jakarta Selatan"
+    "lokasi": "Jakarta Selatan",
+    "mainCategory": "Elektronik",
+    "subCategory": "Laptop",
+    "shortDescription": "sgdsgdsg",
+    "minimumDays": 1,
+    "quantity": 2,
+    "rentalPolicy": "dsgsdgdsgds",
+    "location": "sdgdsgsg"
   },
   {
     "id": "s2",
     "vendorId": "2",
     "vendorName": "Banana Vendor",
-    "title": "Catering Service",
-    "category": "jasa",
+    "title": "Catering Service456",
+    "category": "Jasa Profesional",
     "description": "Full meal catering for events",
     "price": 500000,
     "rating": 4.9,
@@ -35,7 +42,14 @@
     "dendaKeterlambatan": "Rp 100.000 per jam keterlambatan",
     "syaratKetentuan": "1. Minimal order untuk 50 orang\n2. Booking harus 7 hari sebelumnya\n3. Pembayaran 50% saat booking, 50% hari H\n4. Lokasi di area Greater Jakarta",
     "jumlahBarang": "Unlimited",
-    "lokasi": "Jakarta Pusat"
+    "lokasi": "Jakarta Pusat",
+    "mainCategory": "Jasa Profesional",
+    "subCategory": "Lainnya",
+    "shortDescription": "mantap",
+    "minimumDays": 1,
+    "quantity": 1,
+    "rentalPolicy": "knfjasfjahf",
+    "location": "fasfsaf"
   },
   {
     "id": "s3",
@@ -56,5 +70,4 @@
     "jumlahBarang": "1 Tim (2 Fotografer)",
     "lokasi": "Jakarta Barat"
   }
-  
 ]

@@ -79,44 +79,6 @@ export default function SharedFooter() {
             </div>
           </div>
 
-          {/* For Customers */}
-          <div>
-            <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '700' }}>
-              Untuk Customer
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {[
-                { label: '🏠 Beranda', href: '/' },
-                { label: '🔍 Cari Sewa', href: '/#search' },
-                { label: '💬 Chat dengan Vendor', href: '/customer/chats' },
-                { label: '⏳ Pemesanan Saya', href: '/customer/ongoing' },
-                { label: '📋 Invoice', href: '/customer/invoices' }
-              ].map((link, idx) => (
-                <Link
-                  key={idx}
-                  href={link.href}
-                  style={{
-                    color: 'rgba(255,255,255,0.85)',
-                    textDecoration: 'none',
-                    fontSize: '14px',
-                    transition: 'all 0.2s',
-                    cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.color = 'white';
-                    e.target.style.paddingLeft = '8px';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.color = 'rgba(255,255,255,0.85)';
-                    e.target.style.paddingLeft = '0';
-                  }}
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-
           {/* For Vendors - Hanya tampilkan untuk customer */}
           {!user || user.role === 'customer' ? (
             <div>

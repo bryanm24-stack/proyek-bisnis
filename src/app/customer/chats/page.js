@@ -16,6 +16,7 @@ export default function CustomerChatsPage() {
   const [dealData, setDealData] = useState(null);
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showVendorModal, setShowVendorModal] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -32,13 +33,26 @@ export default function CustomerChatsPage() {
 
   const fetchCustomerChats = async (customerId) => {
     try {
+      console.log('[customer/chats] Fetching chats for customerId:', customerId);
       const response = await fetch(`/api/customer/chats?customerId=${customerId}`);
+      
+      if (!response.ok) {
+        throw new Error(`API responded with status ${response.status}`);
+      }
+      
       const data = await response.json();
-      if (data.success) {
-        setChats(data.data || []);
+      console.log('[customer/chats] API response:', data);
+      
+      if (data.success && data.data) {
+        console.log('[customer/chats] Setting chats:', data.data.length, 'items');
+        setChats(data.data);
+      } else {
+        console.error('[customer/chats] API returned success:false -', data.message);
+        setChats([]); // Explicitly set empty
       }
     } catch (error) {
-      console.error('Error fetching chats:', error);
+      console.error('[customer/chats] Error fetching chats:', error);
+      setChats([]); // Explicitly set empty on error
     } finally {
       setLoading(false);
     }
@@ -57,6 +71,17 @@ export default function CustomerChatsPage() {
       return vendorName.includes(searchLower) || serviceTitle.includes(searchLower);
     });
   }, [chats, searchQuery]);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('[customer/chats] State:');
+    console.log('  - user.id:', user?.id, '(type:', typeof user?.id, ')');
+    console.log('  - total chats:', chats.length);
+    console.log('  - filtered chats:', filteredChats.length);
+    if (chats.length > 0) {
+      console.log('  - chats:', chats.map(c => `${c.vendorName} - ${c.serviceTitle}`));
+    }
+  }, [chats, filteredChats, user]);
 
   const openChat = async (chat) => {
     setSelectedChat(chat);
@@ -146,8 +171,8 @@ export default function CustomerChatsPage() {
     }
   };
 
-  if (!user || user.role === 'vendor') {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Akses ditolak</div>;
+  if (!user) {
+    return <div style={{ padding: '40px', textAlign: 'center' }}>Memuat...</div>;
   }
 
   return (
@@ -283,99 +308,66 @@ export default function CustomerChatsPage() {
               <div style={{
                 padding: '20px',
                 borderBottom: '1px solid #eee',
-                background: '#fff'
-              }}>
-                <h2 style={{ margin: 0, fontSize: '18px' }}>
-                  {user.id === selectedChat.customerId ? selectedChat.vendorName : selectedChat.customerName} 🏪
-                </h2>
-                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#666' }}>
-                  {selectedChat.serviceTitle}
-                </p>
-              </div>
-
-              {/* Deal Buttons */}
-              <div style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid #eee',
+                background: '#fff',
                 display: 'flex',
-                gap: '10px',
+                justifyContent: 'space-between',
                 alignItems: 'center'
               }}>
+                <div>
+                  <h2 
+                    style={{ 
+                      margin: 0, 
+                      fontSize: '18px',
+                      cursor: 'pointer',
+                      color: '#7c3aed',
+                      transition: 'all 0.2s'
+                    }}
+                    onClick={() => setShowVendorModal(true)}
+                    onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                    onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                  >
+                    {user.id === selectedChat.customerId ? selectedChat.vendorName : selectedChat.customerName} 🏪
+                  </h2>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#666' }}>
+                    {selectedChat.serviceTitle}
+                  </p>
+                </div>
                 <button
-                  onClick={() => handleDealAction('accept')}
-                  disabled={dealData?.status === 'agreed' || dealData?.status === 'cancelled'}
+                  onClick={() => setShowVendorModal(true)}
                   style={{
-                    padding: '10px 16px',
-                    border: 'none',
-                    borderRadius: '8px',
-                    background: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? '#d1d5db' : '#10b981',
-                    color: 'white',
-                    fontWeight: '600',
-                    cursor: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  ✅ Setuju Deal
-                </button>
-                <button
-                  onClick={() => handleDealAction('cancel')}
-                  disabled={dealData?.status === 'cancelled'}
-                  style={{
-                    padding: '10px 16px',
-                    border: 'none',
-                    borderRadius: '8px',
-                    background: dealData?.status === 'cancelled' ? '#d1d5db' : '#ef4444',
-                    color: 'white',
-                    fontWeight: '600',
-                    cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  ❌ Tolak Deal
-                </button>
-                {dealData?.status === 'agreed' && (
-                  <>
-                    <span style={{
-                      padding: '8px 12px',
-                      background: '#dbeafe',
-                      color: '#0284c7',
-                      borderRadius: '6px',
-                      fontSize: '13px',
-                      fontWeight: '600'
-                    }}>
-                      ✓ Deal Diterima
-                    </span>
-                    <button
-                      onClick={() => router.push(`/transaction/identity-check?dealId=${dealData.id}`)}
-                      style={{
-                        padding: '10px 16px',
-                        border: 'none',
-                        borderRadius: '8px',
-                        background: '#f59e0b',
-                        color: 'white',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        marginLeft: '8px'
-                      }}
-                      onMouseEnter={(e) => e.target.style.background = '#d97706'}
-                      onMouseLeave={(e) => e.target.style.background = '#f59e0b'}
-                    >
-                      💳 Bayar Sekarang
-                    </button>
-                  </>
-                )}
-                {dealData?.status === 'cancelled' && (
-                  <span style={{
                     padding: '8px 12px',
-                    background: '#fee2e2',
-                    color: '#dc2626',
+                    border: 'none',
                     borderRadius: '6px',
-                    fontSize: '13px',
-                    fontWeight: '600'
-                  }}>
-                    ✗ Deal Ditolak
-                  </span>
-                )}
+                    background: '#7c3aed',
+                    color: 'white',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  👤 Profil
+                </button>
               </div>
+
+              {/* Show pricing and discount info when deal agreed */}
+              {dealData?.status === 'agreed' && (
+                <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '13px', color: '#666' }}>Deal telah disetujui</div>
+                    <div style={{ fontWeight: 800, fontSize: '16px', marginTop: '4px' }}>
+                      Harga akhir: Rp {(dealData.finalPrice || dealData.originalPrice || 0).toLocaleString('id-ID')}
+                    </div>
+                    {dealData.discountGiven && dealData.discount && (
+                      <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                        Potongan: Rp {dealData.discount.amount.toLocaleString('id-ID')} ({dealData.discount.type === 'percent' ? `${dealData.discount.value}%` : `Rp ${dealData.discount.value.toLocaleString('id-ID')}`})
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <button style={{ padding: '8px 12px', borderRadius: '8px', border: 'none', background: '#7c3aed', color: 'white', fontWeight: 700 }}>Lanjut ke Pembayaran</button>
+                  </div>
+                </div>
+              )}
 
               {/* Messages */}
               <div style={{
@@ -507,6 +499,173 @@ export default function CustomerChatsPage() {
           )}
         </div>
       </div>
+
+      {/* Vendor Profile Modal */}
+      {showVendorModal && selectedChat && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '30px',
+            maxWidth: '400px',
+            width: '90%',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)'
+          }}>
+            {/* Close Button */}
+            <button
+              onClick={() => setShowVendorModal(false)}
+              style={{
+                position: 'absolute',
+                top: '15px',
+                right: '15px',
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#999'
+              }}
+            >
+              ✕
+            </button>
+
+            {/* Vendor Info */}
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>
+                {selectedChat.vendorName}
+              </h2>
+              <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#666' }}>
+                {selectedChat.serviceTitle}
+              </p>
+            </div>
+
+            {/* Deal Buttons */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              marginBottom: '20px'
+            }}>
+              <button
+                onClick={() => {
+                  handleDealAction('accept');
+                  setShowVendorModal(false);
+                }}
+                disabled={dealData?.status === 'agreed' || dealData?.status === 'cancelled'}
+                style={{
+                  padding: '12px 16px',
+                  border: 'none',
+                  borderRadius: '8px',
+                  background: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? '#d1d5db' : '#10b981',
+                  color: 'white',
+                  fontWeight: '600',
+                  cursor: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                ✅ Setuju Deal
+              </button>
+              <button
+                onClick={() => {
+                  handleDealAction('cancel');
+                  setShowVendorModal(false);
+                }}
+                disabled={dealData?.status === 'cancelled'}
+                style={{
+                  padding: '12px 16px',
+                  border: 'none',
+                  borderRadius: '8px',
+                  background: dealData?.status === 'cancelled' ? '#d1d5db' : '#ef4444',
+                  color: 'white',
+                  fontWeight: '600',
+                  cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                ❌ Tolak Deal
+              </button>
+
+              {dealData?.status === 'agreed' && (
+                <>
+                  <div style={{
+                    padding: '12px',
+                    background: '#dbeafe',
+                    color: '#0284c7',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    textAlign: 'center'
+                  }}>
+                    ✓ Deal Diterima
+                  </div>
+                  <button
+                    onClick={() => {
+                      router.push(`/transaction/identity-check?dealId=${dealData.id}`);
+                      setShowVendorModal(false);
+                    }}
+                    style={{
+                      padding: '12px 16px',
+                      border: 'none',
+                      borderRadius: '8px',
+                      background: '#f59e0b',
+                      color: 'white',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                    onMouseEnter={(e) => e.target.style.background = '#d97706'}
+                    onMouseLeave={(e) => e.target.style.background = '#f59e0b'}
+                  >
+                    💳 Bayar Sekarang
+                  </button>
+                </>
+              )}
+
+              {dealData?.status === 'cancelled' && (
+                <div style={{
+                  padding: '12px',
+                  background: '#fee2e2',
+                  color: '#dc2626',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  textAlign: 'center'
+                }}>
+                  ✗ Deal Ditolak
+                </div>
+              )}
+            </div>
+
+            {/* Close Modal Button */}
+            <button
+              onClick={() => setShowVendorModal(false)}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                background: 'white',
+                color: '#333',
+                fontWeight: '600',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -54,7 +54,6 @@ export default function LoginPage() {
       {/* Sisi Kiri - Branding */}
       <div className="login-left">
         <div className="login-branding">
-          <div className="logo">🛡️</div>
           <h1>🛡️ RentGuard</h1>
           <h2>Platform penyewaan terpercaya</h2>
           <p>Temukan vendor terbaik untuk semua kebutuhan sewa kamu</p>

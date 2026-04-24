@@ -60,7 +60,6 @@ const handleSubmit = async (e) => {
       {/* Sisi Kiri - Branding */}
       <div className="login-left">
         <div className="login-branding">
-          <div className="logo">🛡️</div>
           <h1>🛡️ RentGuard</h1>
           <h2>Mulai perjalanan sewa kamu bersama 🛡️ RentGuard</h2>
           <p>Bergabunglah dengan ribuan pengguna yang sudah mempercayai kami</p>
