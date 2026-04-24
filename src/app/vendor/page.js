@@ -350,6 +350,7 @@ export default function VendorPage() {
               isSubmitting={isSubmitting}
               errorMsg=""
               successMsg=""
+              isEditing={!!editingItemId}
             />
           </div>
         )}

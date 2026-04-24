@@ -151,23 +151,28 @@ export default function HomePageClient() {
       return;
     }
 
-    // Vendor juga bisa melakukan chat sebagai customer saat membeli dari vendor lain
     setSelectedService(service);
     setMessages([]);
     setNewMessage('');
     setShowRatingForm(false);
     setRatingValue(5);
     setRatingReview('');
+    setChatModalOpen(true);
+    setModalOpen(false);
 
     try {
-      const response = await fetch(
-        `/api/chat?serviceId=${service.id}&customerId=${user.id}`
-      );
+      console.log('[openChatModal] Loading chat for service:', service.id);
+
+      // Load existing chat if any
+      const response = await fetch(`/api/chat?serviceId=${service.id}&customerId=${user.id}`);
       const data = await response.json();
+
       if (data.success && data.data) {
+        console.log('[openChatModal] Found existing chat');
         setChatData(data.data);
         setMessages(data.data.messages || []);
-        
+
+        // Load deal status
         const dealResponse = await fetch(`/api/deals?chatId=${data.data.id}`);
         const dealDataResp = await dealResponse.json();
         if (dealDataResp.success && dealDataResp.data) {
@@ -177,14 +182,15 @@ export default function HomePageClient() {
           }
         }
       } else {
+        console.log('[openChatModal] No existing chat found, starting new');
         setChatData(null);
         setMessages([]);
       }
-      setChatModalOpen(true);
-      setModalOpen(false);
     } catch (error) {
-      console.error('Error loading chat:', error);
-      alert('Gagal membuka chat');
+      console.error('[openChatModal] Error:', error);
+      // Still open chat, just without history
+      setChatData(null);
+      setMessages([]);
     }
   };
 
@@ -198,8 +204,12 @@ export default function HomePageClient() {
 
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
+    if (!selectedService) return;
+    if (!user) return;
 
     try {
+      console.log('[sendMessage] Sending:', newMessage);
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -215,14 +225,18 @@ export default function HomePageClient() {
       });
 
       const data = await response.json();
-      if (data.success) {
-        setChatData(data.data);
-        setMessages(data.data.messages || []);
-        setNewMessage('');
+      
+      if (!response.ok || !data.success) {
+        alert('Error: ' + (data.message || 'Failed to send message'));
+        return;
       }
+
+      setChatData(data.data);
+      setMessages(data.data.messages || []);
+      setNewMessage('');
     } catch (error) {
-      console.error('Error sending message:', error);
-      alert('Gagal mengirim pesan');
+      console.error('[sendMessage] Error:', error);
+      alert('Error: ' + error.message);
     }
   };
 

@@ -21,7 +21,12 @@ export async function POST(request) {
     return NextResponse.json({ 
       success: true, 
       message: 'Login berhasil!',
-      user: { id: user.id, name: user.name, email: user.email, role: user.role }
+      user: { 
+        id: String(user.id),  // ← Ensure ID is always string
+        name: user.name, 
+        email: user.email, 
+        role: user.role 
+      }
     }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ success: false, message: 'Terjadi kesalahan server.' }, { status: 500 });

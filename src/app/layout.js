@@ -10,9 +10,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="id" suppressHydrationWarning>
-      <body style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <body style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', margin: 0, padding: 0 }}>
         {/* Main content area yang bisa grow */}
-        <div style={{ flex: '1' }}>
+        <div style={{ flex: '1', display: 'flex', flexDirection: 'column' }}>
           {/* 'children' di sini otomatis akan diisi oleh page.js (Login, Register, Home) */}
           {children}
         </div>
