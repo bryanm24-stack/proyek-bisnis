@@ -4,26 +4,11 @@ import React, { useState, useEffect } from 'react';
 import SharedNavbar from '../../components/SharedNavbar';
 import { useRouter } from 'next/navigation';
 import VendorProductForm from '../VendorProductForm';
-
-const RENTAL_CATEGORIES = {
-  'Elektronik': ['Laptop', 'Kamera', 'Proyektor', 'Drone', 'Speaker', 'Monitor', 'Printer', 'Gaming Console', 'Lainnya'],
-  'Alat Olahraga': ['Sepeda', 'Papan Selancar', 'Peralatan Lari', 'Gym Equipment', 'Sepatu Olahraga', 'Tenda Camping', 'Lainnya'],
-  'Furniture': ['Meja', 'Kursi', 'Lemari', 'Tempat Tidur', 'Sofa', 'Rak', 'Lainnya'],
-  'Peralatan Acara': ['Sound System', 'Lighting', 'Dekorasi', 'Tenda Pesta', 'Kursi Event', 'Panggung Portable', 'Lainnya'],
-  'Peralatan Rumah Tangga': ['Kulkas', 'Mesin Cuci', 'AC', 'Vacuum', 'Oven', 'Rice Cooker', 'Lainnya'],
-  'Peralatan Konstruksi': ['Scaffolding', 'Crane', 'Mixer', 'Chainsaw', 'Generator', 'Kompressor', 'Lainnya'],
-  'Kendaraan': ['Mobil', 'Motor', 'Mobil Bak', 'Sewa Driver', 'Lainnya'],
-  'Peralatan Dapur': ['Piring Set', 'Gelas Set', 'Peralatan Masak', 'Meja Makan', 'Kursi Makan', 'Lainnya'],
-  'Kostum & Fashion': ['Baju Pengantin', 'Kostum Cosplay', 'Pakaian Pesta', 'Aksesori', 'Tas Branded', 'Lainnya'],
-  'Peralatan Fotografi': ['Studio Lighting', 'Tripod', 'Reflector', 'Backdrop', 'Lainnya'],
-  'Peralatan Musik': ['Gitar', 'Keyboard', 'Drum', 'Microphone', 'Amplifier', 'Lainnya'],
-  'Mainan & Anak': ['Playground', 'Bouncing Castle', 'Permainan Edukatif', 'Sepeda Anak', 'Lainnya'],
-  'Lainnya': ['Tidak ada kategori', 'Custom Item']
-};
-
-const SERVICE_CATEGORIES = {
-  'Jasa Profesional': ['Konsultasi', 'Pelatihan', 'Desain', 'Photography', 'Videography', 'Lainnya']
-};
+import {
+  BARANG_CATEGORY_TREE,
+  SERVICE_CATEGORY_TREE,
+  getSuperSubOptions
+} from '../category-tree';
 
 export default function TambahProdukPage() {
   const router = useRouter();
@@ -36,6 +21,7 @@ export default function TambahProdukPage() {
   const [formData, setFormData] = useState({
     mainCategory: '',
     subCategory: '',
+    superSubCategory: '',
     title: '',
     shortDescription: '',
     description: '',
@@ -44,7 +30,11 @@ export default function TambahProdukPage() {
     quantity: '',
     rentalPolicy: '',
     location: '',
-    images: []
+    images: [],
+    specifications: {},
+    descriptionTable: {},
+    checklist: {},
+    items: []
   });
 
   useEffect(() => {
@@ -63,14 +53,33 @@ export default function TambahProdukPage() {
     setUser(parsedUser);
   }, []);
 
+  useEffect(() => {
+    if (!selectedType) return;
+
+    setFormData(prev => ({
+      ...prev,
+      mainCategory: '',
+      subCategory: '',
+      superSubCategory: '',
+      category: '',
+      specifications: {},
+      descriptionTable: {},
+      checklist: {}
+    }));
+  }, [selectedType]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
 
     const missingFields = [];
+    const activeCategories = selectedType === 'barang' ? BARANG_CATEGORY_TREE : SERVICE_CATEGORY_TREE;
+    const currentSuperSubOptions = getSuperSubOptions(activeCategories, formData.mainCategory, formData.subCategory);
+
     if (!formData.mainCategory) missingFields.push('Kategori Utama');
     if (!formData.subCategory) missingFields.push('Sub Kategori');
+    if (currentSuperSubOptions.length > 0 && !formData.superSubCategory) missingFields.push('Super-Sub Kategori');
     if (!formData.title) missingFields.push('Nama Item');
     if (!formData.shortDescription) missingFields.push('Deskripsi Singkat');
     if (!formData.price) missingFields.push('Harga per Hari');
@@ -91,6 +100,7 @@ export default function TambahProdukPage() {
         type: selectedType,
         mainCategory: formData.mainCategory,
         subCategory: formData.subCategory,
+        superSubCategory: formData.superSubCategory,
         category: formData.mainCategory,
         title: formData.title,
         shortDescription: formData.shortDescription,
@@ -101,6 +111,10 @@ export default function TambahProdukPage() {
         quantity: parseInt(formData.quantity),
         rentalPolicy: formData.rentalPolicy,
         location: formData.location,
+        specifications: formData.specifications || {},
+        descriptionTable: formData.descriptionTable || {},
+        checklist: formData.checklist || {},
+        items: formData.items || [],
         images: formData.images.filter(img => typeof img === 'string' && (img.startsWith('data:') || img.startsWith('http'))),
         rating: 0,
         rentCount: 0
@@ -185,7 +199,7 @@ export default function TambahProdukPage() {
                 Sewa Barang
               </h2>
               <p style={{ color: '#666', fontSize: '14px', marginBottom: '24px' }}>
-                Sewakan peralatan, elektronik, furniture, kendaraan, dan berbagai jenis barang fisik
+                Sewakan peralatan, elektronik, furniture, dan berbagai jenis barang fisik
               </p>
               <button style={{
                 padding: '12px 24px',
@@ -229,7 +243,7 @@ export default function TambahProdukPage() {
                 Sewa Jasa
               </h2>
               <p style={{ color: '#666', fontSize: '14px', marginBottom: '24px' }}>
-                Tawarkan jasa profesional seperti konsultasi, pelatihan, desain, fotografi, dan videografi
+                Tawarkan jasa profesional dan transportasi seperti konsultasi, pelatihan, desain, fotografi, serta layanan kendaraan
               </p>
               <button style={{
                 padding: '12px 24px',
@@ -314,7 +328,7 @@ export default function TambahProdukPage() {
           isSubmitting={isSubmitting}
           errorMsg=""
           successMsg=""
-          categories={selectedType === 'barang' ? RENTAL_CATEGORIES : SERVICE_CATEGORIES}
+          categories={selectedType === 'barang' ? BARANG_CATEGORY_TREE : SERVICE_CATEGORY_TREE}
         />
       </div>
     </div>

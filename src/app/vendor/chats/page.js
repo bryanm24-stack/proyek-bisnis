@@ -241,6 +241,10 @@ export default function VendorChatsPage() {
       const data = await res.json();
       if (data.success) {
         setDealData(data.data.deal);
+        if (data.data.chat) {
+          setSelectedChat(data.data.chat);
+          setChats((prev) => prev.map((c) => (c.id === data.data.chat.id ? data.data.chat : c)));
+        }
         setDiscountMode(null);
         alert('Diskon berhasil diterapkan');
       } else {
@@ -248,7 +252,7 @@ export default function VendorChatsPage() {
       }
     } catch (err) {
       console.error(err);
-      alert('Terjadi kesalahan saat menerapkan diskon');
+      alert('Terjadi kesalahan saat menerapkan diskon: ' + err.message);
     }
   };
 

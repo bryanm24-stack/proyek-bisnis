@@ -4,24 +4,11 @@ import React, { useState, useEffect } from 'react';
 import SharedNavbar from '../../components/SharedNavbar';
 import { useRouter, useSearchParams } from 'next/navigation';
 import VendorProductForm from '../VendorProductForm';
-
-const RENTAL_CATEGORIES = {
-  'Elektronik': ['Laptop', 'Kamera', 'Proyektor', 'Drone', 'Speaker', 'Monitor', 'Printer', 'Gaming Console', 'Lainnya'],
-  'Alat Olahraga': ['Sepeda', 'Papan Selancar', 'Peralatan Lari', 'Gym Equipment', 'Sepatu Olahraga', 'Tenda Camping', 'Lainnya'],
-  'Furniture': ['Meja', 'Kursi', 'Lemari', 'Tempat Tidur', 'Sofa', 'Rak', 'Lainnya'],
-  'Peralatan Acara': ['Sound System', 'Lighting', 'Dekorasi', 'Tenda Pesta', 'Kursi Event', 'Panggung Portable', 'Lainnya'],
-  'Peralatan Rumah Tangga': ['Kulkas', 'Mesin Cuci', 'AC', 'Vacuum', 'Oven', 'Rice Cooker', 'Lainnya'],
-  'Peralatan Konstruksi': ['Scaffolding', 'Crane', 'Mixer', 'Chainsaw', 'Generator', 'Kompressor', 'Lainnya'],
-  'Kendaraan': ['Mobil', 'Motor', 'Mobil Bak', 'Sewa Driver', 'Lainnya'],
-  'Peralatan Dapur': ['Piring Set', 'Gelas Set', 'Peralatan Masak', 'Meja Makan', 'Kursi Makan', 'Lainnya'],
-  'Kostum & Fashion': ['Baju Pengantin', 'Kostum Cosplay', 'Pakaian Pesta', 'Aksesori', 'Tas Branded', 'Lainnya'],
-  'Peralatan Fotografi': ['Studio Lighting', 'Tripod', 'Reflector', 'Backdrop', 'Lainnya'],
-  'Peralatan Musik': ['Gitar', 'Keyboard', 'Drum', 'Microphone', 'Amplifier', 'Lainnya'],
-  'Mainan & Anak': ['Playground', 'Bouncing Castle', 'Permainan Edukatif', 'Sepeda Anak', 'Lainnya'],
-  'Jasa Profesional': ['Konsultasi', 'Pelatihan', 'Desain', 'Photography', 'Videography', 'Lainnya'],
-  'Peralatan Outdoor': ['Tenda', 'Sleeping Bag', 'Rucksack', 'Cooking Gear', 'GPS Device', 'Lainnya'],
-  'Lainnya': ['Tidak ada kategori', 'Custom Item']
-};
+import {
+  ALL_VENDOR_CATEGORY_TREE,
+  getSubCategoryMap,
+  getSuperSubOptions
+} from '../category-tree';
 
 export default function EditProdukPage() {
   const router = useRouter();
@@ -37,6 +24,7 @@ export default function EditProdukPage() {
   const [formData, setFormData] = useState({
     mainCategory: '',
     subCategory: '',
+    superSubCategory: '',
     title: '',
     shortDescription: '',
     description: '',
@@ -45,7 +33,11 @@ export default function EditProdukPage() {
     quantity: '',
     rentalPolicy: '',
     location: '',
-    images: []
+    images: [],
+    specifications: {},
+    descriptionTable: {},
+    checklist: {},
+    items: []
   });
 
   useEffect(() => {
@@ -81,6 +73,7 @@ export default function EditProdukPage() {
           setFormData({
             mainCategory: item.mainCategory || item.category || '',
             subCategory: item.subCategory || '',
+            superSubCategory: item.superSubCategory || '',
             title: item.title || '',
             shortDescription: item.shortDescription || '',
             description: item.description || item.detailDescription || '',
@@ -89,7 +82,11 @@ export default function EditProdukPage() {
             quantity: item.quantity?.toString() || '',
             rentalPolicy: item.rentalPolicy || '',
             location: item.location || '',
-            images: item.images || []
+            images: item.images || [],
+            specifications: item.specifications || {},
+            descriptionTable: item.descriptionTable || {},
+            checklist: item.checklist || {},
+            items: item.items || []
           });
         }
       }
@@ -107,8 +104,14 @@ export default function EditProdukPage() {
     setSuccessMsg('');
 
     const missingFields = [];
+    const subCategoryMap = getSubCategoryMap(ALL_VENDOR_CATEGORY_TREE, formData.mainCategory);
+    const superSubOptions = getSuperSubOptions(ALL_VENDOR_CATEGORY_TREE, formData.mainCategory, formData.subCategory);
+
     if (!formData.mainCategory) missingFields.push('Kategori Utama');
-    if (!formData.subCategory && RENTAL_CATEGORIES[formData.mainCategory]?.length > 0) missingFields.push('Sub Kategori');
+    if (!formData.subCategory && Object.keys(subCategoryMap).length > 0) missingFields.push('Sub Kategori');
+    if (!formData.superSubCategory && superSubOptions.length > 0) {
+      missingFields.push('Super-Sub Kategori');
+    }
     if (!formData.title) missingFields.push('Nama Item');
     if (!formData.shortDescription) missingFields.push('Deskripsi Singkat');
     if (!formData.price) missingFields.push('Harga per Hari');
@@ -129,6 +132,7 @@ export default function EditProdukPage() {
         vendorName: user.name,
         mainCategory: formData.mainCategory,
         subCategory: formData.subCategory,
+        superSubCategory: formData.superSubCategory,
         category: formData.mainCategory,
         title: formData.title,
         shortDescription: formData.shortDescription,
@@ -139,6 +143,10 @@ export default function EditProdukPage() {
         quantity: parseInt(formData.quantity),
         rentalPolicy: formData.rentalPolicy,
         location: formData.location,
+        specifications: formData.specifications || {},
+        descriptionTable: formData.descriptionTable || {},
+        checklist: formData.checklist || {},
+        items: formData.items || [],
         images: formData.images.filter(img => typeof img === 'string' && (img.startsWith('data:') || img.startsWith('http'))),
         rating: 0,
         rentCount: 0
@@ -243,6 +251,7 @@ export default function EditProdukPage() {
           isSubmitting={isSubmitting}
           errorMsg=""
           successMsg=""
+          categories={ALL_VENDOR_CATEGORY_TREE}
           isEditing={true}
         />
       </div>

@@ -10,8 +10,9 @@ export default function HomePageClient() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedService, setSelectedService] = useState(null);
+  const [selectedItemDetail, setSelectedItemDetail] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [detailTab, setDetailTab] = useState('information');
+  const [detailTab, setDetailTab] = useState('packages');
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [chatData, setChatData] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -94,7 +95,8 @@ export default function HomePageClient() {
 
   const openModal = (service) => {
     setSelectedService(service);
-    setDetailTab('information');
+    setDetailTab('packages');
+    setSelectedItemDetail(null);
     setServiceReviews([]);
     setReviewsLoading(true);
     setReviewFilter('all');
@@ -120,6 +122,7 @@ export default function HomePageClient() {
   const closeModal = () => {
     setModalOpen(false);
     setSelectedService(null);
+    setSelectedItemDetail(null);
     setServiceReviews([]);
     setReviewsLoading(false);
     setReviewFilter('all');
@@ -220,7 +223,9 @@ export default function HomePageClient() {
           vendorName: selectedService.vendorName,
           customerId: user.id,
           customerName: user.name,
-          message: newMessage
+          message: newMessage,
+          senderId: user.id,
+          senderName: user.name
         })
       });
 
@@ -258,8 +263,13 @@ export default function HomePageClient() {
 
       const data = await response.json();
       if (data.success) {
-        setDealData(data.data.deal);
-        setChatData(data.data.chat);
+        // Handle consistent response format
+        if (data.data.deal) {
+          setDealData(data.data.deal);
+        }
+        if (data.data.chat) {
+          setChatData(data.data.chat);
+        }
         
         if (action === 'accept' && data.data.readyForRating) {
           setShowRatingForm(true);
@@ -270,10 +280,12 @@ export default function HomePageClient() {
         }
 
         alert(data.message);
+      } else {
+        alert('Error: ' + (data.message || 'Gagal memproses deal'));
       }
     } catch (error) {
       console.error('Error processing deal:', error);
-      alert('Gagal memproses deal');
+      alert('Gagal memproses deal: ' + error.message);
     }
   };
 
@@ -515,26 +527,34 @@ export default function HomePageClient() {
             </div>
 
             <div className="modal-body">
+              {/* Gallery dari Paket Items atau Default Image */}
               <div className="modal-image">
-                <img src={selectedService.image || (selectedService.images && selectedService.images.length > 0 ? selectedService.images[0] : 'https://via.placeholder.com/400x300?text=' + encodeURIComponent(selectedService.title || 'Service'))} alt={selectedService.title} />
+                {selectedService.items && selectedService.items.length > 0 ? (
+                  <img src={selectedItemDetail?.images?.[0] || selectedService.items[0].images?.[0] || 'https://via.placeholder.com/400x300?text=' + encodeURIComponent('Paket')} alt={selectedItemDetail?.namaBarang || selectedItemDetail?.namaJasa || 'Paket'} />
+                ) : (
+                  <img src={selectedService.image || (selectedService.images && selectedService.images.length > 0 ? selectedService.images[0] : 'https://via.placeholder.com/400x300?text=' + encodeURIComponent(selectedService.title || 'Service'))} alt={selectedService.title} />
+                )}
               </div>
 
               <div className="modal-price-block">
                 <div className="modal-price-title">Harga Sewa</div>
                 <div className="modal-price">
                   <span className="modal-price-label">Rp</span>
-                  <span className="modal-price-amount">{formatPrice(selectedService.price ?? selectedService.harga)}</span>
-                  <span className="modal-price-period">/ hari</span>
+                  <span className="modal-price-amount">{selectedItemDetail ? (selectedItemDetail.hargaPcs ? Number(selectedItemDetail.hargaPcs).toLocaleString('id-ID') : Number(selectedItemDetail.hargaSesi).toLocaleString('id-ID')) : formatPrice(selectedService.price ?? selectedService.harga)}</span>
+                  <span className="modal-price-period">/ {selectedItemDetail?.hargaSesi ? 'Hari' : selectedItemDetail?.hargaPcs ? 'Pcs' : 'hari'}</span>
                 </div>
               </div>
 
               <div className="modal-info">
-                <div className="modal-tabs">
+              <div className="modal-tabs">
                   <button
-                    className={`tab ${detailTab === 'information' ? 'active' : ''}`}
-                    onClick={() => setDetailTab('information')}
+                    className={`tab ${detailTab === 'packages' ? 'active' : ''}`}
+                    onClick={() => {
+                      setDetailTab('packages');
+                      setSelectedItemDetail(null);
+                    }}
                   >
-                    Informasi Penjual
+                    📦 Paket Tersedia
                   </button>
                   <button
                     className={`tab ${detailTab === 'description' ? 'active' : ''}`}
@@ -543,14 +563,119 @@ export default function HomePageClient() {
                     Deskripsi Produk
                   </button>
                   <button
-                    className={`tab ${detailTab === 'activation' ? 'active' : ''}`}
-                    onClick={() => setDetailTab('activation')}
+                    className={`tab ${detailTab === 'information' ? 'active' : ''}`}
+                    onClick={() => setDetailTab('information')}
                   >
-                    Panduan Aktivasi
+                    Informasi Penjual
                   </button>
                 </div>
 
                 <div className="tab-panel">
+                  {detailTab === 'packages' && (
+                    <>
+                      {selectedService.items && selectedService.items.length > 0 ? (
+                        <>
+                          {/* Package Gallery */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                            gap: '16px',
+                            marginBottom: '24px'
+                          }}>
+                            {selectedService.items.map((item, idx) => (
+                              <div
+                                key={item.id || idx}
+                                onClick={() => setSelectedItemDetail(item)}
+                                style={{
+                                  cursor: 'pointer',
+                                  borderRadius: '8px',
+                                  overflow: 'hidden',
+                                  border: selectedItemDetail?.id === item.id ? '3px solid #5A45D1' : '1px solid #ddd',
+                                  transition: 'all 0.3s ease',
+                                  transform: selectedItemDetail?.id === item.id ? 'scale(1.05)' : 'scale(1)'
+                                }}
+                              >
+                                <img
+                                  src={item.images && item.images.length > 0 ? item.images[0] : 'https://via.placeholder.com/120x120?text=Paket'}
+                                  alt={item.namaBarang || item.namaJasa}
+                                  style={{
+                                    width: '100%',
+                                    height: '120px',
+                                    objectFit: 'cover'
+                                  }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Selected Item Details */}
+                          {selectedItemDetail && (
+                            <div style={{
+                              backgroundColor: '#f8f9fa',
+                              padding: '16px',
+                              borderRadius: '8px',
+                              marginTop: '16px'
+                            }}>
+                              <div style={{ marginBottom: '16px' }}>
+                                <img
+                                  src={selectedItemDetail.images && selectedItemDetail.images.length > 0 ? selectedItemDetail.images[0] : 'https://via.placeholder.com/300x200?text=Paket'}
+                                  alt={selectedItemDetail.namaBarang || selectedItemDetail.namaJasa}
+                                  style={{
+                                    width: '100%',
+                                    height: '200px',
+                                    objectFit: 'cover',
+                                    borderRadius: '8px'
+                                  }}
+                                />
+                              </div>
+                              <h4 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: 'bold' }}>
+                                {selectedItemDetail.namaBarang || selectedItemDetail.namaJasa}
+                              </h4>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                                <div>
+                                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Harga</p>
+                                  <p style={{ margin: '0', fontSize: '16px', fontWeight: 'bold', color: '#5A45D1' }}>
+                                    Rp {selectedItemDetail.hargaPcs ? Number(selectedItemDetail.hargaPcs).toLocaleString('id-ID') : Number(selectedItemDetail.hargaSesi).toLocaleString('id-ID')}
+                                    {selectedItemDetail.hargaSesi ? ' / Hari' : ' / Pcs'}
+                                  </p>
+                                </div>
+                                {selectedItemDetail.stok && (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Stok</p>
+                                    <p style={{ margin: '0', fontSize: '16px', fontWeight: 'bold' }}>{selectedItemDetail.stok}</p>
+                                  </div>
+                                )}
+                              </div>
+                              <button
+                                className="btn-primary-modal"
+                                onClick={() => openChatModal(selectedService)}
+                                disabled={user && user.id === selectedService.vendorId}
+                                style={{
+                                  width: '100%',
+                                  padding: '10px',
+                                  backgroundColor: '#5A45D1',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  cursor: user && user.id === selectedService.vendorId ? 'not-allowed' : 'pointer',
+                                  opacity: user && user.id === selectedService.vendorId ? 0.5 : 1
+                                }}
+                              >
+                                💬 Chat untuk Paket Ini
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="info-section">
+                          <p style={{ color: '#999', textAlign: 'center', padding: '40px 0' }}>
+                            Belum ada paket tersedia
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
+
                   {detailTab === 'information' && (
                     <>
                       <div className="info-section">
@@ -732,26 +857,6 @@ export default function HomePageClient() {
                     </>
                   )}
 
-                  {detailTab === 'activation' && (
-                    <>
-                      <div className="info-section">
-                        <h4>1. Pilih layanan</h4>
-                        <p>Pilih layanan yang Anda inginkan dan klik tombol Chat Vendor untuk negosiasi.</p>
-                      </div>
-                      <div className="info-section">
-                        <h4>2. Konfirmasi pesanan</h4>
-                        <p>Tunggu vendor mengonfirmasi dan setujui detail harga, jumlah, dan waktu pengambilan.</p>
-                      </div>
-                      <div className="info-section">
-                        <h4>3. Bayar atau ambil barang</h4>
-                        <p>Lakukan pembayaran jika diperlukan, lalu ambil barang sesuai jadwal atau minta vendor mengirim.</p>
-                      </div>
-                      <div className="info-section">
-                        <h4>4. Selesaikan transaksi</h4>
-                        <p>Pastikan kondisi barang sesuai, lalu berikan rating dan review setelah transaksi selesai.</p>
-                      </div>
-                    </>
-                  )}
                 </div>
 
                 <div className="modal-actions">
@@ -786,28 +891,54 @@ export default function HomePageClient() {
               <button className="modal-close" onClick={closeChatModal}>✕</button>
             </div>
 
-            {/* Deal Buttons */}
-            <div className="chat-deal-actions">
+            {/* Deal Buttons - Transparent Bar at Top of Chat */}
+            <div className="chat-deal-actions" style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: '12px',
+              padding: '12px',
+              backgroundColor: 'rgba(255, 255, 255, 0.7)',
+              borderBottom: '1px solid rgba(200, 200, 200, 0.3)',
+              backdropFilter: 'blur(4px)'
+            }}>
               <button
                 className="btn-deal"
                 onClick={() => handleDealAction('accept')}
                 disabled={dealData?.status === 'agreed' || dealData?.status === 'cancelled'}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  backgroundColor: dealData?.status === 'agreed' ? '#d4edda' : '#28a745',
+                  color: dealData?.status === 'agreed' ? '#155724' : 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: 'bold',
+                  cursor: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
+                  opacity: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? 0.6 : 1,
+                  transition: 'all 0.3s ease'
+                }}
               >
-                ✅ Deal
+                ✅ {dealData?.status === 'agreed' ? 'Deal Diterima' : 'Deal'}
               </button>
               <button
                 className="btn-cancel"
                 onClick={() => handleDealAction('cancel')}
                 disabled={dealData?.status === 'cancelled'}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  backgroundColor: dealData?.status === 'cancelled' ? '#f8d7da' : '#dc3545',
+                  color: dealData?.status === 'cancelled' ? '#721c24' : 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: 'bold',
+                  cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
+                  opacity: dealData?.status === 'cancelled' ? 0.6 : 1,
+                  transition: 'all 0.3s ease'
+                }}
               >
-                ❌ Cancel
+                ❌ {dealData?.status === 'cancelled' ? 'Dibatalkan' : 'Cancel'}
               </button>
-              {dealData?.status === 'agreed' && (
-                <span className="deal-status">✓ Deal Diterima</span>
-              )}
-              {dealData?.status === 'cancelled' && (
-                <span className="deal-status cancelled">✗ Deal Dibatalkan</span>
-              )}
             </div>
 
             {/* Chat Messages */}

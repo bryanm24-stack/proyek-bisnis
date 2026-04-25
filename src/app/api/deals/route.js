@@ -48,6 +48,87 @@ export async function POST(request) {
     const dealsData = await fs.readFile(dealsPath, 'utf-8');
     const deals = JSON.parse(dealsData);
 
+    // Handle vendor discount after deal is agreed
+    if (action === 'apply-discount') {
+      const { chatId, vendorId, discountType, discountValue } = body;
+      if (!chatId || !vendorId || !discountType || typeof discountValue !== 'number') {
+        return NextResponse.json({ success: false, message: 'Data diskon tidak lengkap' }, { status: 400 });
+      }
+
+      const chatRoom = chats.find(c => c.id === chatId);
+      if (!chatRoom) {
+        return NextResponse.json({ success: false, message: 'Chat room tidak ditemukan' }, { status: 404 });
+      }
+
+      const deal = deals.find(d => d.chatId === chatId);
+      if (!deal) {
+        return NextResponse.json({ success: false, message: 'Deal belum dibuat' }, { status: 404 });
+      }
+
+      if (String(deal.vendorId) !== String(vendorId)) {
+        return NextResponse.json({ success: false, message: 'Hanya vendor pemilik deal yang bisa memberi diskon' }, { status: 403 });
+      }
+
+      if (deal.status !== 'agreed') {
+        return NextResponse.json({ success: false, message: 'Diskon hanya bisa diterapkan setelah deal disetujui' }, { status: 400 });
+      }
+
+      if (typeof deal.originalPrice === 'undefined' || deal.originalPrice === null) {
+        const servicesData = await fs.readFile(servicesPath, 'utf-8');
+        const services = JSON.parse(servicesData);
+        const svc = services.find(s => String(s.id) === String(deal.serviceId));
+        deal.originalPrice = Number(svc?.price ?? svc?.harga ?? 0);
+      }
+
+      const originalPrice = Number(deal.originalPrice || 0);
+      if (originalPrice < 0) {
+        return NextResponse.json({ success: false, message: 'Harga asli tidak valid' }, { status: 400 });
+      }
+
+      let normalizedValue = Number(discountValue);
+      if (!Number.isFinite(normalizedValue) || normalizedValue < 0) {
+        return NextResponse.json({ success: false, message: 'Nilai diskon tidak valid' }, { status: 400 });
+      }
+
+      let amount = 0;
+      if (discountType === 'percent') {
+        if (normalizedValue > 100) normalizedValue = 100;
+        amount = Math.round((normalizedValue / 100) * originalPrice);
+      } else if (discountType === 'amount') {
+        amount = Math.round(normalizedValue);
+      } else {
+        return NextResponse.json({ success: false, message: 'Tipe diskon tidak valid' }, { status: 400 });
+      }
+
+      if (amount > originalPrice) amount = originalPrice;
+      const finalPrice = Math.max(originalPrice - amount, 0);
+
+      deal.discountGiven = amount > 0;
+      deal.discount = {
+        type: discountType,
+        value: normalizedValue,
+        amount
+      };
+      deal.finalPrice = finalPrice;
+      deal.discountUpdatedAt = new Date().toISOString();
+
+      await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+
+      await createNotification(
+        deal.customerId,
+        'deal_discount_applied',
+        `Vendor memberikan diskon. Harga akhir: Rp ${finalPrice.toLocaleString('id-ID')}`,
+        chatId,
+        { vendorId: deal.vendorId, serviceId: deal.serviceId, finalPrice, amount }
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: 'Diskon berhasil diterapkan',
+        data: { deal, chat: chatRoom }
+      }, { status: 200 });
+    }
+
     // Handle cancel
     if (action === 'cancel') {
       const { chatId, customerId, vendorId, serviceId } = body;
@@ -63,9 +144,16 @@ export async function POST(request) {
       chatRoom.dealStatus = 'cancelled';
       await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
 
+      // Find and update deal status if exists
+      const existingDeal = deals.find(d => d.chatId === chatId);
+      if (existingDeal) {
+        existingDeal.status = 'cancelled';
+      }
+      await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+
       await createNotification(vendorId, 'deal_cancelled', 'Deal dibatalkan oleh customer', chatId, { customerId, serviceId });
 
-      return NextResponse.json({ success: true, message: 'Deal dibatalkan', data: chatRoom }, { status: 200 });
+      return NextResponse.json({ success: true, message: 'Deal dibatalkan', data: { deal: existingDeal || null, chat: chatRoom } }, { status: 200 });
     }
 
     // Handle accept
@@ -155,6 +243,8 @@ export async function POST(request) {
         return NextResponse.json({ success: true, message: 'Deal diterima.', data: { deal: existingDeal, chat: chatRoom, readyForRating: true } }, { status: 200 });
       }
     }
+
+    return NextResponse.json({ success: false, message: 'Action tidak dikenali' }, { status: 400 });
   } catch (error) {
     console.error('Error processing deal:', error);
     return NextResponse.json({ success: false, message: 'Terjadi kesalahan server.' }, { status: 500 });
