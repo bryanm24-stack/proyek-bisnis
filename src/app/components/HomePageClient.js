@@ -49,10 +49,10 @@ export default function HomePageClient() {
 
     const fetchServices = async () => {
       try {
-        const response = await fetch('/api/vendor/services');
+        const response = await fetch('/api/vendor/services', { cache: 'no-store' });
         const data = await response.json();
         if (data.success) {
-          setServices(data.data);
+          setServices(Array.isArray(data.data) ? data.data : []);
         }
       } catch (error) {
         console.error('Error fetching services:', error);
@@ -92,6 +92,22 @@ export default function HomePageClient() {
     }
     return '0';
   };
+
+  const getNonEmptyObjectEntries = (value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+    return Object.entries(value).filter(([, entryValue]) => {
+      if (entryValue === null || entryValue === undefined) return false;
+      if (typeof entryValue === 'string') return entryValue.trim() !== '';
+      return true;
+    });
+  };
+
+  const formatFieldLabel = (key) =>
+    key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/[_-]+/g, ' ')
+      .replace(/^./, (char) => char.toUpperCase())
+      .trim();
 
   const openModal = (service) => {
     setSelectedService(service);
@@ -368,6 +384,15 @@ export default function HomePageClient() {
   };
 
   const filteredServices = getFilteredServices();
+  const specificationEntries = getNonEmptyObjectEntries(selectedService?.specifications);
+  const descriptionTableEntries = getNonEmptyObjectEntries(selectedService?.descriptionTable);
+  const checklistEntries = getNonEmptyObjectEntries(selectedService?.checklist);
+  const locationLabel = selectedService?.location || selectedService?.lokasi || '-';
+  const categoryPath = [
+    selectedService?.mainCategory,
+    selectedService?.subCategory,
+    selectedService?.superSubCategory
+  ].filter(Boolean).join(' > ');
   const REVIEWS_PER_PAGE = 5;
   const filteredReviews = serviceReviews.filter((review) =>
     reviewFilter === 'all' ? true : Number(review.rating) === Number(reviewFilter)
@@ -437,6 +462,7 @@ export default function HomePageClient() {
         {/* Search Bar with Category Filter */}
         <SearchBar 
           services={filteredServices}
+          categoriesSource={services}
           onSearch={(term, category) => {
             setSearchTerm(term);
             setSelectedCategory(category);
@@ -490,7 +516,7 @@ export default function HomePageClient() {
                     
                     <div className="vendor-stats">
                       <div className="stat-rating">
-                        <span className="rating-stars">⭐ {service.rating.toFixed(1)}</span>
+                        <span className="rating-stars">⭐ {Number(service.rating || 0).toFixed(1)}</span>
                         <span className="rating-count">({service.rentCount} disewa)</span>
                       </div>
                     </div>
@@ -567,6 +593,12 @@ export default function HomePageClient() {
                     onClick={() => setDetailTab('information')}
                   >
                     Informasi Penjual
+                  </button>
+                  <button
+                    className={`tab ${detailTab === 'reviews' ? 'active' : ''}`}
+                    onClick={() => setDetailTab('reviews')}
+                  >
+                    Rating & Review
                   </button>
                 </div>
 
@@ -684,6 +716,163 @@ export default function HomePageClient() {
                       </div>
 
                       <div className="info-section">
+                        <h4>🏷️ Kategori</h4>
+                        <p>{categoryPath || selectedService.category || '-'}</p>
+                      </div>
+
+                      <div className="info-section">
+                        <h4>📈 Terjual</h4>
+                        <p>{selectedService.rentCount ?? '0'}</p>
+                      </div>
+
+                      {(selectedService.location || selectedService.lokasi) && (
+                        <div className="info-section">
+                          <h4>📍 Lokasi Penjemputan</h4>
+                          <p>{locationLabel}</p>
+                        </div>
+                      )}
+
+                      {selectedService.minimumDays && (
+                        <div className="info-section">
+                          <h4>📅 Minimum Sewa</h4>
+                          <p>{selectedService.minimumDays} hari</p>
+                        </div>
+                      )}
+
+                      {selectedService.rentalPolicy && (
+                        <div className="info-section">
+                          <h4>📜 Kebijakan Sewa</h4>
+                          <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.rentalPolicy}</p>
+                        </div>
+                      )}
+
+                      <div className="info-section">
+                        <h4>🕒 Status</h4>
+                        <p>Terakhir online baru-baru ini</p>
+                      </div>
+                    </>
+                  )}
+
+                  {detailTab === 'description' && (
+                    <>
+                      {selectedService.shortDescription && (
+                        <div className="info-section">
+                          <h4>📌 Deskripsi Singkat</h4>
+                          <p style={{ lineHeight: '1.6', color: '#555' }}>{selectedService.shortDescription}</p>
+                        </div>
+                      )}
+
+                      <div className="info-section">
+                        <h4>📝 Deskripsi Lengkap</h4>
+                        <p style={{ lineHeight: '1.6', color: '#555' }}>
+                          {selectedService.detailDescription || selectedService.description}
+                        </p>
+                      </div>
+
+                      {descriptionTableEntries.length > 0 && (
+                        <div className="info-section">
+                          <h4>📋 Detail Produk/Jasa</h4>
+                          <div style={{ display: 'grid', gap: '10px' }}>
+                            {descriptionTableEntries.map(([key, value]) => (
+                              <div key={key}>
+                                <strong>{formatFieldLabel(key)}:</strong> {String(value)}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {specificationEntries.length > 0 && (
+                        <div className="info-section">
+                          <h4>🔧 Spesifikasi</h4>
+                          <div style={{ display: 'grid', gap: '10px' }}>
+                            {specificationEntries.map(([key, value]) => (
+                              <div key={key}>
+                                <strong>{formatFieldLabel(key)}:</strong> {String(value)}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {checklistEntries.length > 0 && (
+                        <div className="info-section">
+                          <h4>✅ Checklist</h4>
+                          <ul style={{ margin: '0', paddingLeft: '18px' }}>
+                            {checklistEntries.map(([key, value]) => (
+                              <li key={key}>{String(value) === 'true' ? formatFieldLabel(key) : String(value)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {(selectedService.type === 'barang' || selectedService.category === 'barang') && (
+                        <>
+                          <div className="info-section">
+                            <h4>📦 Keterangan Barang</h4>
+                            <p>{selectedService.jenisBarang || selectedService.shortDescription || '-'}</p>
+                          </div>
+
+                          {selectedService.spesifikBarang && (
+                            <div className="info-section">
+                              <h4>🔎 Spesifik Barang</h4>
+                              <p>{selectedService.spesifikBarang}</p>
+                            </div>
+                          )}
+
+                          {selectedService.kebijakanKerusakan && (
+                            <div className="info-section">
+                              <h4>🛡️ Kebijakan Kerusakan</h4>
+                              <p>{selectedService.kebijakanKerusakan}</p>
+                            </div>
+                          )}
+
+                          {selectedService.dendaKeterlambatan && (
+                            <div className="info-section">
+                              <h4>⚠️ Denda Keterlambatan</h4>
+                              <p>{selectedService.dendaKeterlambatan}</p>
+                            </div>
+                          )}
+
+                          {selectedService.syaratKetentuan && (
+                            <div className="info-section">
+                              <h4>📋 Syarat & Ketentuan</h4>
+                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {(selectedService.type === 'jasa' || selectedService.category === 'jasa') && (
+                        <>
+                          {selectedService.spesifikBarang && (
+                            <div className="info-section">
+                              <h4>✨ Detail Layanan</h4>
+                              <p>{selectedService.spesifikBarang}</p>
+                            </div>
+                          )}
+
+                          {selectedService.dendaKeterlambatan && (
+                            <div className="info-section">
+                              <h4>⚠️ Denda Keterlambatan</h4>
+                              <p>{selectedService.dendaKeterlambatan}</p>
+                            </div>
+                          )}
+
+                          {selectedService.syaratKetentuan && (
+                            <div className="info-section">
+                              <h4>📋 Syarat & Ketentuan</h4>
+                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  {detailTab === 'reviews' && (
+                    <>
+                      <div className="info-section">
                         <h4>⭐ Rating & Review</h4>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#5A45D1' }}>
@@ -756,104 +945,6 @@ export default function HomePageClient() {
                           </div>
                         )}
                       </div>
-                    
-
-                      {(selectedService.category === 'barang' || selectedService.type === 'barang') && (
-                        <div className="info-section">
-                          <h4>📦 Stok</h4>
-                          <p>{selectedService.jumlahBarang ?? 'N/A'}</p>
-                        </div>
-                      )}
-
-                      <div className="info-section">
-                        <h4>📈 Terjual</h4>
-                        <p>{selectedService.rentCount ?? '0'}</p>
-                      </div>
-
-                      {selectedService.lokasi && (
-                        <div className="info-section">
-                          <h4>📍 Lokasi Penjemputan</h4>
-                          <p>{selectedService.lokasi}</p>
-                        </div>
-                      )}
-
-                      <div className="info-section">
-                        <h4>🕒 Status</h4>
-                        <p>Terakhir online baru-baru ini</p>
-                      </div>
-                    </>
-                  )}
-
-                  {detailTab === 'description' && (
-                    <>
-                      <div className="info-section">
-                        <h4>📝 Deskripsi Lengkap</h4>
-                        <p style={{ lineHeight: '1.6', color: '#555' }}>
-                          {selectedService.detailDescription || selectedService.description}
-                        </p>
-                      </div>
-
-                      {(selectedService.type === 'barang' || selectedService.category === 'barang') && (
-                        <>
-                          <div className="info-section">
-                            <h4>📦 Keterangan Barang</h4>
-                            <p>{selectedService.jenisBarang || selectedService.shortDescription || '-'}</p>
-                          </div>
-
-                          {selectedService.spesifikBarang && (
-                            <div className="info-section">
-                              <h4>🔎 Spesifik Barang</h4>
-                              <p>{selectedService.spesifikBarang}</p>
-                            </div>
-                          )}
-
-                          {selectedService.kebijakanKerusakan && (
-                            <div className="info-section">
-                              <h4>🛡️ Kebijakan Kerusakan</h4>
-                              <p>{selectedService.kebijakanKerusakan}</p>
-                            </div>
-                          )}
-
-                          {selectedService.dendaKeterlambatan && (
-                            <div className="info-section">
-                              <h4>⚠️ Denda Keterlambatan</h4>
-                              <p>{selectedService.dendaKeterlambatan}</p>
-                            </div>
-                          )}
-
-                          {selectedService.syaratKetentuan && (
-                            <div className="info-section">
-                              <h4>📋 Syarat & Ketentuan</h4>
-                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {(selectedService.type === 'jasa' || selectedService.category === 'jasa') && (
-                        <>
-                          {selectedService.spesifikBarang && (
-                            <div className="info-section">
-                              <h4>✨ Detail Layanan</h4>
-                              <p>{selectedService.spesifikBarang}</p>
-                            </div>
-                          )}
-
-                          {selectedService.dendaKeterlambatan && (
-                            <div className="info-section">
-                              <h4>⚠️ Denda Keterlambatan</h4>
-                              <p>{selectedService.dendaKeterlambatan}</p>
-                            </div>
-                          )}
-
-                          {selectedService.syaratKetentuan && (
-                            <div className="info-section">
-                              <h4>📋 Syarat & Ketentuan</h4>
-                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
-                            </div>
-                          )}
-                        </>
-                      )}
                     </>
                   )}
 

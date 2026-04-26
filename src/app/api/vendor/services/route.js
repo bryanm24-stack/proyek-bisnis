@@ -49,6 +49,7 @@ export async function POST(request) {
       specifications,
       descriptionTable,
       checklist,
+      items,
       // Fields untuk barang
       namaBarang,
       jenisBarang,
