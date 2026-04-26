@@ -49,10 +49,10 @@ export default function HomePageClient() {
 
     const fetchServices = async () => {
       try {
-        const response = await fetch('/api/vendor/services');
+        const response = await fetch('/api/vendor/services', { cache: 'no-store' });
         const data = await response.json();
         if (data.success) {
-          setServices(data.data);
+          setServices(Array.isArray(data.data) ? data.data : []);
         }
       } catch (error) {
         console.error('Error fetching services:', error);
@@ -92,6 +92,22 @@ export default function HomePageClient() {
     }
     return '0';
   };
+
+  const getNonEmptyObjectEntries = (value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+    return Object.entries(value).filter(([, entryValue]) => {
+      if (entryValue === null || entryValue === undefined) return false;
+      if (typeof entryValue === 'string') return entryValue.trim() !== '';
+      return true;
+    });
+  };
+
+  const formatFieldLabel = (key) =>
+    key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/[_-]+/g, ' ')
+      .replace(/^./, (char) => char.toUpperCase())
+      .trim();
 
   const openModal = (service) => {
     setSelectedService(service);
@@ -246,7 +262,7 @@ export default function HomePageClient() {
   };
 
   const handleDealAction = async (action) => {
-    if (!selectedService || !user) return;
+    if (!selectedService || !user || !chatData?.id) return;
 
     try {
       const response = await fetch('/api/deals', {
@@ -254,7 +270,7 @@ export default function HomePageClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action,
-          chatId: chatData?.id,
+          chatId: chatData.id,
           customerId: user.id,
           vendorId: selectedService.vendorId,
           serviceId: selectedService.id
@@ -262,31 +278,81 @@ export default function HomePageClient() {
       });
 
       const data = await response.json();
-      if (data.success) {
-        // Handle consistent response format
-        if (data.data.deal) {
-          setDealData(data.data.deal);
-        }
-        if (data.data.chat) {
-          setChatData(data.data.chat);
-        }
-        
-        if (action === 'accept' && data.data.readyForRating) {
-          setShowRatingForm(true);
-        }
+      if (!response.ok || !data.success) {
+        alert('Error: ' + (data.message || 'Gagal memproses deal'));
+        return;
+      }
 
-        if (action === 'cancel') {
+      if (data.data?.deal) {
+        setDealData(data.data.deal);
+        if (data.data.deal.status === 'cancelled') {
           setShowRatingForm(false);
         }
-
-        alert(data.message);
-      } else {
-        alert('Error: ' + (data.message || 'Gagal memproses deal'));
       }
+
+      if (data.data?.chat) {
+        setChatData(data.data.chat);
+      }
+
+      alert(data.message);
     } catch (error) {
       console.error('Error processing deal:', error);
       alert('Gagal memproses deal: ' + error.message);
     }
+  };
+
+  const getDealStatusConfig = () => {
+    if (!dealData) {
+      return {
+        label: 'Belum ada status deal',
+        description: 'Transaksi diproses vendor. Kamu cukup lanjut negosiasi di chat.',
+        background: '#f3f4f6',
+        color: '#374151'
+      };
+    }
+
+    if (dealData.status === 'pending') {
+      return {
+        label: 'Menunggu konfirmasi vendor',
+        description: 'Vendor belum mengonfirmasi. Tunggu update dari vendor di chat ini.',
+        background: '#fff7ed',
+        color: '#c2410c'
+      };
+    }
+
+    if (dealData.status === 'agreed') {
+      return {
+        label: 'Deal disetujui',
+        description: 'Deal sudah disepakati. Kamu bisa lanjut ke pembayaran.',
+        background: '#dbeafe',
+        color: '#1d4ed8'
+      };
+    }
+
+    if (dealData.status === 'cancelled') {
+      return {
+        label: 'Deal dibatalkan',
+        description: 'Deal dibatalkan. Kamu bisa lanjut negosiasi ulang melalui chat.',
+        background: '#fee2e2',
+        color: '#b91c1c'
+      };
+    }
+
+    if (dealData.status === 'completed') {
+      return {
+        label: 'Transaksi selesai',
+        description: 'Transaksi sudah selesai. Kamu bisa lanjut isi review.',
+        background: '#dcfce7',
+        color: '#166534'
+      };
+    }
+
+    return {
+      label: `Status: ${dealData.status}`,
+      description: 'Status deal diperbarui secara otomatis dari sistem.',
+      background: '#f3f4f6',
+      color: '#374151'
+    };
   };
 
   const submitRating = async () => {
@@ -368,6 +434,15 @@ export default function HomePageClient() {
   };
 
   const filteredServices = getFilteredServices();
+  const specificationEntries = getNonEmptyObjectEntries(selectedService?.specifications);
+  const descriptionTableEntries = getNonEmptyObjectEntries(selectedService?.descriptionTable);
+  const checklistEntries = getNonEmptyObjectEntries(selectedService?.checklist);
+  const locationLabel = selectedService?.location || selectedService?.lokasi || '-';
+  const categoryPath = [
+    selectedService?.mainCategory,
+    selectedService?.subCategory,
+    selectedService?.superSubCategory
+  ].filter(Boolean).join(' > ');
   const REVIEWS_PER_PAGE = 5;
   const filteredReviews = serviceReviews.filter((review) =>
     reviewFilter === 'all' ? true : Number(review.rating) === Number(reviewFilter)
@@ -437,6 +512,7 @@ export default function HomePageClient() {
         {/* Search Bar with Category Filter */}
         <SearchBar 
           services={filteredServices}
+          categoriesSource={services}
           onSearch={(term, category) => {
             setSearchTerm(term);
             setSelectedCategory(category);
@@ -490,7 +566,7 @@ export default function HomePageClient() {
                     
                     <div className="vendor-stats">
                       <div className="stat-rating">
-                        <span className="rating-stars">⭐ {service.rating.toFixed(1)}</span>
+                        <span className="rating-stars">⭐ {Number(service.rating || 0).toFixed(1)}</span>
                         <span className="rating-count">({service.rentCount} disewa)</span>
                       </div>
                     </div>
@@ -567,6 +643,12 @@ export default function HomePageClient() {
                     onClick={() => setDetailTab('information')}
                   >
                     Informasi Penjual
+                  </button>
+                  <button
+                    className={`tab ${detailTab === 'reviews' ? 'active' : ''}`}
+                    onClick={() => setDetailTab('reviews')}
+                  >
+                    Rating & Review
                   </button>
                 </div>
 
@@ -684,6 +766,163 @@ export default function HomePageClient() {
                       </div>
 
                       <div className="info-section">
+                        <h4>🏷️ Kategori</h4>
+                        <p>{categoryPath || selectedService.category || '-'}</p>
+                      </div>
+
+                      <div className="info-section">
+                        <h4>📈 Terjual</h4>
+                        <p>{selectedService.rentCount ?? '0'}</p>
+                      </div>
+
+                      {(selectedService.location || selectedService.lokasi) && (
+                        <div className="info-section">
+                          <h4>📍 Lokasi Penjemputan</h4>
+                          <p>{locationLabel}</p>
+                        </div>
+                      )}
+
+                      {selectedService.minimumDays && (
+                        <div className="info-section">
+                          <h4>📅 Minimum Sewa</h4>
+                          <p>{selectedService.minimumDays} hari</p>
+                        </div>
+                      )}
+
+                      {selectedService.rentalPolicy && (
+                        <div className="info-section">
+                          <h4>📜 Kebijakan Sewa</h4>
+                          <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.rentalPolicy}</p>
+                        </div>
+                      )}
+
+                      <div className="info-section">
+                        <h4>🕒 Status</h4>
+                        <p>Terakhir online baru-baru ini</p>
+                      </div>
+                    </>
+                  )}
+
+                  {detailTab === 'description' && (
+                    <>
+                      {selectedService.shortDescription && (
+                        <div className="info-section">
+                          <h4>📌 Deskripsi Singkat</h4>
+                          <p style={{ lineHeight: '1.6', color: '#555' }}>{selectedService.shortDescription}</p>
+                        </div>
+                      )}
+
+                      <div className="info-section">
+                        <h4>📝 Deskripsi Lengkap</h4>
+                        <p style={{ lineHeight: '1.6', color: '#555' }}>
+                          {selectedService.detailDescription || selectedService.description}
+                        </p>
+                      </div>
+
+                      {descriptionTableEntries.length > 0 && (
+                        <div className="info-section">
+                          <h4>📋 Detail Produk/Jasa</h4>
+                          <div style={{ display: 'grid', gap: '10px' }}>
+                            {descriptionTableEntries.map(([key, value]) => (
+                              <div key={key}>
+                                <strong>{formatFieldLabel(key)}:</strong> {String(value)}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {specificationEntries.length > 0 && (
+                        <div className="info-section">
+                          <h4>🔧 Spesifikasi</h4>
+                          <div style={{ display: 'grid', gap: '10px' }}>
+                            {specificationEntries.map(([key, value]) => (
+                              <div key={key}>
+                                <strong>{formatFieldLabel(key)}:</strong> {String(value)}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {checklistEntries.length > 0 && (
+                        <div className="info-section">
+                          <h4>✅ Checklist</h4>
+                          <ul style={{ margin: '0', paddingLeft: '18px' }}>
+                            {checklistEntries.map(([key, value]) => (
+                              <li key={key}>{String(value) === 'true' ? formatFieldLabel(key) : String(value)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {(selectedService.type === 'barang' || selectedService.category === 'barang') && (
+                        <>
+                          <div className="info-section">
+                            <h4>📦 Keterangan Barang</h4>
+                            <p>{selectedService.jenisBarang || selectedService.shortDescription || '-'}</p>
+                          </div>
+
+                          {selectedService.spesifikBarang && (
+                            <div className="info-section">
+                              <h4>🔎 Spesifik Barang</h4>
+                              <p>{selectedService.spesifikBarang}</p>
+                            </div>
+                          )}
+
+                          {selectedService.kebijakanKerusakan && (
+                            <div className="info-section">
+                              <h4>🛡️ Kebijakan Kerusakan</h4>
+                              <p>{selectedService.kebijakanKerusakan}</p>
+                            </div>
+                          )}
+
+                          {selectedService.dendaKeterlambatan && (
+                            <div className="info-section">
+                              <h4>⚠️ Denda Keterlambatan</h4>
+                              <p>{selectedService.dendaKeterlambatan}</p>
+                            </div>
+                          )}
+
+                          {selectedService.syaratKetentuan && (
+                            <div className="info-section">
+                              <h4>📋 Syarat & Ketentuan</h4>
+                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {(selectedService.type === 'jasa' || selectedService.category === 'jasa') && (
+                        <>
+                          {selectedService.spesifikBarang && (
+                            <div className="info-section">
+                              <h4>✨ Detail Layanan</h4>
+                              <p>{selectedService.spesifikBarang}</p>
+                            </div>
+                          )}
+
+                          {selectedService.dendaKeterlambatan && (
+                            <div className="info-section">
+                              <h4>⚠️ Denda Keterlambatan</h4>
+                              <p>{selectedService.dendaKeterlambatan}</p>
+                            </div>
+                          )}
+
+                          {selectedService.syaratKetentuan && (
+                            <div className="info-section">
+                              <h4>📋 Syarat & Ketentuan</h4>
+                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  {detailTab === 'reviews' && (
+                    <>
+                      <div className="info-section">
                         <h4>⭐ Rating & Review</h4>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#5A45D1' }}>
@@ -756,104 +995,6 @@ export default function HomePageClient() {
                           </div>
                         )}
                       </div>
-                    
-
-                      {(selectedService.category === 'barang' || selectedService.type === 'barang') && (
-                        <div className="info-section">
-                          <h4>📦 Stok</h4>
-                          <p>{selectedService.jumlahBarang ?? 'N/A'}</p>
-                        </div>
-                      )}
-
-                      <div className="info-section">
-                        <h4>📈 Terjual</h4>
-                        <p>{selectedService.rentCount ?? '0'}</p>
-                      </div>
-
-                      {selectedService.lokasi && (
-                        <div className="info-section">
-                          <h4>📍 Lokasi Penjemputan</h4>
-                          <p>{selectedService.lokasi}</p>
-                        </div>
-                      )}
-
-                      <div className="info-section">
-                        <h4>🕒 Status</h4>
-                        <p>Terakhir online baru-baru ini</p>
-                      </div>
-                    </>
-                  )}
-
-                  {detailTab === 'description' && (
-                    <>
-                      <div className="info-section">
-                        <h4>📝 Deskripsi Lengkap</h4>
-                        <p style={{ lineHeight: '1.6', color: '#555' }}>
-                          {selectedService.detailDescription || selectedService.description}
-                        </p>
-                      </div>
-
-                      {(selectedService.type === 'barang' || selectedService.category === 'barang') && (
-                        <>
-                          <div className="info-section">
-                            <h4>📦 Keterangan Barang</h4>
-                            <p>{selectedService.jenisBarang || selectedService.shortDescription || '-'}</p>
-                          </div>
-
-                          {selectedService.spesifikBarang && (
-                            <div className="info-section">
-                              <h4>🔎 Spesifik Barang</h4>
-                              <p>{selectedService.spesifikBarang}</p>
-                            </div>
-                          )}
-
-                          {selectedService.kebijakanKerusakan && (
-                            <div className="info-section">
-                              <h4>🛡️ Kebijakan Kerusakan</h4>
-                              <p>{selectedService.kebijakanKerusakan}</p>
-                            </div>
-                          )}
-
-                          {selectedService.dendaKeterlambatan && (
-                            <div className="info-section">
-                              <h4>⚠️ Denda Keterlambatan</h4>
-                              <p>{selectedService.dendaKeterlambatan}</p>
-                            </div>
-                          )}
-
-                          {selectedService.syaratKetentuan && (
-                            <div className="info-section">
-                              <h4>📋 Syarat & Ketentuan</h4>
-                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {(selectedService.type === 'jasa' || selectedService.category === 'jasa') && (
-                        <>
-                          {selectedService.spesifikBarang && (
-                            <div className="info-section">
-                              <h4>✨ Detail Layanan</h4>
-                              <p>{selectedService.spesifikBarang}</p>
-                            </div>
-                          )}
-
-                          {selectedService.dendaKeterlambatan && (
-                            <div className="info-section">
-                              <h4>⚠️ Denda Keterlambatan</h4>
-                              <p>{selectedService.dendaKeterlambatan}</p>
-                            </div>
-                          )}
-
-                          {selectedService.syaratKetentuan && (
-                            <div className="info-section">
-                              <h4>📋 Syarat & Ketentuan</h4>
-                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
-                            </div>
-                          )}
-                        </>
-                      )}
                     </>
                   )}
 
@@ -889,56 +1030,6 @@ export default function HomePageClient() {
                 </p>
               </div>
               <button className="modal-close" onClick={closeChatModal}>✕</button>
-            </div>
-
-            {/* Deal Buttons - Transparent Bar at Top of Chat */}
-            <div className="chat-deal-actions" style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: '12px',
-              padding: '12px',
-              backgroundColor: 'rgba(255, 255, 255, 0.7)',
-              borderBottom: '1px solid rgba(200, 200, 200, 0.3)',
-              backdropFilter: 'blur(4px)'
-            }}>
-              <button
-                className="btn-deal"
-                onClick={() => handleDealAction('accept')}
-                disabled={dealData?.status === 'agreed' || dealData?.status === 'cancelled'}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  backgroundColor: dealData?.status === 'agreed' ? '#d4edda' : '#28a745',
-                  color: dealData?.status === 'agreed' ? '#155724' : 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: 'bold',
-                  cursor: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
-                  opacity: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? 0.6 : 1,
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                ✅ {dealData?.status === 'agreed' ? 'Deal Diterima' : 'Deal'}
-              </button>
-              <button
-                className="btn-cancel"
-                onClick={() => handleDealAction('cancel')}
-                disabled={dealData?.status === 'cancelled'}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  backgroundColor: dealData?.status === 'cancelled' ? '#f8d7da' : '#dc3545',
-                  color: dealData?.status === 'cancelled' ? '#721c24' : 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: 'bold',
-                  cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
-                  opacity: dealData?.status === 'cancelled' ? 0.6 : 1,
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                ❌ {dealData?.status === 'cancelled' ? 'Dibatalkan' : 'Cancel'}
-              </button>
             </div>
 
             {/* Chat Messages */}
@@ -1001,22 +1092,119 @@ export default function HomePageClient() {
 
             {/* Chat Input */}
             {!showRatingForm && (
-              <div className="chat-input-section">
-                <input
-                  type="text"
-                  className="chat-input"
-                  placeholder="Ketik pesan..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      sendMessage();
-                    }
-                  }}
-                />
-                <button className="btn-send" onClick={sendMessage}>
-                  Kirim
-                </button>
+              <div className="chat-input-section" style={{ flexDirection: 'column', gap: '10px' }}>
+                {(() => {
+                  const statusConfig = getDealStatusConfig();
+                  const finalPrice = dealData?.finalPrice || dealData?.originalPrice || 0;
+                  const dealDisabled = dealData?.status === 'agreed' || dealData?.status === 'cancelled';
+
+                  return (
+                    <div
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid #e5e7eb',
+                        background: statusConfig.background
+                      }}
+                    >
+                      <div style={{ fontSize: '12px', fontWeight: '700', color: statusConfig.color }}>
+                        {statusConfig.label}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#4b5563', marginTop: '3px' }}>
+                        {statusConfig.description}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleDealAction('accept')}
+                          disabled={dealDisabled}
+                          style={{
+                            flex: 1,
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #10b981',
+                            background: 'rgba(16, 185, 129, 0.08)',
+                            color: '#047857',
+                            fontWeight: '700',
+                            cursor: dealDisabled ? 'not-allowed' : 'pointer',
+                            opacity: dealDisabled ? 0.55 : 1
+                          }}
+                        >
+                          {dealData?.status === 'agreed' ? 'Deal Diterima' : 'Terima Deal'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDealAction('cancel')}
+                          disabled={dealData?.status === 'cancelled'}
+                          style={{
+                            flex: 1,
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #ef4444',
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            color: '#b91c1c',
+                            fontWeight: '700',
+                            cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
+                            opacity: dealData?.status === 'cancelled' ? 0.55 : 1
+                          }}
+                        >
+                          {dealData?.status === 'cancelled' ? 'Dibatalkan' : 'Cancel'}
+                        </button>
+                      </div>
+
+                      {dealData?.status === 'agreed' && (
+                        <div style={{ marginTop: '8px', fontSize: '12px', color: '#1e40af' }}>
+                          <div style={{ fontWeight: '700' }}>
+                            Harga akhir: Rp {Number(finalPrice).toLocaleString('id-ID')}
+                          </div>
+                          {dealData.discountGiven && dealData.discount && (
+                            <div style={{ marginTop: '2px' }}>
+                              Potongan: Rp {Number(dealData.discount.amount || 0).toLocaleString('id-ID')}
+                            </div>
+                          )}
+                          {dealData.id && (
+                            <button
+                              type="button"
+                              onClick={() => router.push(`/transaction/identity-check?dealId=${dealData.id}`)}
+                              style={{
+                                marginTop: '7px',
+                                padding: '7px 10px',
+                                border: '1px solid #1d4ed8',
+                                borderRadius: '8px',
+                                background: 'rgba(29, 78, 216, 0.09)',
+                                color: '#1d4ed8',
+                                fontWeight: '700',
+                                fontSize: '12px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Lanjut ke Pembayaran
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input
+                    type="text"
+                    className="chat-input"
+                    placeholder="Ketik pesan..."
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        sendMessage();
+                      }
+                    }}
+                  />
+                  <button className="btn-send" onClick={sendMessage}>
+                    Kirim
+                  </button>
+                </div>
               </div>
             )}
           </div>

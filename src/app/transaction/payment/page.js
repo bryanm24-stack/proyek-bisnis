@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import SharedNavbar from '../components/SharedNavbar';
+import SharedNavbar from '../../components/SharedNavbar';
 
 function PaymentContent() {
   const router = useRouter();
@@ -282,7 +282,7 @@ function PaymentContent() {
       setDiscountAmount(0);
       setPromoMessage('Subtotal berubah, silakan terapkan ulang kode promo.');
     }
-  }, [quantity, durationDays, basePrice]);
+  }, [quantity, durationDays, basePrice, appliedPromo]);
 
   if (isLoading) {
     return <div style={{ padding: '40px', textAlign: 'center', minHeight: '100vh', background: '#f5f3ff' }}>⏳ Loading...</div>;

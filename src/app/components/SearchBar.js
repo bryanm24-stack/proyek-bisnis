@@ -2,18 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 
-export default function SearchBar({ services, onSearch, onCategoryChange }) {
+export default function SearchBar({ services, onSearch, onCategoryChange, categoriesSource }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-  const [categories, setCategories] = useState([]);
+  const categorySource = categoriesSource || services;
 
-  // Extract unique categories from services data (dynamic)
-  useEffect(() => {
+  // Extract unique categories from all services (not filtered results)
+  const categories = React.useMemo(() => {
     const uniqueCategories = new Set();
     
-    if (services && services.length > 0) {
-      services.forEach(service => {
+    if (categorySource && categorySource.length > 0) {
+      categorySource.forEach(service => {
         if (service.mainCategory) {
           uniqueCategories.add(service.mainCategory);
         } else if (service.category) {
@@ -54,8 +54,8 @@ export default function SearchBar({ services, onSearch, onCategoryChange }) {
       });
     });
 
-    setCategories(categoryList);
-  }, [services]);
+    return categoryList;
+  }, [categorySource]);
 
   useEffect(() => {
     if (onSearch) {
@@ -124,7 +124,7 @@ export default function SearchBar({ services, onSearch, onCategoryChange }) {
         <div className="search-results-info">
           {searchTerm && (
             <p>
-              Ditemukan <strong>{services.length}</strong> hasil pencarian untuk "<strong>{searchTerm}</strong>"
+              Ditemukan <strong>{services.length}</strong> hasil pencarian untuk &quot;<strong>{searchTerm}</strong>&quot;
               {selectedCategory !== 'all' && ` pada kategori ${selectedCategoryLabel.toLowerCase()}`}
             </p>
           )}

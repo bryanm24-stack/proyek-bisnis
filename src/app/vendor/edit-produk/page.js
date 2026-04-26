@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import SharedNavbar from '../../components/SharedNavbar';
 import { useRouter, useSearchParams } from 'next/navigation';
 import VendorProductForm from '../VendorProductForm';
@@ -10,7 +10,7 @@ import {
   getSuperSubOptions
 } from '../category-tree';
 
-export default function EditProdukPage() {
+function EditProdukPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const itemId = searchParams.get('id');
@@ -60,7 +60,7 @@ export default function EditProdukPage() {
     } else {
       setLoading(false);
     }
-  }, [itemId]);
+  }, [itemId, router]);
 
   const fetchItemData = async (id, vendorId) => {
     try {
@@ -115,7 +115,6 @@ export default function EditProdukPage() {
     if (!formData.title) missingFields.push('Nama Item');
     if (!formData.shortDescription) missingFields.push('Deskripsi Singkat');
     if (!formData.price) missingFields.push('Harga per Hari');
-    if (!formData.quantity) missingFields.push('Jumlah Item');
     if (!formData.location) missingFields.push('Lokasi Pickup');
 
     if (missingFields.length > 0) {
@@ -126,6 +125,11 @@ export default function EditProdukPage() {
     setIsSubmitting(true);
 
     try {
+      const derivedQuantity = Math.max(
+        1,
+        (formData.items || []).reduce((sum, item) => sum + (parseInt(item.stok, 10) || 0), 0)
+      );
+
       const submitData = {
         id: itemId,
         vendorId: user.id,
@@ -140,7 +144,7 @@ export default function EditProdukPage() {
         description: formData.description,
         price: parseInt(formData.price),
         minimumDays: parseInt(formData.minimumDays),
-        quantity: parseInt(formData.quantity),
+        quantity: derivedQuantity,
         rentalPolicy: formData.rentalPolicy,
         location: formData.location,
         specifications: formData.specifications || {},
@@ -256,5 +260,13 @@ export default function EditProdukPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function EditProdukPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center' }}>⏳ Loading...</div>}>
+      <EditProdukPageContent />
+    </Suspense>
   );
 }

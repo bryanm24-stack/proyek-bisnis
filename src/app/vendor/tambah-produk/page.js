@@ -51,7 +51,7 @@ export default function TambahProdukPage() {
     }
 
     setUser(parsedUser);
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (!selectedType) return;
@@ -83,7 +83,6 @@ export default function TambahProdukPage() {
     if (!formData.title) missingFields.push('Nama Item');
     if (!formData.shortDescription) missingFields.push('Deskripsi Singkat');
     if (!formData.price) missingFields.push('Harga per Hari');
-    if (!formData.quantity) missingFields.push('Jumlah Item');
     if (!formData.location) missingFields.push('Lokasi Pickup');
 
     if (missingFields.length > 0) {
@@ -94,6 +93,13 @@ export default function TambahProdukPage() {
     setIsSubmitting(true);
 
     try {
+      const derivedQuantity = selectedType === 'barang'
+        ? Math.max(
+            1,
+            (formData.items || []).reduce((sum, item) => sum + (parseInt(item.stok, 10) || 0), 0)
+          )
+        : Math.max(1, (formData.items || []).length || 1);
+
       const submitData = {
         vendorId: user.id,
         vendorName: user.name,
@@ -108,7 +114,7 @@ export default function TambahProdukPage() {
         description: formData.description,
         price: parseInt(formData.price),
         minimumDays: parseInt(formData.minimumDays),
-        quantity: parseInt(formData.quantity),
+        quantity: derivedQuantity,
         rentalPolicy: formData.rentalPolicy,
         location: formData.location,
         specifications: formData.specifications || {},
