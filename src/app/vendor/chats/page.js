@@ -72,7 +72,7 @@ export default function VendorChatsPage() {
     console.log('  - total chats:', chats.length);
     console.log('  - vendorChats:', vendorChats.length, vendorChats.map(c => c.customerName));
     console.log('  - customerChats:', customerChats.length, customerChats.map(c => c.vendorName));
-  }, [vendorChats, customerChats, user]);
+  }, [vendorChats, customerChats, user, chats.length]);
 
   // Filter chats berdasarkan search query
   const filteredVendorChats = useMemo(() => {
@@ -198,7 +198,7 @@ export default function VendorChatsPage() {
     }
   };
 
-  const computePreview = () => {
+  useEffect(() => {
     const original = dealData?.originalPrice ?? null;
     if (original == null) {
       setDiscountPreview(null);
@@ -215,10 +215,6 @@ export default function VendorChatsPage() {
     let finalP = original - amount;
     if (finalP < 0) finalP = 0;
     setDiscountPreview({ amount, finalPrice: finalP, original });
-  };
-
-  useEffect(() => {
-    computePreview();
   }, [discountType, discountValue, dealData]);
 
   const applyDiscount = async () => {
@@ -545,7 +541,7 @@ export default function VendorChatsPage() {
                   <div style={{ background: 'rgba(0,0,0,0.35)', position: 'absolute', inset: 0 }} onClick={() => setDiscountMode(null)} />
                   <div style={{ position: 'relative', background: 'white', padding: '18px', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.15)', width: '420px', maxWidth: '92%', textAlign: 'left', zIndex: 90 }}>
                     <div style={{ fontWeight: 800, fontSize: '16px', marginBottom: '6px' }}>Berikan diskon untuk pesanan ini?</div>
-                    <div style={{ color: '#666', fontSize: '13px', marginBottom: '12px' }}>Pilih "Ya" untuk menetapkan potongan harga sekarang atau "Tidak" untuk melewati.</div>
+                    <div style={{ color: '#666', fontSize: '13px', marginBottom: '12px' }}>Pilih &quot;Ya&quot; untuk menetapkan potongan harga sekarang atau &quot;Tidak&quot; untuk melewati.</div>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                       <button onClick={() => setDiscountMode(null)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #ddd', background: 'white' }}>Tidak</button>
                       <button onClick={() => setDiscountMode('yes')} style={{ padding: '8px 12px', borderRadius: '8px', border: 'none', background: '#5A45D1', color: 'white', fontWeight: 700 }}>Ya, beri diskon</button>

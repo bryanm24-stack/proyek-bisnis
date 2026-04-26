@@ -26,7 +26,7 @@ export default function VendorProdukPage() {
 
     setUser(parsedUser);
     fetchVendorItems(parsedUser.id);
-  }, []);
+  }, [router]);
 
   const fetchVendorItems = async (vendorId) => {
     try {

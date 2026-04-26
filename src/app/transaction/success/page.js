@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import SharedNavbar from '../components/SharedNavbar';
+import SharedNavbar from '../../components/SharedNavbar';
 
 function SuccessContent() {
   const router = useRouter();

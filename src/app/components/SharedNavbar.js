@@ -6,15 +6,25 @@ import { useRouter, usePathname } from 'next/navigation';
 
 export default function SharedNavbar() {
   const [user, setUser] = useState(null);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
+    setIsHydrated(true);
     const userData = localStorage.getItem('user');
-    if (userData) {
+
+    if (!userData) {
+      setUser(null);
+      return;
+    }
+
+    try {
       setUser(JSON.parse(userData));
+    } catch {
+      setUser(null);
     }
   }, []);
 
@@ -56,7 +66,7 @@ export default function SharedNavbar() {
     return pathname === href || pathname.startsWith(href + '/');
   };
 
-  if (!user) {
+  if (!isHydrated || !user) {
     return null;
   }
 

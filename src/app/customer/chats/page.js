@@ -261,7 +261,7 @@ export default function CustomerChatsPage() {
             ) : filteredChats.length === 0 ? (
               <div style={{ textAlign: 'center' }}>
                 <p style={{ color: '#999', fontSize: '13px' }}>
-                  ❌ Tidak ada hasil untuk "{searchQuery}"
+                  ❌ Tidak ada hasil untuk &quot;{searchQuery}&quot;
                 </p>
                 <p style={{ color: '#bbb', fontSize: '12px', marginTop: '8px' }}>
                   Coba kata kunci lain
@@ -549,51 +549,40 @@ export default function CustomerChatsPage() {
               </p>
             </div>
 
-            {/* Deal Buttons */}
+            {/* Status Deal */}
             <div style={{
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
               marginBottom: '20px'
             }}>
-              <button
-                onClick={() => {
-                  handleDealAction('accept');
-                  setShowVendorModal(false);
-                }}
-                disabled={dealData?.status === 'agreed' || dealData?.status === 'cancelled'}
-                style={{
-                  padding: '12px 16px',
-                  border: 'none',
+              {!dealData && (
+                <div style={{
+                  padding: '12px',
+                  background: '#f3f4f6',
+                  color: '#4b5563',
                   borderRadius: '8px',
-                  background: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? '#d1d5db' : '#10b981',
-                  color: 'white',
+                  fontSize: '13px',
                   fontWeight: '600',
-                  cursor: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                ✅ Setuju Deal
-              </button>
-              <button
-                onClick={() => {
-                  handleDealAction('cancel');
-                  setShowVendorModal(false);
-                }}
-                disabled={dealData?.status === 'cancelled'}
-                style={{
-                  padding: '12px 16px',
-                  border: 'none',
+                  textAlign: 'center'
+                }}>
+                  Belum ada status deal. Lanjutkan negosiasi lewat chat.
+                </div>
+              )}
+
+              {dealData?.status === 'pending' && (
+                <div style={{
+                  padding: '12px',
+                  background: '#fff7ed',
+                  color: '#c2410c',
                   borderRadius: '8px',
-                  background: dealData?.status === 'cancelled' ? '#d1d5db' : '#ef4444',
-                  color: 'white',
+                  fontSize: '13px',
                   fontWeight: '600',
-                  cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                ❌ Tolak Deal
-              </button>
+                  textAlign: 'center'
+                }}>
+                  Menunggu konfirmasi vendor.
+                </div>
+              )}
 
               {dealData?.status === 'agreed' && (
                 <>
@@ -606,7 +595,7 @@ export default function CustomerChatsPage() {
                     fontWeight: '600',
                     textAlign: 'center'
                   }}>
-                    ✓ Deal Diterima
+                    ✓ Deal sudah disetujui.
                   </div>
                   <button
                     onClick={() => {
@@ -626,7 +615,7 @@ export default function CustomerChatsPage() {
                     onMouseEnter={(e) => e.target.style.background = '#d97706'}
                     onMouseLeave={(e) => e.target.style.background = '#f59e0b'}
                   >
-                    💳 Bayar Sekarang
+                    💳 Lanjut ke Pembayaran
                   </button>
                 </>
               )}
@@ -641,7 +630,7 @@ export default function CustomerChatsPage() {
                   fontWeight: '600',
                   textAlign: 'center'
                 }}>
-                  ✗ Deal Ditolak
+                  Deal dibatalkan.
                 </div>
               )}
             </div>
