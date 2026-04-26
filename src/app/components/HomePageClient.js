@@ -261,6 +261,46 @@ export default function HomePageClient() {
     }
   };
 
+  const handleDealAction = async (action) => {
+    if (!selectedService || !user || !chatData?.id) return;
+
+    try {
+      const response = await fetch('/api/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          chatId: chatData.id,
+          customerId: user.id,
+          vendorId: selectedService.vendorId,
+          serviceId: selectedService.id
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        alert('Error: ' + (data.message || 'Gagal memproses deal'));
+        return;
+      }
+
+      if (data.data?.deal) {
+        setDealData(data.data.deal);
+        if (data.data.deal.status === 'cancelled') {
+          setShowRatingForm(false);
+        }
+      }
+
+      if (data.data?.chat) {
+        setChatData(data.data.chat);
+      }
+
+      alert(data.message);
+    } catch (error) {
+      console.error('Error processing deal:', error);
+      alert('Gagal memproses deal: ' + error.message);
+    }
+  };
+
   const getDealStatusConfig = () => {
     if (!dealData) {
       return {
@@ -992,60 +1032,6 @@ export default function HomePageClient() {
               <button className="modal-close" onClick={closeChatModal}>✕</button>
             </div>
 
-            {/* Deal Status - Informational only for customer */}
-            {(() => {
-              const statusConfig = getDealStatusConfig();
-              const finalPrice = dealData?.finalPrice || dealData?.originalPrice || 0;
-              return (
-                <div
-                  style={{
-                    padding: '12px 14px',
-                    background: statusConfig.background,
-                    borderBottom: '1px solid #e5e7eb'
-                  }}
-                >
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: statusConfig.color }}>
-                    {statusConfig.label}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#4b5563', marginTop: '4px' }}>
-                    {statusConfig.description}
-                  </div>
-
-                  {dealData?.status === 'agreed' && (
-                    <div style={{ marginTop: '10px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#1d4ed8' }}>
-                        Harga akhir: Rp {Number(finalPrice).toLocaleString('id-ID')}
-                      </div>
-                      {dealData.discountGiven && dealData.discount && (
-                        <div style={{ fontSize: '12px', color: '#1e40af', marginTop: '2px' }}>
-                          Potongan: Rp {Number(dealData.discount.amount || 0).toLocaleString('id-ID')}
-                        </div>
-                      )}
-                      {dealData.id && (
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/transaction/identity-check?dealId=${dealData.id}`)}
-                          style={{
-                            marginTop: '8px',
-                            padding: '8px 12px',
-                            border: 'none',
-                            borderRadius: '8px',
-                            background: '#1d4ed8',
-                            color: 'white',
-                            fontWeight: '600',
-                            fontSize: '12px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Lanjut ke Pembayaran
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
             {/* Chat Messages */}
             <div className="chat-messages">
               {messages.length === 0 ? (
@@ -1106,22 +1092,119 @@ export default function HomePageClient() {
 
             {/* Chat Input */}
             {!showRatingForm && (
-              <div className="chat-input-section">
-                <input
-                  type="text"
-                  className="chat-input"
-                  placeholder="Ketik pesan..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      sendMessage();
-                    }
-                  }}
-                />
-                <button className="btn-send" onClick={sendMessage}>
-                  Kirim
-                </button>
+              <div className="chat-input-section" style={{ flexDirection: 'column', gap: '10px' }}>
+                {(() => {
+                  const statusConfig = getDealStatusConfig();
+                  const finalPrice = dealData?.finalPrice || dealData?.originalPrice || 0;
+                  const dealDisabled = dealData?.status === 'agreed' || dealData?.status === 'cancelled';
+
+                  return (
+                    <div
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid #e5e7eb',
+                        background: statusConfig.background
+                      }}
+                    >
+                      <div style={{ fontSize: '12px', fontWeight: '700', color: statusConfig.color }}>
+                        {statusConfig.label}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#4b5563', marginTop: '3px' }}>
+                        {statusConfig.description}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleDealAction('accept')}
+                          disabled={dealDisabled}
+                          style={{
+                            flex: 1,
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #10b981',
+                            background: 'rgba(16, 185, 129, 0.08)',
+                            color: '#047857',
+                            fontWeight: '700',
+                            cursor: dealDisabled ? 'not-allowed' : 'pointer',
+                            opacity: dealDisabled ? 0.55 : 1
+                          }}
+                        >
+                          {dealData?.status === 'agreed' ? 'Deal Diterima' : 'Terima Deal'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDealAction('cancel')}
+                          disabled={dealData?.status === 'cancelled'}
+                          style={{
+                            flex: 1,
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #ef4444',
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            color: '#b91c1c',
+                            fontWeight: '700',
+                            cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
+                            opacity: dealData?.status === 'cancelled' ? 0.55 : 1
+                          }}
+                        >
+                          {dealData?.status === 'cancelled' ? 'Dibatalkan' : 'Cancel'}
+                        </button>
+                      </div>
+
+                      {dealData?.status === 'agreed' && (
+                        <div style={{ marginTop: '8px', fontSize: '12px', color: '#1e40af' }}>
+                          <div style={{ fontWeight: '700' }}>
+                            Harga akhir: Rp {Number(finalPrice).toLocaleString('id-ID')}
+                          </div>
+                          {dealData.discountGiven && dealData.discount && (
+                            <div style={{ marginTop: '2px' }}>
+                              Potongan: Rp {Number(dealData.discount.amount || 0).toLocaleString('id-ID')}
+                            </div>
+                          )}
+                          {dealData.id && (
+                            <button
+                              type="button"
+                              onClick={() => router.push(`/transaction/identity-check?dealId=${dealData.id}`)}
+                              style={{
+                                marginTop: '7px',
+                                padding: '7px 10px',
+                                border: '1px solid #1d4ed8',
+                                borderRadius: '8px',
+                                background: 'rgba(29, 78, 216, 0.09)',
+                                color: '#1d4ed8',
+                                fontWeight: '700',
+                                fontSize: '12px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Lanjut ke Pembayaran
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input
+                    type="text"
+                    className="chat-input"
+                    placeholder="Ketik pesan..."
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        sendMessage();
+                      }
+                    }}
+                  />
+                  <button className="btn-send" onClick={sendMessage}>
+                    Kirim
+                  </button>
+                </div>
               </div>
             )}
           </div>
