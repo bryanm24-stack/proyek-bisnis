@@ -70,29 +70,73 @@ export async function POST(request) {
     // Write transaction
     fs.writeFileSync(transactionsFile, JSON.stringify(transactions, null, 2));
 
-    // If pay_after payment, create invoice and update deal
-    if (body.paymentType === 'pay_after') {
+    let currentDeal = null;
+    try {
+      const dealsData = fs.readFileSync(dealsFile, 'utf-8');
+      const deals = JSON.parse(dealsData);
+      currentDeal = deals.find((item) => item.id === body.dealId) || null;
+    } catch (dealReadError) {
+      console.warn('Could not read deal for invoice metadata:', dealReadError);
+    }
+
+    // Create invoice for deal payments (exclude invoice settlement transactions)
+    if (body.dealId && body.paymentType !== 'invoice_payment') {
       const invoicesData = fs.readFileSync(invoicesFile, 'utf-8');
       let invoices = JSON.parse(invoicesData);
-      
-      // Create invoice for remaining 80% payment
-      const paymentDeadline = new Date();
-      paymentDeadline.setDate(paymentDeadline.getDate() + 2); // 2 days from now
-      
+
+      const isPayAfter = body.paymentType === 'pay_after';
+      const createdAt = new Date().toISOString();
+      const paymentDeadlineDate = new Date();
+      paymentDeadlineDate.setDate(paymentDeadlineDate.getDate() + 2);
+
+      const existingInvoice = invoices.find(
+        (item) =>
+          item.transactionId === body.id ||
+          (item.dealId === body.dealId && item.paymentType === body.paymentType) ||
+          (item.dealId === body.dealId && item.paymentType === 'deal_pending' && item.status !== 'paid')
+      );
+      if (existingInvoice) {
+        existingInvoice.customerId = existingInvoice.customerId || body.userId || currentDeal?.customerId || null;
+        existingInvoice.vendorId = existingInvoice.vendorId || currentDeal?.vendorId || body.vendorId || null;
+        existingInvoice.serviceId = existingInvoice.serviceId || currentDeal?.serviceId || null;
+        existingInvoice.transactionId = body.id;
+        existingInvoice.remainingPayment = isPayAfter
+          ? Number(body.remainingPayment ?? 0)
+          : Number(body.totalAmount ?? body.amount ?? 0);
+        existingInvoice.paymentDeadline = isPayAfter ? paymentDeadlineDate.toISOString() : body.timestamp || createdAt;
+        existingInvoice.paymentMethod = body.paymentMethod || existingInvoice.paymentMethod || null;
+        existingInvoice.paymentType = body.paymentType || existingInvoice.paymentType || 'full';
+        existingInvoice.status = isPayAfter ? 'pending' : 'paid';
+        existingInvoice.createdAt = existingInvoice.createdAt || createdAt;
+        existingInvoice.paidAt = isPayAfter ? null : (body.timestamp || createdAt);
+        existingInvoice.paymentTransactionId = isPayAfter ? null : body.id;
+        existingInvoice.notes = body.notes || existingInvoice.notes || '';
+        fs.writeFileSync(invoicesFile, JSON.stringify(invoices, null, 2));
+      } else {
+
       const newInvoice = {
         id: `INV-${Date.now()}`,
         dealId: body.dealId,
-        customerId: body.userId,
+        customerId: body.userId || currentDeal?.customerId || null,
+        vendorId: currentDeal?.vendorId || body.vendorId || null,
+        serviceId: currentDeal?.serviceId || null,
         transactionId: body.id,
-        remainingPayment: body.remainingPayment,
-        paymentDeadline: paymentDeadline.toISOString(),
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        paidAt: null
+        remainingPayment: isPayAfter
+          ? Number(body.remainingPayment ?? 0)
+          : Number(body.totalAmount ?? body.amount ?? 0),
+        paymentDeadline: isPayAfter ? paymentDeadlineDate.toISOString() : body.timestamp || createdAt,
+        paymentMethod: body.paymentMethod || null,
+        paymentType: body.paymentType || 'full',
+        status: isPayAfter ? 'pending' : 'paid',
+        createdAt,
+        paidAt: isPayAfter ? null : (body.timestamp || createdAt),
+        paymentTransactionId: isPayAfter ? null : body.id,
+        notes: body.notes || ''
       };
-      
+
       invoices.push(newInvoice);
       fs.writeFileSync(invoicesFile, JSON.stringify(invoices, null, 2));
+      }
 
       // Update deal with payment info
       try {
@@ -103,11 +147,11 @@ export async function POST(request) {
         if (dealIndex !== -1) {
           deals[dealIndex] = {
             ...deals[dealIndex],
-            paymentType: 'pay_after',
-            downPayment: body.downPayment,
-            remainingPayment: body.remainingPayment,
-            invoiceStatus: 'pending',
-            paymentDeadline: paymentDeadline.toISOString(),
+            paymentType: body.paymentType,
+            downPayment: isPayAfter ? body.downPayment : null,
+            remainingPayment: isPayAfter ? body.remainingPayment : 0,
+            invoiceStatus: isPayAfter ? 'pending' : 'paid',
+            paymentDeadline: isPayAfter ? paymentDeadlineDate.toISOString() : null,
             invoiceId: newInvoice.id
           };
           fs.writeFileSync(dealsFile, JSON.stringify(deals, null, 2));

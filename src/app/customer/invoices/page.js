@@ -1,27 +1,68 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import SharedNavbar from '../../components/SharedNavbar';
 
-export default function InvoicesPage() {
+export default function CustomerInvoicesPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [invoices, setInvoices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState('pending'); // pending, paid, all
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+
   const [paymentMethod, setPaymentMethod] = useState('qris');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cardDetails, setCardDetails] = useState({
     cardName: '',
     cardNumber: '',
     expiryDate: '',
-    cvv: '',
-    cardPhoto: null,
-    cardPhotoPreview: null
+    cvv: ''
   });
   const [cardErrors, setCardErrors] = useState({});
+
+  const [activeRatingInvoiceId, setActiveRatingInvoiceId] = useState(null);
+  const [ratingValue, setRatingValue] = useState(5);
+  const [ratingReview, setRatingReview] = useState('');
+  const [isRatingSubmitting, setIsRatingSubmitting] = useState(false);
+
+  const formatCurrency = (num) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0
+    }).format(Number(num || 0));
+  };
+
+  const formatDate = (value) => {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleDateString('id-ID');
+  };
+
+  const fetchInvoices = async (customerId, selectedFilter) => {
+    try {
+      setIsLoading(true);
+      const query = selectedFilter === 'all' ? '' : `&status=${selectedFilter}`;
+      const response = await fetch(`/api/invoices?customerId=${customerId}${query}`);
+      const data = await response.json();
+
+      if (Array.isArray(data)) {
+        setInvoices(data);
+      } else if (data?.data && Array.isArray(data.data)) {
+        setInvoices(data.data);
+      } else {
+        setInvoices([]);
+      }
+    } catch (error) {
+      console.error('Error fetching invoices:', error);
+      setInvoices([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -37,47 +78,21 @@ export default function InvoicesPage() {
     }
 
     setUser(parsedUser);
-
-    // Fetch invoices
-    const fetchInvoices = async () => {
-      try {
-        const response = await fetch(`/api/invoices?customerId=${parsedUser.id}&status=pending`);
-        if (!response.ok) throw new Error('Failed to fetch invoices');
-        const data = await response.json();
-        setInvoices(data);
-      } catch (error) {
-        console.error('Error fetching invoices:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchInvoices();
+    fetchInvoices(parsedUser.id, 'pending');
   }, [router]);
 
-  const calculateTimeRemaining = (deadline) => {
-    const now = new Date();
-    const deadlineDate = new Date(deadline);
-    const diff = deadlineDate - now;
-
-    if (diff < 0) {
-      return { text: 'SUDAH LEWAT', color: '#dc2626' };
-    }
-
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-
-    if (days > 0) {
-      return { text: `${days}h ${hours}m tersisa`, color: '#22c55e' };
-    } else {
-      return { text: `${hours}m tersisa`, color: '#f59e0b' };
+  const handleFilterChange = (newFilter) => {
+    setFilter(newFilter);
+    setSelectedInvoice(null);
+    if (user?.id) {
+      fetchInvoices(user.id, newFilter);
     }
   };
 
   const validateCardDetails = () => {
     const errors = {};
 
-    if (!cardDetails.cardName) {
+    if (!cardDetails.cardName.trim()) {
       errors.cardName = 'Nama pemilik kartu wajib diisi';
     }
     if (!cardDetails.cardNumber || cardDetails.cardNumber.replace(/\D/g, '').length < 13) {
@@ -94,7 +109,19 @@ export default function InvoicesPage() {
     return Object.keys(errors).length === 0;
   };
 
+  const resetPaymentForm = () => {
+    setCardDetails({
+      cardName: '',
+      cardNumber: '',
+      expiryDate: '',
+      cvv: ''
+    });
+    setPaymentMethod('qris');
+    setCardErrors({});
+  };
+
   const handlePayInvoice = async (invoice) => {
+    if (!invoice) return;
     if (paymentMethod === 'card' && !validateCardDetails()) {
       return;
     }
@@ -102,40 +129,38 @@ export default function InvoicesPage() {
     setIsSubmitting(true);
 
     try {
-      // Create payment transaction
       const transactionData = {
         id: `TRX-${Date.now()}`,
         invoiceId: invoice.id,
         dealId: invoice.dealId,
         userId: user.id,
-        paymentMethod: paymentMethod,
-        amount: invoice.remainingPayment,
+        paymentMethod,
+        amount: Number(invoice.remainingPayment || invoice.totalAmount || 0),
         paymentType: 'invoice_payment',
         status: 'success',
         timestamp: new Date().toISOString(),
-        cardDetails: paymentMethod === 'card' ? {
-          cardName: cardDetails.cardName,
-          cardLast4: cardDetails.cardNumber.slice(-4),
-          cardPhoto: cardDetails.cardPhotoPreview
-        } : null,
+        cardDetails: paymentMethod === 'card'
+          ? {
+              cardName: cardDetails.cardName,
+              cardLast4: cardDetails.cardNumber.slice(-4)
+            }
+          : null,
         qrCode: paymentMethod === 'qris' ? `QR-${Date.now()}` : null
       };
 
-      // Save transaction
       await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(transactionData)
       });
 
-      // Update invoice status to paid
       const updateResponse = await fetch('/api/invoices', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           invoiceId: invoice.id,
           status: 'paid',
-          paymentMethod: paymentMethod,
+          paymentMethod,
           transactionId: transactionData.id
         })
       });
@@ -143,17 +168,10 @@ export default function InvoicesPage() {
       if (updateResponse.ok) {
         alert('✅ Pembayaran berhasil! Invoice sudah terbayar.');
         setSelectedInvoice(null);
-        setInvoices(invoices.filter(inv => inv.id !== invoice.id));
-        // Reset form
-        setCardDetails({
-          cardName: '',
-          cardNumber: '',
-          expiryDate: '',
-          cvv: '',
-          cardPhoto: null,
-          cardPhotoPreview: null
-        });
-        setPaymentMethod('qris');
+        resetPaymentForm();
+        if (user?.id) {
+          fetchInvoices(user.id, filter);
+        }
       }
     } catch (error) {
       console.error('Error processing payment:', error);
@@ -163,199 +181,396 @@ export default function InvoicesPage() {
     }
   };
 
+  const handleSubmitRating = async (invoice) => {
+    if (!invoice?.serviceId || !invoice?.vendorId || !user?.id) {
+      alert('Data layanan untuk rating belum lengkap.');
+      return;
+    }
+
+    setIsRatingSubmitting(true);
+
+    try {
+      const response = await fetch('/api/ratings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceId: invoice.serviceId,
+          customerId: user.id,
+          vendorId: invoice.vendorId,
+          rating: ratingValue,
+          review: ratingReview
+        })
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Gagal menyimpan rating');
+      }
+
+      alert('✅ Rating berhasil disimpan.');
+      setInvoices((prev) => prev.map((item) => (
+        item.id === invoice.id ? { ...item, hasCustomerRating: true } : item
+      )));
+      setActiveRatingInvoiceId(null);
+      setRatingReview('');
+      setRatingValue(5);
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+      alert(error.message || 'Gagal menyimpan rating');
+    } finally {
+      setIsRatingSubmitting(false);
+    }
+  };
+
+  const summary = useMemo(() => {
+    const pending = invoices.filter((item) => item.status === 'pending');
+    const paid = invoices.filter((item) => item.status === 'paid');
+    const totalPending = pending.reduce((sum, item) => sum + Number(item.remainingPayment || item.totalAmount || 0), 0);
+    return {
+      pendingCount: pending.length,
+      paidCount: paid.length,
+      totalPending
+    };
+  }, [invoices]);
+
+  if (!user) return null;
+
   if (isLoading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#f5f3ff', padding: '40px' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
-          <p style={{ fontSize: '18px', color: '#666' }}>⏳ Loading invoices...</p>
+      <div>
+        <SharedNavbar />
+        <div style={{ textAlign: 'center', padding: '50px', color: '#666' }}>
+          ⏳ Memuat invoice...
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f3ff' }}>
+    <div>
       <SharedNavbar />
 
-      {/* Main Content */}
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1f2937', marginBottom: '12px' }}>📋 Invoice yang Menunggu Pembayaran</h1>
-        <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '32px' }}>Daftar pembayaran 80% yang jatuh tempo</p>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 24px' }}>
+        <div style={{ marginBottom: '18px' }}>
+          <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>
+            📋 Invoice Pembelian
+          </h1>
+          <p style={{ color: '#666', fontSize: '16px' }}>
+            Kelola invoice pembayaran Anda dengan rincian lengkap.
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '22px' }}>
+          <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '10px', padding: '12px 14px' }}>
+            <div style={{ fontSize: '12px', color: '#6b7280' }}>Total menunggu pembayaran</div>
+            <div style={{ fontSize: '20px', fontWeight: '800', color: '#5b21b6' }}>{formatCurrency(summary.totalPending)}</div>
+          </div>
+          <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '10px', padding: '12px 14px' }}>
+            <div style={{ fontSize: '12px', color: '#6b7280' }}>Invoice pending</div>
+            <div style={{ fontSize: '20px', fontWeight: '800', color: '#5b21b6' }}>{summary.pendingCount}</div>
+          </div>
+          <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '10px', padding: '12px 14px' }}>
+            <div style={{ fontSize: '12px', color: '#6b7280' }}>Invoice dibayar</div>
+            <div style={{ fontSize: '20px', fontWeight: '800', color: '#065f46' }}>{summary.paidCount}</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '28px', flexWrap: 'wrap' }}>
+          {[
+            { value: 'pending', label: '⏳ Menunggu Pembayaran' },
+            { value: 'paid', label: '✅ Sudah Dibayar' },
+            { value: 'all', label: '📊 Semua Invoice' }
+          ].map((btn) => (
+            <button
+              key={btn.value}
+              onClick={() => handleFilterChange(btn.value)}
+              style={{
+                padding: '10px 20px',
+                background: filter === btn.value ? '#7c3aed' : '#f3f4f6',
+                color: filter === btn.value ? 'white' : '#374151',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '14px',
+                transition: 'all 0.2s'
+              }}
+            >
+              {btn.label}
+            </button>
+          ))}
+        </div>
 
         {invoices.length === 0 ? (
-          <div style={{ background: 'white', borderRadius: '12px', padding: '40px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-            <p style={{ fontSize: '18px', color: '#6b7280', marginBottom: '8px' }}>✅ Tidak ada invoice yang pending</p>
-            <p style={{ fontSize: '14px', color: '#999' }}>Semua pembayaran Anda sudah terbayar.</p>
+          <div style={{ background: '#f3f4f6', padding: '40px', borderRadius: '12px', textAlign: 'center', color: '#666' }}>
+            <p style={{ fontSize: '18px', marginBottom: '8px' }}>📭 Tidak ada invoice</p>
+            <p style={{ fontSize: '14px', color: '#999' }}>Invoice akan muncul saat deal disepakati.</p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: selectedInvoice ? '1fr 1fr' : '1fr', gap: '32px' }}>
-            {/* Invoices List */}
-            <div>
-              <div style={{ display: 'grid', gap: '16px' }}>
-                {invoices.map((invoice) => {
-                  const timeInfo = calculateTimeRemaining(invoice.paymentDeadline);
-                  const isOverdue = timeInfo.color === '#dc2626';
-
-                  return (
+          <div style={{ display: 'grid', gap: '20px' }}>
+            {invoices.map((invoice) => (
+              <div
+                key={invoice.id}
+                style={{
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  background: 'white',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: selectedInvoice?.id === invoice.id ? '0 4px 12px rgba(124, 58, 237, 0.15)' : 'none'
+                }}
+                onClick={() => setSelectedInvoice(selectedInvoice?.id === invoice.id ? null : invoice)}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: '600' }}>
+                      Invoice #{invoice.id?.substring(0, 8) || 'N/A'}
+                    </h3>
+                    <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>
+                      Vendor: <strong>{invoice.vendorName || 'Unknown'}</strong>
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', marginBottom: '4px' }}>
+                      {formatCurrency(invoice.totalAmount || invoice.remainingPayment || 0)}
+                    </div>
                     <div
-                      key={invoice.id}
-                      onClick={() => setSelectedInvoice(invoice)}
                       style={{
-                        background: 'white',
-                        borderRadius: '12px',
-                        padding: '20px',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                        cursor: 'pointer',
-                        border: selectedInvoice?.id === invoice.id ? '2px solid #7c3aed' : '1px solid #e5e7eb',
-                        transition: 'all 0.2s'
+                        display: 'inline-block',
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        background: invoice.status === 'paid' ? '#dcfce7' : '#fef3c7',
+                        color: invoice.status === 'paid' ? '#166534' : '#92400e'
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                        <div>
-                          <p style={{ fontSize: '13px', color: '#6b7280', margin: '0 0 4px 0' }}>Invoice ID</p>
-                          <p style={{ fontSize: '14px', fontWeight: '700', color: '#1f2937', margin: 0 }}>{invoice.id}</p>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <p style={{ fontSize: '12px', color: isOverdue ? '#dc2626' : '#22c55e', fontWeight: '600', margin: 0 }}>
-                            {isOverdue ? '⚠️ OVERDUE' : '✅ Aktif'}
-                          </p>
-                          <p style={{ fontSize: '12px', color: timeInfo.color, fontWeight: '600', margin: '4px 0 0 0' }}>
-                            ⏱️ {timeInfo.text}
-                          </p>
-                        </div>
-                      </div>
+                      {invoice.status === 'paid' ? '✅ Dibayar' : '⏳ Pending'}
+                    </div>
+                  </div>
+                </div>
 
-                      <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                          <span style={{ fontSize: '13px', color: '#6b7280' }}>Sisa Pembayaran (80%)</span>
-                          <span style={{ fontSize: '16px', fontWeight: '700', color: '#2563eb' }}>Rp {invoice.remainingPayment.toLocaleString('id-ID')}</span>
+                <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+                    <div>
+                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>📦 Item Sewa</p>
+                      <p style={{ margin: 0, fontSize: '15px', fontWeight: '600' }}>{invoice.serviceTitle || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>📅 Durasi Sewa</p>
+                      <p style={{ margin: 0, fontSize: '15px', fontWeight: '600' }}>{invoice.durationDays || 1} hari</p>
+                    </div>
+                    <div>
+                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>💰 Harga/Hari</p>
+                      <p style={{ margin: 0, fontSize: '15px', fontWeight: '600' }}>{formatCurrency(invoice.basePrice || 0)}</p>
+                    </div>
+                    <div>
+                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>📆 Batas Pembayaran</p>
+                      <p style={{ margin: 0, fontSize: '15px', fontWeight: '600' }}>{formatDate(invoice.paymentDeadline)}</p>
+                    </div>
+                  </div>
+
+                  {selectedInvoice?.id === invoice.id && (
+                    <div style={{ background: '#f9fafb', padding: '16px', borderRadius: '8px', marginTop: '16px', borderLeft: '4px solid #7c3aed' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>📋 Detail Invoice</h4>
+                      <div style={{ display: 'grid', gap: '8px', fontSize: '13px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: '#666' }}>Tanggal Invoice:</span>
+                          <strong>{formatDate(invoice.createdAt)}</strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: '12px', color: '#6b7280' }}>Jatuh Tempo</span>
-                          <span style={{ fontSize: '12px', fontWeight: '600', color: '#1f2937' }}>
-                            {new Date(invoice.paymentDeadline).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' })}
-                          </span>
+                          <span style={{ color: '#666' }}>Status Pembayaran:</span>
+                          <strong>{invoice.status === 'paid' ? '✅ Sudah Dibayar' : '⏳ Belum Dibayar'}</strong>
                         </div>
-                      </div>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedInvoice(invoice);
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '10px',
-                          background: '#7c3aed',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '8px',
-                          fontWeight: '600',
-                          fontSize: '14px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        Bayar Sekarang
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Payment Form - Only show if invoice selected */}
-            {selectedInvoice && (
-              <div>
-                <div style={{ background: 'white', borderRadius: '12px', padding: '32px', boxShadow: '0 4px 6px rgba(0, 0, 0, 0.07)' }}>
-                  <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '24px', color: '#1f2937' }}>Pilih Metode Pembayaran</h2>
-
-                  <form onSubmit={(e) => { e.preventDefault(); handlePayInvoice(selectedInvoice); }}>
-                    {/* QRIS Option */}
-                    <div style={{ marginBottom: '16px' }}>
-                      <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', border: paymentMethod === 'qris' ? '2px solid #7c3aed' : '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', background: paymentMethod === 'qris' ? '#f3f4f6' : 'transparent', transition: 'all 0.2s' }}>
-                        <input type="radio" name="paymentMethod" value="qris" checked={paymentMethod === 'qris'} onChange={(e) => setPaymentMethod(e.target.value)} style={{ marginTop: '4px', cursor: 'pointer' }} />
-                        <div>
-                          <div style={{ fontWeight: '600', color: '#1f2937' }}>💳 QRIS</div>
-                          <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px', margin: 0 }}>Scan QR code dengan aplikasi pembayaran Anda</p>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: '#666' }}>Subtotal:</span>
+                          <strong>{formatCurrency(invoice.discountedSubtotal || invoice.basePrice || 0)}</strong>
                         </div>
-                      </label>
-                    </div>
-
-                    {/* Card Option */}
-                    <div style={{ marginBottom: '24px' }}>
-                      <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', border: paymentMethod === 'card' ? '2px solid #7c3aed' : '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', background: paymentMethod === 'card' ? '#f3f4f6' : 'transparent', transition: 'all 0.2s' }}>
-                        <input type="radio" name="paymentMethod" value="card" checked={paymentMethod === 'card'} onChange={(e) => setPaymentMethod(e.target.value)} style={{ marginTop: '4px', cursor: 'pointer' }} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: '600', color: '#1f2937' }}>🏦 Debit/Credit Card</div>
-                          <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px', margin: 0 }}>Gunakan kartu debit atau credit card Anda</p>
-                        </div>
-                      </label>
-                    </div>
-
-                    {/* Card Details */}
-                    {paymentMethod === 'card' && (
-                      <div style={{ background: '#f9fafb', padding: '20px', borderRadius: '8px', marginBottom: '24px', border: '1px solid #ddd' }}>
-                        <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: '#1f2937' }}>Detail Kartu</h3>
-                        <div style={{ marginBottom: '12px' }}>
-                          <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Nama Pemilik Kartu</label>
-                          <input type="text" value={cardDetails.cardName} onChange={(e) => setCardDetails(prev => ({ ...prev, cardName: e.target.value }))} placeholder="Contoh: BUDI SANTOSO" style={{ width: '100%', padding: '10px', border: cardErrors.cardName ? '2px solid #dc2626' : '1px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }} />
-                          {cardErrors.cardName && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px', margin: 0 }}>{cardErrors.cardName}</p>}
-                        </div>
-                        <div style={{ marginBottom: '12px' }}>
-                          <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Nomor Kartu</label>
-                          <input type="text" value={cardDetails.cardNumber} onChange={(e) => setCardDetails(prev => ({ ...prev, cardNumber: e.target.value.replace(/\D/g, '').slice(0, 19) }))} placeholder="1234 5678 9012 3456" style={{ width: '100%', padding: '10px', border: cardErrors.cardNumber ? '2px solid #dc2626' : '1px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }} />
-                          {cardErrors.cardNumber && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px', margin: 0 }}>{cardErrors.cardNumber}</p>}
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                          <div>
-                            <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>Tanggal Berlaku</label>
-                            <input type="text" value={cardDetails.expiryDate} onChange={(e) => { let value = e.target.value.replace(/\D/g, '').slice(0, 4); if (value.length >= 2) { value = value.slice(0, 2) + '/' + value.slice(2); } setCardDetails(prev => ({ ...prev, expiryDate: value })); }} placeholder="MM/YY" style={{ width: '100%', padding: '10px', border: cardErrors.expiryDate ? '2px solid #dc2626' : '1px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }} />
-                            {cardErrors.expiryDate && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px', margin: 0 }}>{cardErrors.expiryDate}</p>}
+                        {Number(invoice.discountAmount || 0) > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: '#666' }}>Diskon:</span>
+                            <strong>- {formatCurrency(invoice.discountAmount)}</strong>
                           </div>
-                          <div>
-                            <label style={{ fontSize: '13px', fontWeight: '600', display: 'block', marginBottom: '6px' }}>CVV</label>
-                            <input type="text" value={cardDetails.cvv} onChange={(e) => setCardDetails(prev => ({ ...prev, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) }))} placeholder="123" style={{ width: '100%', padding: '10px', border: cardErrors.cvv ? '2px solid #dc2626' : '1px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }} />
-                            {cardErrors.cvv && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px', margin: 0 }}>{cardErrors.cvv}</p>}
+                        )}
+                        {Number(invoice.serviceFee || 0) > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: '#666' }}>Biaya Layanan:</span>
+                            <strong>{formatCurrency(invoice.serviceFee)}</strong>
                           </div>
-                        </div>
+                        )}
+                        {invoice.promo?.code && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: '#666' }}>Kode Promo:</span>
+                            <strong>{invoice.promo.code}</strong>
+                          </div>
+                        )}
                       </div>
-                    )}
 
-                    {/* QRIS Display */}
-                    {paymentMethod === 'qris' && (
-                      <div style={{ background: '#f0fdf4', padding: '20px', borderRadius: '8px', marginBottom: '24px', textAlign: 'center', border: '2px solid #86efac' }}>
-                        <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: '#166534' }}>📲 Scan QR Code</h3>
-                        <div style={{ background: 'white', padding: '16px', borderRadius: '8px', display: 'inline-block', border: '2px solid #86efac' }}>
-                          <div style={{ fontSize: '64px', padding: '24px', background: '#f3f4f6', borderRadius: '8px', fontWeight: '700' }}>📱</div>
-                        </div>
-                        <p style={{ fontSize: '12px', color: '#166534', marginTop: '12px', fontWeight: '500', margin: 0 }}>Silahkan scan QR code dengan aplikasi pembayaran Anda</p>
-                      </div>
-                    )}
+                      {invoice.status === 'pending' && (
+                        <div style={{ marginTop: '16px', borderTop: '1px solid #e5e7eb', paddingTop: '14px' }}>
+                          <h4 style={{ margin: '0 0 10px', fontSize: '14px', fontWeight: '700', color: '#1f2937' }}>💳 Bayar Invoice</h4>
 
-                    {/* Summary */}
-                    <div style={{ background: '#fef3c7', padding: '16px', borderRadius: '8px', marginBottom: '24px', border: '1px solid #fcd34d' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '13px', color: '#92400e' }}>Sisa Pembayaran</span>
-                        <span style={{ fontSize: '18px', fontWeight: '700', color: '#ca8a04' }}>Rp {selectedInvoice.remainingPayment.toLocaleString('id-ID')}</span>
-                      </div>
-                      <p style={{ fontSize: '12px', color: '#92400e', margin: '8px 0 0 0', fontWeight: '500' }}>
-                        Jatuh Tempo: {new Date(selectedInvoice.paymentDeadline).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </p>
+                          <div style={{ display: 'grid', gap: '8px', marginBottom: '10px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                              <input type="radio" name="paymentMethod" value="qris" checked={paymentMethod === 'qris'} onChange={(e) => setPaymentMethod(e.target.value)} />
+                              QRIS
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                              <input type="radio" name="paymentMethod" value="card" checked={paymentMethod === 'card'} onChange={(e) => setPaymentMethod(e.target.value)} />
+                              Kartu Debit/Kredit
+                            </label>
+                          </div>
+
+                          {paymentMethod === 'card' && (
+                            <div style={{ display: 'grid', gap: '8px', marginBottom: '12px' }}>
+                              <input
+                                type="text"
+                                placeholder="Nama pemilik kartu"
+                                value={cardDetails.cardName}
+                                onChange={(e) => setCardDetails((prev) => ({ ...prev, cardName: e.target.value }))}
+                                style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '9px 10px', fontSize: '13px' }}
+                              />
+                              {cardErrors.cardName && <p style={{ margin: 0, color: '#dc2626', fontSize: '12px' }}>{cardErrors.cardName}</p>}
+
+                              <input
+                                type="text"
+                                placeholder="Nomor kartu"
+                                value={cardDetails.cardNumber}
+                                onChange={(e) => setCardDetails((prev) => ({ ...prev, cardNumber: e.target.value.replace(/\D/g, '').slice(0, 19) }))}
+                                style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '9px 10px', fontSize: '13px' }}
+                              />
+                              {cardErrors.cardNumber && <p style={{ margin: 0, color: '#dc2626', fontSize: '12px' }}>{cardErrors.cardNumber}</p>}
+
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                <div>
+                                  <input
+                                    type="text"
+                                    placeholder="MM/YY"
+                                    value={cardDetails.expiryDate}
+                                    onChange={(e) => {
+                                      let value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                      if (value.length >= 2) {
+                                        value = value.slice(0, 2) + '/' + value.slice(2);
+                                      }
+                                      setCardDetails((prev) => ({ ...prev, expiryDate: value }));
+                                    }}
+                                    style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '9px 10px', fontSize: '13px', width: '100%', boxSizing: 'border-box' }}
+                                  />
+                                  {cardErrors.expiryDate && <p style={{ margin: '4px 0 0', color: '#dc2626', fontSize: '12px' }}>{cardErrors.expiryDate}</p>}
+                                </div>
+                                <div>
+                                  <input
+                                    type="text"
+                                    placeholder="CVV"
+                                    value={cardDetails.cvv}
+                                    onChange={(e) => setCardDetails((prev) => ({ ...prev, cvv: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                                    style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '9px 10px', fontSize: '13px', width: '100%', boxSizing: 'border-box' }}
+                                  />
+                                  {cardErrors.cvv && <p style={{ margin: '4px 0 0', color: '#dc2626', fontSize: '12px' }}>{cardErrors.cvv}</p>}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handlePayInvoice(invoice)}
+                            disabled={isSubmitting}
+                            style={{
+                              padding: '10px 14px',
+                              border: 'none',
+                              borderRadius: '8px',
+                              background: isSubmitting ? '#9ca3af' : '#22c55e',
+                              color: 'white',
+                              fontWeight: '700',
+                              cursor: isSubmitting ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            {isSubmitting ? 'Memproses...' : `Bayar ${formatCurrency(invoice.remainingPayment || invoice.totalAmount || 0)}`}
+                          </button>
+                        </div>
+                      )}
+
+                      {invoice.status === 'paid' && (
+                        <div style={{ marginTop: '16px', borderTop: '1px solid #e5e7eb', paddingTop: '14px' }}>
+                          <div style={{ padding: '10px 12px', borderRadius: '8px', background: '#ecfdf5', border: '1px solid #a7f3d0', marginBottom: '12px' }}>
+                            <p style={{ margin: 0, fontSize: '13px', color: '#065f46', fontWeight: '700' }}>
+                              Kerja sama dengan vendor telah selesai sesuai kesepakatan.
+                            </p>
+                          </div>
+
+                          {invoice.hasCustomerRating ? (
+                            <button
+                              type="button"
+                              disabled
+                              style={{ padding: '10px 12px', border: 'none', borderRadius: '8px', background: '#9ca3af', color: 'white', fontWeight: '600', cursor: 'not-allowed' }}
+                            >
+                              Rating Sudah Diberikan
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveRatingInvoiceId(invoice.id);
+                                setRatingValue(5);
+                                setRatingReview('');
+                              }}
+                              style={{ padding: '10px 12px', border: 'none', borderRadius: '8px', background: '#7c3aed', color: 'white', fontWeight: '700', cursor: 'pointer' }}
+                            >
+                              Beri Rating
+                            </button>
+                          )}
+
+                          {activeRatingInvoiceId === invoice.id && !invoice.hasCustomerRating && (
+                            <div style={{ marginTop: '12px' }}>
+                              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <button
+                                    key={star}
+                                    type="button"
+                                    onClick={() => setRatingValue(star)}
+                                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '24px', lineHeight: 1 }}
+                                  >
+                                    {star <= ratingValue ? '⭐' : '☆'}
+                                  </button>
+                                ))}
+                              </div>
+
+                              <textarea
+                                value={ratingReview}
+                                onChange={(e) => setRatingReview(e.target.value)}
+                                placeholder="Tulis ulasan singkat (opsional)..."
+                                rows={3}
+                                style={{ width: '100%', border: '1px solid #ddd', borderRadius: '8px', padding: '10px', fontSize: '13px', resize: 'vertical', boxSizing: 'border-box' }}
+                              />
+
+                              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSubmitRating(invoice)}
+                                  disabled={isRatingSubmitting}
+                                  style={{ padding: '10px 12px', border: 'none', borderRadius: '8px', background: isRatingSubmitting ? '#a78bfa' : '#7c3aed', color: 'white', fontWeight: '700', cursor: isRatingSubmitting ? 'not-allowed' : 'pointer' }}
+                                >
+                                  {isRatingSubmitting ? 'Menyimpan...' : 'Kirim Rating'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveRatingInvoiceId(null)}
+                                  style={{ padding: '10px 12px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', color: '#374151', fontWeight: '600', cursor: 'pointer' }}
+                                >
+                                  Batal
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-
-                    {/* Submit Button */}
-                    <button type="submit" disabled={isSubmitting} style={{ width: '100%', padding: '14px', background: isSubmitting ? '#ccc' : '#22c55e', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '16px', cursor: isSubmitting ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}>
-                      {isSubmitting ? '⏳ Memproses...' : '💳 Bayar Sekarang'}
-                    </button>
-
-                    <button type="button" onClick={() => setSelectedInvoice(null)} style={{ width: '100%', padding: '12px', background: '#f3f4f6', color: '#333', border: '1px solid #ddd', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', marginTop: '12px', transition: 'all 0.2s' }}>
-                      ← Batal
-                    </button>
-                  </form>
+                  )}
                 </div>
               </div>
-            )}
+            ))}
           </div>
         )}
       </div>

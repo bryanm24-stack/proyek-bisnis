@@ -10,6 +10,18 @@ export default function VendorProdukPage() {
   const [vendorItems, setVendorItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [promoModalOpen, setPromoModalOpen] = useState(false);
+  const [selectedPromoItem, setSelectedPromoItem] = useState(null);
+  const [promoSubmitting, setPromoSubmitting] = useState(false);
+  const [promoMessage, setPromoMessage] = useState('');
+  const [promoForm, setPromoForm] = useState({
+    promoCode: '',
+    promoType: 'percent',
+    promoValue: '',
+    minSubtotal: '',
+    description: '',
+    active: true
+  });
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -66,6 +78,75 @@ export default function VendorProdukPage() {
     } catch (error) {
       console.error('Error deleting item:', error);
       alert('❌ Terjadi kesalahan');
+    }
+  };
+
+  const openPromoModal = (item) => {
+    const basePrice = Number(item.price || item.hargaBarang || item.hargaPerHari || 0);
+    setSelectedPromoItem(item);
+    setPromoForm({
+      promoCode: '',
+      promoType: 'percent',
+      promoValue: basePrice > 0 ? Math.min(25, Math.max(10, Math.round(basePrice / 100000))) : 15,
+      minSubtotal: basePrice > 0 ? basePrice : '',
+      description: `Promo spesial untuk ${item.title || item.namaBarang || item.namaJasa}`,
+      active: true
+    });
+    setPromoMessage('');
+    setPromoModalOpen(true);
+  };
+
+  const closePromoModal = () => {
+    setPromoModalOpen(false);
+    setSelectedPromoItem(null);
+    setPromoMessage('');
+  };
+
+  const handleCreatePromo = async (event) => {
+    event.preventDefault();
+    if (!selectedPromoItem || !user) return;
+
+    if (!promoForm.promoValue) {
+      setPromoMessage('Isi nilai promo terlebih dahulu.');
+      return;
+    }
+
+    setPromoSubmitting(true);
+    setPromoMessage('');
+
+    try {
+      const response = await fetch('/api/promos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vendorId: user.id,
+          vendorName: user.name,
+          productId: selectedPromoItem.id,
+          productName: selectedPromoItem.title || selectedPromoItem.namaBarang || selectedPromoItem.namaJasa,
+          productImage: selectedPromoItem.images?.[0] || '',
+          originalPrice: selectedPromoItem.price || selectedPromoItem.hargaBarang || selectedPromoItem.hargaPerHari || 0,
+          promoCode: promoForm.promoCode,
+          promoType: promoForm.promoType,
+          promoValue: Number.parseInt(promoForm.promoValue, 10),
+          minSubtotal: Number.parseInt(promoForm.minSubtotal, 10) || 0,
+          description: promoForm.description,
+          active: promoForm.active
+        })
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        setPromoMessage(data.message || 'Gagal membuat promo.');
+        return;
+      }
+
+      setPromoMessage('✅ Promo berhasil dibuat dan siap tampil di detail customer.');
+      setTimeout(() => closePromoModal(), 1000);
+    } catch (error) {
+      console.error('Error creating promo:', error);
+      setPromoMessage('Terjadi kesalahan saat membuat promo.');
+    } finally {
+      setPromoSubmitting(false);
     }
   };
 
@@ -245,6 +326,25 @@ export default function VendorProdukPage() {
                       ✏️ Edit
                     </button>
                     <button
+                      onClick={() => openPromoModal(item)}
+                      style={{
+                        flex: 1,
+                        padding: '10px 12px',
+                        background: '#ecfeff',
+                        color: '#0f766e',
+                        border: '1px solid #a5f3fc',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.target.style.background = '#cffafe'}
+                      onMouseLeave={(e) => e.target.style.background = '#ecfeff'}
+                    >
+                      ✨ Add Promo
+                    </button>
+                    <button
                       onClick={() => handleDelete(item.id)}
                       style={{
                         flex: 1,
@@ -276,6 +376,119 @@ export default function VendorProdukPage() {
           </div>
         )}
       </div>
+
+      {promoModalOpen && selectedPromoItem && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '24px' }}
+          onClick={closePromoModal}
+        >
+          <div
+            style={{ width: '100%', maxWidth: '620px', background: 'white', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 25px 60px rgba(0,0,0,0.25)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: '24px 28px', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', color: 'white' }}>
+              <div style={{ fontSize: '14px', opacity: 0.9 }}>Tambah promo untuk produk vendor</div>
+              <h3 style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: '800' }}>✨ Add Promo</h3>
+            </div>
+
+            <form onSubmit={handleCreatePromo} style={{ padding: '28px', display: 'grid', gap: '18px' }}>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '16px', border: '1px solid #e5e7eb', borderRadius: '16px', background: '#fafafa' }}>
+                <div style={{ width: '84px', height: '84px', borderRadius: '14px', overflow: 'hidden', flexShrink: 0, background: '#e5e7eb' }}>
+                  <img
+                    src={selectedPromoItem.images?.[0] || 'https://via.placeholder.com/150x150?text=Promo'}
+                    alt={selectedPromoItem.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Produk yang dipromosikan</div>
+                  <div style={{ fontSize: '18px', fontWeight: '800', color: '#111827' }}>{selectedPromoItem.title || selectedPromoItem.namaBarang || selectedPromoItem.namaJasa}</div>
+                  <div style={{ fontSize: '14px', color: '#6b7280' }}>Harga dasar Rp {(selectedPromoItem.price || selectedPromoItem.hargaBarang || selectedPromoItem.hargaPerHari || 0).toLocaleString('id-ID')}</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>Kode Promo</label>
+                  <input
+                    type="text"
+                    value={promoForm.promoCode}
+                    onChange={(e) => setPromoForm(prev => ({ ...prev, promoCode: e.target.value.toUpperCase() }))}
+                    placeholder="Opsional, contoh: PROMOHEMAT"
+                    style={{ width: '100%', padding: '12px', border: '1px solid #d1d5db', borderRadius: '10px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>Tipe Diskon</label>
+                  <select
+                    value={promoForm.promoType}
+                    onChange={(e) => setPromoForm(prev => ({ ...prev, promoType: e.target.value }))}
+                    style={{ width: '100%', padding: '12px', border: '1px solid #d1d5db', borderRadius: '10px' }}
+                  >
+                    <option value="percent">Persen (%)</option>
+                    <option value="fixed">Nominal (Rp)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>Nilai Promo</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={promoForm.promoValue}
+                    onChange={(e) => setPromoForm(prev => ({ ...prev, promoValue: e.target.value }))}
+                    placeholder="Mis. 10"
+                    style={{ width: '100%', padding: '12px', border: '1px solid #d1d5db', borderRadius: '10px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>Minimal Transaksi</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={promoForm.minSubtotal}
+                    onChange={(e) => setPromoForm(prev => ({ ...prev, minSubtotal: e.target.value }))}
+                    placeholder="Contoh: 100000"
+                    style={{ width: '100%', padding: '12px', border: '1px solid #d1d5db', borderRadius: '10px' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>Deskripsi Promo</label>
+                <textarea
+                  value={promoForm.description}
+                  onChange={(e) => setPromoForm(prev => ({ ...prev, description: e.target.value }))}
+                  rows={3}
+                  placeholder="Contoh: Diskon spesial untuk booking minggu ini."
+                  style={{ width: '100%', padding: '12px', border: '1px solid #d1d5db', borderRadius: '10px', fontFamily: 'inherit' }}
+                />
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: '#374151' }}>
+                <input
+                  type="checkbox"
+                  checked={promoForm.active}
+                  onChange={(e) => setPromoForm(prev => ({ ...prev, active: e.target.checked }))}
+                />
+                Promo aktif dan bisa langsung muncul di detail customer
+              </label>
+
+              {promoMessage && (
+                <div style={{ padding: '12px 14px', borderRadius: '10px', background: promoMessage.startsWith('✅') ? '#ecfdf5' : '#fef2f2', color: promoMessage.startsWith('✅') ? '#166534' : '#991b1b', fontSize: '14px', whiteSpace: 'pre-wrap' }}>
+                  {promoMessage}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '4px' }}>
+                <button type="button" onClick={closePromoModal} style={{ padding: '12px 18px', borderRadius: '10px', border: '1px solid #d1d5db', background: 'white', fontWeight: '700', cursor: 'pointer' }}>Batal</button>
+                <button type="submit" disabled={promoSubmitting} style={{ padding: '12px 18px', borderRadius: '10px', border: 'none', background: promoSubmitting ? '#a78bfa' : '#7c3aed', color: 'white', fontWeight: '800', cursor: promoSubmitting ? 'not-allowed' : 'pointer' }}>
+                  {promoSubmitting ? 'Menyimpan...' : 'Simpan Promo'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

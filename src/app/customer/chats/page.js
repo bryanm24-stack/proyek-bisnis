@@ -108,6 +108,14 @@ export default function CustomerChatsPage() {
     setDealData(null);
   };
 
+  const proceedToPayment = () => {
+    if (!dealData?.id) {
+      alert('Deal belum siap untuk pembayaran.');
+      return;
+    }
+    router.push(`/transaction/payment?dealId=${dealData.id}`);
+  };
+
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
 
@@ -338,7 +346,12 @@ export default function CustomerChatsPage() {
                     )}
                   </div>
                   <div>
-                    <button style={{ padding: '8px 12px', borderRadius: '8px', border: 'none', background: '#7c3aed', color: 'white', fontWeight: 700 }}>Lanjut ke Pembayaran</button>
+                    <button
+                      onClick={proceedToPayment}
+                      style={{ padding: '8px 12px', borderRadius: '8px', border: 'none', background: '#7c3aed', color: 'white', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Lanjut ke Pembayaran
+                    </button>
                   </div>
                 </div>
               )}
@@ -571,26 +584,17 @@ export default function CustomerChatsPage() {
                   }}>
                     ✓ Deal sudah disetujui.
                   </div>
-                  <button
-                    onClick={() => {
-                      router.push(`/transaction/identity-check?dealId=${dealData.id}`);
-                      setShowVendorModal(false);
-                    }}
-                    style={{
-                      padding: '12px 16px',
-                      border: 'none',
-                      borderRadius: '8px',
-                      background: '#f59e0b',
-                      color: 'white',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      fontSize: '14px'
-                    }}
-                    onMouseEnter={(e) => e.target.style.background = '#d97706'}
-                    onMouseLeave={(e) => e.target.style.background = '#f59e0b'}
-                  >
-                    💳 Lanjut ke Pembayaran
-                  </button>
+                  <div style={{
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    background: '#f5f3ff',
+                    color: '#5b21b6',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    textAlign: 'center'
+                  }}>
+                    Gunakan tombol ungu Lanjut ke Pembayaran di area chat untuk melanjutkan pembayaran.
+                  </div>
                 </>
               )}
 
