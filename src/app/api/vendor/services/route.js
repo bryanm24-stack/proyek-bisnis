@@ -34,6 +34,7 @@ export async function POST(request) {
       // Modern payload fields (used by VendorProductForm)
       mainCategory,
       subCategory,
+      superSubCategory,
       title,
       shortDescription,
       description,
@@ -45,6 +46,9 @@ export async function POST(request) {
       location,
       category,
       type, // 'barang' atau 'jasa'
+      specifications,
+      descriptionTable,
+      checklist,
       // Fields untuk barang
       namaBarang,
       jenisBarang,
@@ -104,7 +108,7 @@ export async function POST(request) {
         }, { status: 400 });
       }
 
-      const resolvedType = type || (mainCategory === 'Jasa Profesional' ? 'jasa' : 'barang');
+      const resolvedType = type || (mainCategory && mainCategory.toLowerCase().includes('jasa') ? 'jasa' : 'barang');
       const parsedPrice = Number.parseInt(price, 10);
       const parsedMinimumDays = Number.parseInt(minimumDays, 10);
       const parsedQuantity = Number.parseInt(quantity, 10);
@@ -115,6 +119,7 @@ export async function POST(request) {
         vendorName,
         mainCategory,
         subCategory,
+        superSubCategory: superSubCategory || '',
         category: category || mainCategory,
         title,
         shortDescription,
@@ -125,6 +130,10 @@ export async function POST(request) {
         quantity: Number.isNaN(parsedQuantity) ? 0 : parsedQuantity,
         rentalPolicy: rentalPolicy || '',
         location,
+        specifications: specifications && typeof specifications === 'object' ? specifications : {},
+        descriptionTable: descriptionTable && typeof descriptionTable === 'object' ? descriptionTable : {},
+        checklist: checklist && typeof checklist === 'object' ? checklist : {},
+        items: items && Array.isArray(items) ? items : [],
         type: resolvedType,
         rating: 0,
         rentCount: 0,
@@ -245,6 +254,7 @@ export async function PUT(request) {
       vendorId,
       mainCategory,
       subCategory,
+      superSubCategory,
       title,
       shortDescription,
       description,
@@ -254,7 +264,11 @@ export async function PUT(request) {
       rentalPolicy,
       location,
       images,
-      category
+      category,
+      specifications,
+      descriptionTable,
+      checklist,
+      items
     } = body;
 
     if (!id || !vendorId) {
@@ -283,6 +297,7 @@ export async function PUT(request) {
       ...services[serviceIndex],
       mainCategory: mainCategory || services[serviceIndex].mainCategory,
       subCategory: subCategory || services[serviceIndex].subCategory,
+      superSubCategory: superSubCategory !== undefined ? superSubCategory : (services[serviceIndex].superSubCategory || ''),
       title: title || services[serviceIndex].title,
       shortDescription: shortDescription || services[serviceIndex].shortDescription,
       description: description || services[serviceIndex].description,
@@ -292,7 +307,19 @@ export async function PUT(request) {
       rentalPolicy: rentalPolicy || services[serviceIndex].rentalPolicy,
       location: location || services[serviceIndex].location,
       images: images && images.length > 0 ? images : services[serviceIndex].images,
-      category: category || services[serviceIndex].category
+      category: category || services[serviceIndex].category,
+      specifications: specifications && typeof specifications === 'object'
+        ? specifications
+        : (services[serviceIndex].specifications || {}),
+      descriptionTable: descriptionTable && typeof descriptionTable === 'object'
+        ? descriptionTable
+        : (services[serviceIndex].descriptionTable || {}),
+      checklist: checklist && typeof checklist === 'object'
+        ? checklist
+        : (services[serviceIndex].checklist || {}),
+      items: items && Array.isArray(items)
+        ? items
+        : (services[serviceIndex].items || [])
     };
 
     await fs.writeFile(filePath, JSON.stringify(services, null, 2));
