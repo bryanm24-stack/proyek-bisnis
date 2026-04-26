@@ -292,7 +292,7 @@ export default function VendorChatsPage() {
               }}>
                 <button
                   onClick={() => setChatTab('vendor')}
-                  disabled={vendorChats.length === 0}
+                  disabled={customerChats.length === 0}
                   style={{
                     flex: 1,
                     padding: '10px 8px',
@@ -301,18 +301,18 @@ export default function VendorChatsPage() {
                     fontSize: '13px',
                     fontWeight: chatTab === 'vendor' ? '700' : '500',
                     color: chatTab === 'vendor' ? '#5A45D1' : '#999',
-                    cursor: vendorChats.length === 0 ? 'not-allowed' : 'pointer',
+                    cursor: customerChats.length === 0 ? 'not-allowed' : 'pointer',
                     borderBottom: chatTab === 'vendor' ? '2px solid #5A45D1' : 'none',
                     transition: 'all 0.2s',
-                    opacity: vendorChats.length === 0 ? 0.5 : 1,
+                    opacity: customerChats.length === 0 ? 0.5 : 1,
                     marginBottom: '-2px'
                   }}
                 >
-                  🏪 Vendor {vendorChats.length > 0 && `(${vendorChats.length})`}
+                  🏪 Vendor {customerChats.length > 0 && `(${customerChats.length})`}
                 </button>
                 <button
                   onClick={() => setChatTab('customer')}
-                  disabled={customerChats.length === 0}
+                  disabled={vendorChats.length === 0}
                   style={{
                     flex: 1,
                     padding: '10px 8px',
@@ -321,14 +321,14 @@ export default function VendorChatsPage() {
                     fontSize: '13px',
                     fontWeight: chatTab === 'customer' ? '700' : '500',
                     color: chatTab === 'customer' ? '#5A45D1' : '#999',
-                    cursor: customerChats.length === 0 ? 'not-allowed' : 'pointer',
+                    cursor: vendorChats.length === 0 ? 'not-allowed' : 'pointer',
                     borderBottom: chatTab === 'customer' ? '2px solid #5A45D1' : 'none',
                     transition: 'all 0.2s',
-                    opacity: customerChats.length === 0 ? 0.5 : 1,
+                    opacity: vendorChats.length === 0 ? 0.5 : 1,
                     marginBottom: '-2px'
                   }}
                 >
-                  👤 Customer {customerChats.length > 0 && `(${customerChats.length})`}
+                  👤 Customer {vendorChats.length > 0 && `(${vendorChats.length})`}
                 </button>
               </div>
             ) : null}
@@ -341,7 +341,7 @@ export default function VendorChatsPage() {
               <div style={{ position: 'relative' }}>
                 <input
                   type="text"
-                  placeholder={chatTab === 'vendor' ? "🔍 Cari customer..." : "🔍 Cari vendor..."}
+                  placeholder={chatTab === 'vendor' ? "🔍 Cari vendor..." : "🔍 Cari customer..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   style={{
@@ -396,53 +396,11 @@ export default function VendorChatsPage() {
               <p style={{ color: '#999', textAlign: 'center' }}>Memuat pesan...</p>
             ) : (
               <div>
-                {/* VENDOR CHATS - Sebagai penyedia layanan */}
+                {/* VENDOR TAB - Chat saat user berperan sebagai customer */}
                 {chatTab === 'vendor' ? (
-                  vendorChats.length === 0 ? (
-                    <p style={{ color: '#999', textAlign: 'center', fontSize: '13px', marginTop: '20px' }}>
-                      Belum ada chat sebagai vendor
-                    </p>
-                  ) : (
-                    <>
-                      {filteredVendorChats.length === 0 && searchQuery ? (
-                        <p style={{ fontSize: '12px', color: '#999', padding: '8px', textAlign: 'center' }}>
-                          Tidak ada hasil
-                        </p>
-                      ) : (
-                        filteredVendorChats.map((chat) => (
-                          <div
-                            key={chat.id}
-                            onClick={() => openChat(chat)}
-                            style={{
-                              padding: '12px',
-                              marginBottom: '8px',
-                              borderRadius: '8px',
-                              cursor: 'pointer',
-                              background: selectedChat?.id === chat.id ? '#5A45D1' : '#fff',
-                              color: selectedChat?.id === chat.id ? '#fff' : '#333',
-                              border: selectedChat?.id === chat.id ? '2px solid #5A45D1' : '1px solid #eee',
-                              transition: 'all 0.3s'
-                            }}
-                          >
-                            <div style={{ fontWeight: '600', fontSize: '14px' }}>
-                              {chat.customerName}
-                            </div>
-                            <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '4px' }}>
-                              {chat.serviceTitle}
-                            </div>
-                            <div style={{ fontSize: '12px', opacity: 0.6, marginTop: '4px' }}>
-                              {chat.messages?.length || 0} pesan
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </>
-                  )
-                ) : (
-                  /* CUSTOMER CHATS - Sebagai pembeli */
                   customerChats.length === 0 ? (
                     <p style={{ color: '#999', textAlign: 'center', fontSize: '13px', marginTop: '20px' }}>
-                      Belum ada chat sebagai customer
+                      Belum ada chat dengan vendor
                     </p>
                   ) : (
                     <>
@@ -468,6 +426,48 @@ export default function VendorChatsPage() {
                           >
                             <div style={{ fontWeight: '600', fontSize: '14px' }}>
                               {chat.vendorName}
+                            </div>
+                            <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '4px' }}>
+                              {chat.serviceTitle}
+                            </div>
+                            <div style={{ fontSize: '12px', opacity: 0.6, marginTop: '4px' }}>
+                              {chat.messages?.length || 0} pesan
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </>
+                  )
+                ) : (
+                  /* CUSTOMER TAB - Chat saat user berperan sebagai vendor */
+                  vendorChats.length === 0 ? (
+                    <p style={{ color: '#999', textAlign: 'center', fontSize: '13px', marginTop: '20px' }}>
+                      Belum ada chat dengan customer
+                    </p>
+                  ) : (
+                    <>
+                      {filteredVendorChats.length === 0 && searchQuery ? (
+                        <p style={{ fontSize: '12px', color: '#999', padding: '8px', textAlign: 'center' }}>
+                          Tidak ada hasil
+                        </p>
+                      ) : (
+                        filteredVendorChats.map((chat) => (
+                          <div
+                            key={chat.id}
+                            onClick={() => openChat(chat)}
+                            style={{
+                              padding: '12px',
+                              marginBottom: '8px',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              background: selectedChat?.id === chat.id ? '#5A45D1' : '#fff',
+                              color: selectedChat?.id === chat.id ? '#fff' : '#333',
+                              border: selectedChat?.id === chat.id ? '2px solid #5A45D1' : '1px solid #eee',
+                              transition: 'all 0.3s'
+                            }}
+                          >
+                            <div style={{ fontWeight: '600', fontSize: '14px' }}>
+                              {chat.customerName}
                             </div>
                             <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '4px' }}>
                               {chat.serviceTitle}

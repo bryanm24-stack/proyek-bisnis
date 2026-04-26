@@ -145,32 +145,6 @@ export default function CustomerChatsPage() {
     }
   };
 
-  const handleDealAction = async (action) => {
-    try {
-      const response = await fetch('/api/deals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action,
-          chatId: selectedChat.id,
-          customerId: user.id,
-          vendorId: selectedChat.vendorId,
-          serviceId: selectedChat.serviceId
-        })
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setDealData(data.data.deal);
-        setSelectedChat(data.data.chat);
-        alert(data.message);
-      }
-    } catch (error) {
-      console.error('Error processing deal:', error);
-      alert('Gagal memproses deal');
-    }
-  };
-
   if (!user) {
     return <div style={{ padding: '40px', textAlign: 'center' }}>Memuat...</div>;
   }

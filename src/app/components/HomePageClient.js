@@ -261,48 +261,58 @@ export default function HomePageClient() {
     }
   };
 
-  const handleDealAction = async (action) => {
-    if (!selectedService || !user) return;
-
-    try {
-      const response = await fetch('/api/deals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action,
-          chatId: chatData?.id,
-          customerId: user.id,
-          vendorId: selectedService.vendorId,
-          serviceId: selectedService.id
-        })
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        // Handle consistent response format
-        if (data.data.deal) {
-          setDealData(data.data.deal);
-        }
-        if (data.data.chat) {
-          setChatData(data.data.chat);
-        }
-        
-        if (action === 'accept' && data.data.readyForRating) {
-          setShowRatingForm(true);
-        }
-
-        if (action === 'cancel') {
-          setShowRatingForm(false);
-        }
-
-        alert(data.message);
-      } else {
-        alert('Error: ' + (data.message || 'Gagal memproses deal'));
-      }
-    } catch (error) {
-      console.error('Error processing deal:', error);
-      alert('Gagal memproses deal: ' + error.message);
+  const getDealStatusConfig = () => {
+    if (!dealData) {
+      return {
+        label: 'Belum ada status deal',
+        description: 'Transaksi diproses vendor. Kamu cukup lanjut negosiasi di chat.',
+        background: '#f3f4f6',
+        color: '#374151'
+      };
     }
+
+    if (dealData.status === 'pending') {
+      return {
+        label: 'Menunggu konfirmasi vendor',
+        description: 'Vendor belum mengonfirmasi. Tunggu update dari vendor di chat ini.',
+        background: '#fff7ed',
+        color: '#c2410c'
+      };
+    }
+
+    if (dealData.status === 'agreed') {
+      return {
+        label: 'Deal disetujui',
+        description: 'Deal sudah disepakati. Kamu bisa lanjut ke pembayaran.',
+        background: '#dbeafe',
+        color: '#1d4ed8'
+      };
+    }
+
+    if (dealData.status === 'cancelled') {
+      return {
+        label: 'Deal dibatalkan',
+        description: 'Deal dibatalkan. Kamu bisa lanjut negosiasi ulang melalui chat.',
+        background: '#fee2e2',
+        color: '#b91c1c'
+      };
+    }
+
+    if (dealData.status === 'completed') {
+      return {
+        label: 'Transaksi selesai',
+        description: 'Transaksi sudah selesai. Kamu bisa lanjut isi review.',
+        background: '#dcfce7',
+        color: '#166534'
+      };
+    }
+
+    return {
+      label: `Status: ${dealData.status}`,
+      description: 'Status deal diperbarui secara otomatis dari sistem.',
+      background: '#f3f4f6',
+      color: '#374151'
+    };
   };
 
   const submitRating = async () => {
@@ -982,55 +992,59 @@ export default function HomePageClient() {
               <button className="modal-close" onClick={closeChatModal}>✕</button>
             </div>
 
-            {/* Deal Buttons - Transparent Bar at Top of Chat */}
-            <div className="chat-deal-actions" style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: '12px',
-              padding: '12px',
-              backgroundColor: 'rgba(255, 255, 255, 0.7)',
-              borderBottom: '1px solid rgba(200, 200, 200, 0.3)',
-              backdropFilter: 'blur(4px)'
-            }}>
-              <button
-                className="btn-deal"
-                onClick={() => handleDealAction('accept')}
-                disabled={dealData?.status === 'agreed' || dealData?.status === 'cancelled'}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  backgroundColor: dealData?.status === 'agreed' ? '#d4edda' : '#28a745',
-                  color: dealData?.status === 'agreed' ? '#155724' : 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: 'bold',
-                  cursor: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
-                  opacity: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? 0.6 : 1,
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                ✅ {dealData?.status === 'agreed' ? 'Deal Diterima' : 'Deal'}
-              </button>
-              <button
-                className="btn-cancel"
-                onClick={() => handleDealAction('cancel')}
-                disabled={dealData?.status === 'cancelled'}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  backgroundColor: dealData?.status === 'cancelled' ? '#f8d7da' : '#dc3545',
-                  color: dealData?.status === 'cancelled' ? '#721c24' : 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: 'bold',
-                  cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
-                  opacity: dealData?.status === 'cancelled' ? 0.6 : 1,
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                ❌ {dealData?.status === 'cancelled' ? 'Dibatalkan' : 'Cancel'}
-              </button>
-            </div>
+            {/* Deal Status - Informational only for customer */}
+            {(() => {
+              const statusConfig = getDealStatusConfig();
+              const finalPrice = dealData?.finalPrice || dealData?.originalPrice || 0;
+              return (
+                <div
+                  style={{
+                    padding: '12px 14px',
+                    background: statusConfig.background,
+                    borderBottom: '1px solid #e5e7eb'
+                  }}
+                >
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: statusConfig.color }}>
+                    {statusConfig.label}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#4b5563', marginTop: '4px' }}>
+                    {statusConfig.description}
+                  </div>
+
+                  {dealData?.status === 'agreed' && (
+                    <div style={{ marginTop: '10px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#1d4ed8' }}>
+                        Harga akhir: Rp {Number(finalPrice).toLocaleString('id-ID')}
+                      </div>
+                      {dealData.discountGiven && dealData.discount && (
+                        <div style={{ fontSize: '12px', color: '#1e40af', marginTop: '2px' }}>
+                          Potongan: Rp {Number(dealData.discount.amount || 0).toLocaleString('id-ID')}
+                        </div>
+                      )}
+                      {dealData.id && (
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/transaction/identity-check?dealId=${dealData.id}`)}
+                          style={{
+                            marginTop: '8px',
+                            padding: '8px 12px',
+                            border: 'none',
+                            borderRadius: '8px',
+                            background: '#1d4ed8',
+                            color: 'white',
+                            fontWeight: '600',
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Lanjut ke Pembayaran
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Chat Messages */}
             <div className="chat-messages">

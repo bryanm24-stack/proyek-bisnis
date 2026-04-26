@@ -591,7 +591,7 @@ export default function VendorProductForm({
         {/* Jasa atau Barang */}
         <div>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            🧭 Jasa atau Barang *
+            🧭 Jasa atau Barang
           </label>
           <button
             type="button"
@@ -623,7 +623,7 @@ export default function VendorProductForm({
         {/* Nama Barang/Jasa */}
         <div>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            📝 Nama {entityLabel} *
+            📝 Nama {entityLabel}
           </label>
           <input
             type="text"
@@ -646,7 +646,7 @@ export default function VendorProductForm({
         {/* Deskripsi Singkat */}
         <div>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            ✍️ Deskripsi Singkat {entityLabel} *
+            ✍️ Deskripsi Singkat {entityLabel}
           </label>
           <textarea
             name="shortDescription"
@@ -1238,7 +1238,7 @@ export default function VendorProductForm({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div>
             <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-              💰 Harga per Hari (Rp) *
+              💰 Harga per Hari (Rp)
             </label>
             <input
               type="number"
@@ -1261,7 +1261,7 @@ export default function VendorProductForm({
 
           <div>
             <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-              📅 Durasi Minimum Sewa (hari) *
+              📅 Durasi Minimum Sewa (hari)
             </label>
             <input
               type="number"
@@ -1309,7 +1309,7 @@ export default function VendorProductForm({
         {/* Lokasi Pickup */}
         <div>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            📍 Lokasi Pickup/Pengiriman *
+            📍 Lokasi Pickup/Pengiriman
           </label>
           <input
             type="text"
@@ -1659,7 +1659,7 @@ export default function VendorProductForm({
                   {activeSpecTemplate.map((field) => (
                     <tr key={field.key} style={{ borderBottom: '1px solid #f3f4f6' }}>
                       <td style={{ width: '34%', minWidth: '220px', padding: '12px 10px', fontSize: '13px', color: '#374151', fontWeight: '600', verticalAlign: 'top' }}>
-                        {field.label}{field.required ? ' *' : ''}
+                        {field.label}
                       </td>
                       <td style={{ padding: '10px' }}>
                         <input
@@ -1736,7 +1736,7 @@ export default function VendorProductForm({
                   {activeDescriptionTemplate.map((field) => (
                     <tr key={field.key} style={{ borderBottom: '1px solid #f3f4f6' }}>
                       <td style={{ width: '34%', minWidth: '220px', padding: '12px 10px', fontSize: '13px', color: '#374151', fontWeight: '600', verticalAlign: 'top' }}>
-                        {field.label}{field.required ? ' *' : ''}
+                        {field.label}
                       </td>
                       <td style={{ padding: '10px' }}>
                         <textarea

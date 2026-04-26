@@ -1,14 +1,26 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 export default function SharedFooter() {
-  const [user] = useState(() => {
-    if (typeof window === 'undefined') return null;
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
     const userData = localStorage.getItem('user');
-    return userData ? JSON.parse(userData) : null;
-  });
+
+    if (!userData) {
+      setUser(null);
+      return;
+    }
+
+    try {
+      setUser(JSON.parse(userData));
+    } catch {
+      setUser(null);
+    }
+  }, []);
+
   const currentYear = new Date().getFullYear();
 
   return (
