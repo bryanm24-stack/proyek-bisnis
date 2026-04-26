@@ -42,6 +42,7 @@ export async function POST(request) {
     const chatsPath = path.join(process.cwd(), 'chats.json');
     const dealsPath = path.join(process.cwd(), 'deals.json');
     const servicesPath = path.join(process.cwd(), 'services.json');
+    const invoicesPath = path.join(process.cwd(), 'invoices.json');
 
     const chatsData = await fs.readFile(chatsPath, 'utf-8');
     const chats = JSON.parse(chatsData);
@@ -113,6 +114,58 @@ export async function POST(request) {
       deal.discountUpdatedAt = new Date().toISOString();
 
       await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+
+      // Ensure invoice pending exists right after deal + discount so vendor can track waiting payment.
+      try {
+        let invoices = [];
+        try {
+          const invoicesData = await fs.readFile(invoicesPath, 'utf-8');
+          invoices = JSON.parse(invoicesData);
+        } catch {
+          invoices = [];
+        }
+
+        const now = new Date();
+        const deadline = new Date(now);
+        deadline.setDate(deadline.getDate() + 2);
+
+        const existingPendingInvoice = invoices.find(
+          (item) => String(item.dealId) === String(deal.id) && item.status !== 'paid'
+        );
+
+        if (existingPendingInvoice) {
+          existingPendingInvoice.customerId = existingPendingInvoice.customerId || deal.customerId;
+          existingPendingInvoice.vendorId = existingPendingInvoice.vendorId || deal.vendorId;
+          existingPendingInvoice.serviceId = existingPendingInvoice.serviceId || deal.serviceId;
+          existingPendingInvoice.remainingPayment = Number(finalPrice || 0);
+          existingPendingInvoice.paymentDeadline = existingPendingInvoice.paymentDeadline || deadline.toISOString();
+          existingPendingInvoice.paymentType = existingPendingInvoice.paymentType || 'deal_pending';
+          existingPendingInvoice.status = 'pending';
+          existingPendingInvoice.notes = existingPendingInvoice.notes || 'Menunggu pembayaran setelah deal disepakati dan diskon diterapkan.';
+        } else {
+          invoices.push({
+            id: `INV-${Date.now()}`,
+            dealId: deal.id,
+            customerId: deal.customerId,
+            vendorId: deal.vendorId,
+            serviceId: deal.serviceId,
+            transactionId: null,
+            remainingPayment: Number(finalPrice || 0),
+            paymentDeadline: deadline.toISOString(),
+            paymentMethod: null,
+            paymentType: 'deal_pending',
+            status: 'pending',
+            createdAt: now.toISOString(),
+            paidAt: null,
+            paymentTransactionId: null,
+            notes: 'Menunggu pembayaran setelah deal disepakati dan diskon diterapkan.'
+          });
+        }
+
+        await fs.writeFile(invoicesPath, JSON.stringify(invoices, null, 2));
+      } catch (invoiceError) {
+        console.warn('Could not create pending invoice after discount:', invoiceError);
+      }
 
       await createNotification(
         deal.customerId,

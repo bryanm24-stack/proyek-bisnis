@@ -63,11 +63,6 @@ function PaymentContent() {
     }
 
     const verificationRaw = localStorage.getItem('verificationData');
-    if (!verificationRaw && dealId) {
-      alert('Silakan lengkapi verifikasi identitas terlebih dahulu');
-      router.push(`/transaction/identity-check?dealId=${dealId}`);
-      return;
-    }
 
     if (verificationRaw) {
       try {

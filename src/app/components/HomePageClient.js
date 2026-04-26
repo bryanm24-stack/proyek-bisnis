@@ -7,6 +7,7 @@ import SharedNavbar from './SharedNavbar';
 
 export default function HomePageClient() {
   const [services, setServices] = useState([]);
+  const [promos, setPromos] = useState([]);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedService, setSelectedService] = useState(null);
@@ -61,11 +62,28 @@ export default function HomePageClient() {
       }
     };
 
+    const fetchPromos = async () => {
+      try {
+        const response = await fetch('/api/promos?active=true', { cache: 'no-store' });
+        const data = await response.json();
+        if (data.success) {
+          setPromos(Array.isArray(data.data) ? data.data : []);
+        }
+      } catch (error) {
+        console.error('Error fetching promos:', error);
+      }
+    };
+
     fetchServices();
+    fetchPromos();
 
     // Refresh services setiap 10 detik untuk deteksi service baru dari vendor
     const serviceInterval = setInterval(fetchServices, 10000);
-    return () => clearInterval(serviceInterval);
+    const promoInterval = setInterval(fetchPromos, 15000);
+    return () => {
+      clearInterval(serviceInterval);
+      clearInterval(promoInterval);
+    };
   }, []);
 
   // Fetch notifications for current user
@@ -108,6 +126,43 @@ export default function HomePageClient() {
       .replace(/[_-]+/g, ' ')
       .replace(/^./, (char) => char.toUpperCase())
       .trim();
+
+  const getPromoOffers = (service) => {
+    if (!service) return [];
+
+    const promoMatches = promos.filter((promo) =>
+      promo.active !== false &&
+      (promo.productId === service.id || promo.vendorId === service.vendorId)
+    );
+
+    const fallbackMatches = services.filter((item) =>
+      item.id !== service.id &&
+      (item.vendorId === service.vendorId || item.mainCategory === service.mainCategory || item.category === service.category)
+    );
+
+    const mappedPromos = promoMatches.map((promo) => ({
+      id: promo.id,
+      title: promo.productName,
+      image: promo.productImage || service.image || service.images?.[0],
+      originalPrice: promo.originalPrice || service.price || 0,
+      promoPrice: promo.promoPrice ?? null,
+      description: promo.description || 'Promo spesial dari vendor',
+      code: promo.code
+    }));
+
+    const mappedFallbacks = fallbackMatches.map((item) => ({
+      id: item.id,
+      title: item.title || item.namaBarang || item.namaJasa,
+      image: item.images?.[0],
+      originalPrice: item.price || 0,
+      promoPrice: item.price ? Math.max(0, Math.round(item.price * 0.85)) : null,
+      description: 'Rekomendasi produk serupa dengan penawaran menarik',
+      code: null
+    }));
+
+    const pool = mappedPromos.length > 0 ? mappedPromos : mappedFallbacks;
+    return pool.sort(() => Math.random() - 0.5).slice(0, 3);
+  };
 
   const openModal = (service) => {
     setSelectedService(service);
@@ -1000,6 +1055,34 @@ export default function HomePageClient() {
 
                 </div>
 
+                <div className="info-section" style={{ marginTop: '24px', background: 'linear-gradient(135deg, #f8f7ff, #eef6ff)', border: '1px solid #dbeafe' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <div>
+                      <h4 style={{ margin: 0 }}>🎁 Offer Promo Random</h4>
+                      <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#6b7280' }}>Rekomendasi menarik dari produk lain yang sedang tampil di katalog.</p>
+                    </div>
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#5A45D1', background: '#ede9fe', padding: '6px 10px', borderRadius: '999px' }}>Limited deal</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+                    {getPromoOffers(selectedService).map((offer) => (
+                      <div key={offer.id} style={{ background: 'white', borderRadius: '14px', overflow: 'hidden', border: '1px solid #e5e7eb', boxShadow: '0 8px 20px rgba(91, 69, 209, 0.08)' }}>
+                        <div style={{ height: '120px', background: '#f3f4f6' }}>
+                          <img src={offer.image || 'https://via.placeholder.com/400x240?text=Promo'} alt={offer.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                        <div style={{ padding: '14px' }}>
+                          <div style={{ fontSize: '12px', color: '#7c3aed', fontWeight: '700', marginBottom: '6px' }}>Promo {offer.code ? `• ${offer.code}` : 'spesial'}</div>
+                          <div style={{ fontSize: '15px', fontWeight: '800', color: '#111827', marginBottom: '8px' }}>{offer.title}</div>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '18px', fontWeight: '900', color: '#dc2626' }}>Rp {Number(offer.promoPrice ?? offer.originalPrice).toLocaleString('id-ID')}</span>
+                            <span style={{ fontSize: '12px', color: '#6b7280', textDecoration: 'line-through' }}>Rp {Number(offer.originalPrice || 0).toLocaleString('id-ID')}</span>
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#4b5563', minHeight: '36px' }}>{offer.description}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="modal-actions">
                   <button 
                     className="btn-primary-modal"
@@ -1166,7 +1249,7 @@ export default function HomePageClient() {
                           {dealData.id && (
                             <button
                               type="button"
-                              onClick={() => router.push(`/transaction/identity-check?dealId=${dealData.id}`)}
+                              onClick={() => router.push(`/transaction/payment?dealId=${dealData.id}`)}
                               style={{
                                 marginTop: '7px',
                                 padding: '7px 10px',

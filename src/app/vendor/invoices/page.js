@@ -168,7 +168,7 @@ export default function VendorInvoicesPage() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', marginBottom: '4px' }}>
-                      {formatCurrency(invoice.totalAmount || 0)}
+                      {formatCurrency(invoice.totalAmount || invoice.remainingPayment || 0)}
                     </div>
                     <div style={{
                       display: 'inline-block',
@@ -196,19 +196,19 @@ export default function VendorInvoicesPage() {
                     <div>
                       <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>📅 Durasi Sewa</p>
                       <p style={{ margin: '0', fontSize: '15px', fontWeight: '600' }}>
-                        {invoice.rentalDays || 'N/A'} hari
+                        {invoice.durationDays || 1} hari
                       </p>
                     </div>
                     <div>
                       <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>💰 Harga/Hari</p>
                       <p style={{ margin: '0', fontSize: '15px', fontWeight: '600' }}>
-                        {formatCurrency(invoice.pricePerDay || 0)}
+                        {formatCurrency(invoice.basePrice || 0)}
                       </p>
                     </div>
                     <div>
                       <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>📆 Batas Pembayaran</p>
                       <p style={{ margin: '0', fontSize: '15px', fontWeight: '600' }}>
-                        {invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('id-ID') : 'N/A'}
+                        {invoice.paymentDeadline ? new Date(invoice.paymentDeadline).toLocaleDateString('id-ID') : 'N/A'}
                       </p>
                     </div>
                   </div>
@@ -226,7 +226,7 @@ export default function VendorInvoicesPage() {
                       <div style={{ display: 'grid', gap: '8px', fontSize: '13px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#666' }}>Tanggal Invoice:</span>
-                          <strong>{invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString('id-ID') : 'N/A'}</strong>
+                          <strong>{invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('id-ID') : 'N/A'}</strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#666' }}>Status Pembayaran:</span>

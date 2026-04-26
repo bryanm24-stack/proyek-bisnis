@@ -140,7 +140,23 @@ function SuccessContent() {
           </div>
 
           {/* Action Buttons */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+            <button
+              onClick={() => router.push('/customer/invoices')}
+              style={{
+                padding: '14px 24px',
+                background: '#ecfeff',
+                color: '#0f766e',
+                border: '1px solid #99f6e4',
+                borderRadius: '8px',
+                fontWeight: '700',
+                fontSize: '16px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              📄 Lihat Invoice
+            </button>
             <button
               onClick={() => router.push('/customer/chats')}
               style={{
