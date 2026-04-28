@@ -14,6 +14,9 @@ export default function HomePageClient() {
   const [selectedItemDetail, setSelectedItemDetail] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [detailTab, setDetailTab] = useState('packages');
+  const [modalImageIndex, setModalImageIndex] = useState(0);
+  // ✅ NEW: Track image carousel for product cards
+  const [currentImageIndex, setCurrentImageIndex] = useState({});
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [chatData, setChatData] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -103,6 +106,25 @@ export default function HomePageClient() {
     window.location.reload();
   };
 
+  // ✅ NEW: Handle image navigation in carousel
+  const handleNextImage = (e, serviceId, totalImages) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentImageIndex(prev => ({
+      ...prev,
+      [serviceId]: ((prev[serviceId] || 0) + 1) % totalImages
+    }));
+  };
+
+  const handlePrevImage = (e, serviceId, totalImages) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentImageIndex(prev => ({
+      ...prev,
+      [serviceId]: ((prev[serviceId] || 0) - 1 + totalImages) % totalImages
+    }));
+  };
+
   // Helper function to safely format price
   const formatPrice = (price) => {
     if (typeof price === 'number' && isFinite(price) && price > 0 && price < 1e20) {
@@ -126,6 +148,40 @@ export default function HomePageClient() {
       .replace(/[_-]+/g, ' ')
       .replace(/^./, (char) => char.toUpperCase())
       .trim();
+
+  const getServiceThumbnail = (service) => {
+    if (!service) {
+      return 'https://via.placeholder.com/400x300?text=' + encodeURIComponent('Service');
+    }
+
+    return (
+      service.thumbnail ||
+      service.coverImage ||
+      service.image ||
+      (Array.isArray(service.images) && service.images.length > 0 ? service.images[0] : null) ||
+      'https://via.placeholder.com/400x300?text=' + encodeURIComponent(service.title || 'Service')
+    );
+  };
+
+  const getServiceGalleryImages = (service) => {
+    if (!service) return [];
+
+    const uploadedImages = Array.isArray(service.images)
+      ? service.images.filter((img) => typeof img === 'string' && img.trim() !== '')
+      : [];
+
+    if (uploadedImages.length > 0) {
+      return uploadedImages.slice(0, 5);
+    }
+
+    return [getServiceThumbnail(service)];
+  };
+
+  const getItemPreviewImage = (item) =>
+    item?.thumbnail ||
+    item?.image ||
+    (Array.isArray(item?.images) && item.images.length > 0 ? item.images[0] : null) ||
+    'https://via.placeholder.com/120x120?text=Paket';
 
   const getPromoOffers = (service) => {
     if (!service) return [];
@@ -168,6 +224,7 @@ export default function HomePageClient() {
     setSelectedService(service);
     setDetailTab('packages');
     setSelectedItemDetail(null);
+    setModalImageIndex(0);
     setServiceReviews([]);
     setReviewsLoading(true);
     setReviewFilter('all');
@@ -194,6 +251,7 @@ export default function HomePageClient() {
     setModalOpen(false);
     setSelectedService(null);
     setSelectedItemDetail(null);
+    setModalImageIndex(0);
     setServiceReviews([]);
     setReviewsLoading(false);
     setReviewFilter('all');
@@ -606,8 +664,134 @@ export default function HomePageClient() {
                 <div key={service.id} className="vendor-card">
                   {isPopular && <div className="popular-badge">🔥 Populer</div>}
                   
-                  <div className="vendor-cover">
-                    <img src={imageUrl} alt={service.title} />
+                  {/* ✅ CAROUSEL */}
+                  <div className="vendor-cover" style={{ position: 'relative', overflow: 'hidden' }}>
+                    <img 
+                      src={service.images && service.images.length > 0 
+                        ? service.images[currentImageIndex[service.id] || 0] 
+                        : imageUrl} 
+                      alt={service.title}
+                      style={{ transition: 'opacity 0.3s ease' }}
+                    />
+                    
+                    {/* Carousel Controls (show if multiple images) */}
+                    {service.images && service.images.length > 1 && (
+                      <>
+                        {/* Prev Button */}
+                        <button
+                          onClick={(e) => handlePrevImage(e, service.id, service.images.length)}
+                          style={{
+                            position: 'absolute',
+                            left: '8px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'rgba(0,0,0,0.5)',
+                            color: 'white',
+                            border: 'none',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '14px',
+                            zIndex: 5,
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.target.style.background = 'rgba(0,0,0,0.8)'}
+                          onMouseLeave={(e) => e.target.style.background = 'rgba(0,0,0,0.5)'}
+                          title="Foto sebelumnya"
+                        >
+                          ◀
+                        </button>
+                        
+                        {/* Next Button */}
+                        <button
+                          onClick={(e) => handleNextImage(e, service.id, service.images.length)}
+                          style={{
+                            position: 'absolute',
+                            right: '8px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'rgba(0,0,0,0.5)',
+                            color: 'white',
+                            border: 'none',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '14px',
+                            zIndex: 5,
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.target.style.background = 'rgba(0,0,0,0.8)'}
+                          onMouseLeave={(e) => e.target.style.background = 'rgba(0,0,0,0.5)'}
+                          title="Foto berikutnya"
+                        >
+                          ▶
+                        </button>
+                        
+                        {/* Image Counter Badge */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            background: 'rgba(0,0,0,0.7)',
+                            color: 'white',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            zIndex: 4
+                          }}
+                        >
+                          {(currentImageIndex[service.id] || 0) + 1}/{service.images.length}
+                        </div>
+                        
+                        {/* Image Dots */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: '8px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            background: 'rgba(0,0,0,0.6)',
+                            padding: '4px 8px',
+                            borderRadius: '12px',
+                            display: 'flex',
+                            gap: '4px',
+                            zIndex: 4
+                          }}
+                        >
+                          {service.images.map((_, idx) => (
+                            <span
+                              key={idx}
+                              style={{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                background: idx === (currentImageIndex[service.id] || 0) ? 'white' : 'rgba(255,255,255,0.5)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCurrentImageIndex(prev => ({
+                                  ...prev,
+                                  [service.id]: idx
+                                }));
+                              }}
+                              title={`Foto ${idx + 1}`}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                   
                   <div className="vendor-content">
@@ -658,14 +842,58 @@ export default function HomePageClient() {
             </div>
 
             <div className="modal-body">
-              {/* Gallery dari Paket Items atau Default Image */}
+              {/* Thumbnail utama service, dipisahkan dari gambar katalog/aset paket */}
               <div className="modal-image">
-                {selectedService.items && selectedService.items.length > 0 ? (
-                  <img src={selectedItemDetail?.images?.[0] || selectedService.items[0].images?.[0] || 'https://via.placeholder.com/400x300?text=' + encodeURIComponent('Paket')} alt={selectedItemDetail?.namaBarang || selectedItemDetail?.namaJasa || 'Paket'} />
-                ) : (
-                  <img src={selectedService.image || (selectedService.images && selectedService.images.length > 0 ? selectedService.images[0] : 'https://via.placeholder.com/400x300?text=' + encodeURIComponent(selectedService.title || 'Service'))} alt={selectedService.title} />
+                <img
+                  src={getServiceGalleryImages(selectedService)[modalImageIndex] || getServiceThumbnail(selectedService)}
+                  alt={selectedService.title || 'Thumbnail service'}
+                />
+
+                {getServiceGalleryImages(selectedService).length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      className="modal-image-nav prev"
+                      onClick={() => {
+                        const total = getServiceGalleryImages(selectedService).length;
+                        setModalImageIndex((prev) => (prev - 1 + total) % total);
+                      }}
+                      aria-label="Foto sebelumnya"
+                    >
+                      ◀
+                    </button>
+                    <button
+                      type="button"
+                      className="modal-image-nav next"
+                      onClick={() => {
+                        const total = getServiceGalleryImages(selectedService).length;
+                        setModalImageIndex((prev) => (prev + 1) % total);
+                      }}
+                      aria-label="Foto berikutnya"
+                    >
+                      ▶
+                    </button>
+
+                    <div className="modal-image-counter">
+                      {modalImageIndex + 1}/{getServiceGalleryImages(selectedService).length}
+                    </div>
+                  </>
                 )}
               </div>
+
+              {getServiceGalleryImages(selectedService).length > 1 && (
+                <div className="modal-image-dots">
+                  {getServiceGalleryImages(selectedService).map((img, idx) => (
+                    <button
+                      type="button"
+                      key={`${img.slice(0, 20)}-${idx}`}
+                      className={`modal-image-dot ${modalImageIndex === idx ? 'active' : ''}`}
+                      onClick={() => setModalImageIndex(idx)}
+                      aria-label={`Lihat foto ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+              )}
 
               <div className="modal-price-block">
                 <div className="modal-price-title">Harga Sewa</div>
@@ -725,7 +953,7 @@ export default function HomePageClient() {
                                 onClick={() => setSelectedItemDetail(item)}
                                 style={{
                                   cursor: 'pointer',
-                                  borderRadius: '8px',
+                                  borderRadius: '14px',
                                   overflow: 'hidden',
                                   border: selectedItemDetail?.id === item.id ? '3px solid #5A45D1' : '1px solid #ddd',
                                   transition: 'all 0.3s ease',
@@ -733,7 +961,7 @@ export default function HomePageClient() {
                                 }}
                               >
                                 <img
-                                  src={item.images && item.images.length > 0 ? item.images[0] : 'https://via.placeholder.com/120x120?text=Paket'}
+                                  src={getItemPreviewImage(item)}
                                   alt={item.namaBarang || item.namaJasa}
                                   style={{
                                     width: '100%',
@@ -750,18 +978,18 @@ export default function HomePageClient() {
                             <div style={{
                               backgroundColor: '#f8f9fa',
                               padding: '16px',
-                              borderRadius: '8px',
+                              borderRadius: '14px',
                               marginTop: '16px'
                             }}>
                               <div style={{ marginBottom: '16px' }}>
                                 <img
-                                  src={selectedItemDetail.images && selectedItemDetail.images.length > 0 ? selectedItemDetail.images[0] : 'https://via.placeholder.com/300x200?text=Paket'}
+                                  src={getItemPreviewImage(selectedItemDetail)}
                                   alt={selectedItemDetail.namaBarang || selectedItemDetail.namaJasa}
                                   style={{
                                     width: '100%',
                                     height: '200px',
                                     objectFit: 'cover',
-                                    borderRadius: '8px'
+                                    borderRadius: '14px'
                                   }}
                                 />
                               </div>
@@ -2032,11 +2260,13 @@ export default function HomePageClient() {
         .modal-content {
           background: white;
           border-radius: 16px;
-          max-width: 600px;
+          max-width: 900px;
           width: 100%;
           max-height: 90vh;
-          overflow-y: auto;
+          overflow: hidden;
           box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+          display: flex;
+          flex-direction: column;
         }
 
         .modal-header {
@@ -2049,6 +2279,7 @@ export default function HomePageClient() {
           top: 0;
           background: white;
           z-index: 10;
+          border-radius: 16px 16px 0 0;
         }
 
         .modal-header h2 {
@@ -2080,20 +2311,91 @@ export default function HomePageClient() {
 
         .modal-body {
           padding: 24px;
+          overflow-y: auto;
+          max-height: calc(90vh - 92px);
         }
 
         .modal-image {
           width: 100%;
           height: 300px;
           margin-bottom: 24px;
-          border-radius: 12px;
+          border-radius: 14px;
           overflow: hidden;
+          position: relative;
+          background: #f3f4f6;
         }
 
         .modal-image img {
           width: 100%;
           height: 100%;
           object-fit: cover;
+        }
+
+        .modal-image-nav {
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          border: none;
+          width: 34px;
+          height: 34px;
+          border-radius: 50%;
+          background: rgba(17, 24, 39, 0.65);
+          color: #fff;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 3;
+          transition: background 0.2s ease;
+        }
+
+        .modal-image-nav:hover {
+          background: rgba(17, 24, 39, 0.85);
+        }
+
+        .modal-image-nav.prev {
+          left: 10px;
+        }
+
+        .modal-image-nav.next {
+          right: 10px;
+        }
+
+        .modal-image-counter {
+          position: absolute;
+          right: 12px;
+          bottom: 12px;
+          background: rgba(17, 24, 39, 0.72);
+          color: #fff;
+          font-size: 12px;
+          font-weight: 600;
+          padding: 4px 8px;
+          border-radius: 999px;
+          z-index: 3;
+        }
+
+        .modal-image-dots {
+          display: flex;
+          gap: 8px;
+          margin-top: -12px;
+          margin-bottom: 20px;
+          justify-content: center;
+        }
+
+        .modal-image-dot {
+          width: 9px;
+          height: 9px;
+          border-radius: 50%;
+          border: none;
+          background: #d1d5db;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .modal-image-dot.active {
+          width: 22px;
+          border-radius: 999px;
+          background: #5A45D1;
         }
 
         .modal-info {

@@ -293,11 +293,32 @@ export default function VendorProductForm({
   const handleImageUpload = (e) => {
     const files = e.target.files;
     if (files) {
-      const imageUrls = Array.from(files).map(file => URL.createObjectURL(file));
-      setFormData(prev => ({
-        ...prev,
-        images: imageUrls
-      }));
+      // ✅ LIMIT: Maximum 5 images
+      const maxImages = 5;
+      const filesToProcess = Array.from(files).slice(0, maxImages);
+      
+      // Convert files to Base64 for persistent storage (not Blob URL which expires)
+      Promise.all(
+        filesToProcess.map(file => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              resolve(event.target.result); // Base64 string
+            };
+            reader.readAsDataURL(file);
+          });
+        })
+      ).then(base64Images => {
+        setFormData(prev => ({
+          ...prev,
+          images: base64Images
+        }));
+      });
+      
+      // ⚠️ Warn user if they uploaded more than 5
+      if (files.length > maxImages) {
+        alert(`⚠️ Maksimal 5 foto. Anda memilih ${files.length} foto, hanya ${maxImages} yang digunakan.`);
+      }
     }
   };
 
