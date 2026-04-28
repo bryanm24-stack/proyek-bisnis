@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import SearchBar from './SearchBar';
 import SharedNavbar from './SharedNavbar';
@@ -33,8 +33,63 @@ export default function HomePageClient() {
   const [reviewPage, setReviewPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [userFavorites, setUserFavorites] = useState([]);
+  const [favoriteLoading, setFavoriteLoading] = useState({});
 
-  const fetchNotifications = async (currentUser) => {
+  const fetchFavorites = useCallback(async (currentUser) => {
+    if (!currentUser) return;
+    try {
+      const response = await fetch(`/api/favorites?userId=${currentUser.id}`);
+      const data = await response.json();
+      setUserFavorites(Array.isArray(data.data) ? data.data : []);
+    } catch (error) {
+      console.error('Error fetching favorites:', error);
+    }
+  }, []);
+
+  const toggleFavorite = async (service, isFavorite) => {
+    if (!user) {
+      alert('Silakan login terlebih dahulu');
+      return;
+    }
+
+    setFavoriteLoading(prev => ({ ...prev, [service.id]: true }));
+
+    try {
+      const response = await fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          serviceId: service.id,
+          type: 'service'
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        // Update local favorites state
+        if (data.isFavorite) {
+          setUserFavorites(prev => [...prev, { id: data.data.id, serviceId: service.id, userId: user.id, type: 'service' }]);
+        } else {
+          setUserFavorites(prev => prev.filter(fav => fav.serviceId !== service.id));
+        }
+      } else {
+        alert('Gagal: ' + (data.message || 'Error'));
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      alert('Error: ' + error.message);
+    } finally {
+      setFavoriteLoading(prev => ({ ...prev, [service.id]: false }));
+    }
+  };
+
+  const isFavorited = (serviceId) => {
+    return userFavorites.some(fav => fav.serviceId === serviceId);
+  };
+
+  const fetchNotifications = useCallback(async (currentUser) => {
     if (!currentUser) return;
     try {
       const response = await fetch(`/api/notifications?userId=${currentUser.id}`);
@@ -43,7 +98,7 @@ export default function HomePageClient() {
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -98,7 +153,16 @@ export default function HomePageClient() {
     // Polling every 5 seconds untuk check notifikasi baru
     const interval = setInterval(() => fetchNotifications(user), 5000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, fetchNotifications]);
+
+  // Fetch favorites for current user
+  useEffect(() => {
+    if (!user) {
+      setUserFavorites([]);
+      return;
+    }
+    fetchFavorites(user);
+  }, [user, fetchFavorites]);
 
   const handleLogout = () => {
     localStorage.removeItem('user');
@@ -663,6 +727,46 @@ export default function HomePageClient() {
               return (
                 <div key={service.id} className="vendor-card">
                   {isPopular && <div className="popular-badge">🔥 Populer</div>}
+                  
+                  {/* Favorite Button */}
+                  <button
+                    onClick={() => toggleFavorite(service, isFavorited(service.id))}
+                    disabled={favoriteLoading[service.id]}
+                    style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      background: isFavorited(service.id) ? '#FF6B6B' : 'rgba(255,255,255,0.9)',
+                      border: 'none',
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '20px',
+                      zIndex: 10,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                      transition: 'all 0.3s ease',
+                      opacity: favoriteLoading[service.id] ? 0.6 : 1
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!favoriteLoading[service.id]) {
+                        e.target.style.transform = 'scale(1.1)';
+                        e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!favoriteLoading[service.id]) {
+                        e.target.style.transform = 'scale(1)';
+                        e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+                      }
+                    }}
+                    title={isFavorited(service.id) ? 'Hapus dari favorit' : 'Tambah ke favorit'}
+                  >
+                    {isFavorited(service.id) ? '❤️' : '🤍'}
+                  </button>
                   
                   {/* ✅ CAROUSEL */}
                   <div className="vendor-cover" style={{ position: 'relative', overflow: 'hidden' }}>

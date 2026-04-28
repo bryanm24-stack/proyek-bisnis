@@ -2,6 +2,9 @@ import fs from 'fs/promises';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
+// Helper: Normalize ID for consistent comparison
+const normalizeId = (id) => String(id || '').trim();
+
 // Helper function to create notification
 async function createNotification(userId, type, message, relatedId, relatedData = {}) {
   try {
@@ -66,7 +69,7 @@ export async function POST(request) {
         return NextResponse.json({ success: false, message: 'Deal belum dibuat' }, { status: 404 });
       }
 
-      if (String(deal.vendorId) !== String(vendorId)) {
+      if (normalizeId(deal.vendorId) !== normalizeId(vendorId)) {
         return NextResponse.json({ success: false, message: 'Hanya vendor pemilik deal yang bisa memberi diskon' }, { status: 403 });
       }
 
@@ -77,7 +80,7 @@ export async function POST(request) {
       if (typeof deal.originalPrice === 'undefined' || deal.originalPrice === null) {
         const servicesData = await fs.readFile(servicesPath, 'utf-8');
         const services = JSON.parse(servicesData);
-        const svc = services.find(s => String(s.id) === String(deal.serviceId));
+        const svc = services.find(s => normalizeId(s.id) === normalizeId(deal.serviceId));
         deal.originalPrice = Number(svc?.price ?? svc?.harga ?? 0);
       }
 
@@ -130,7 +133,7 @@ export async function POST(request) {
         deadline.setDate(deadline.getDate() + 2);
 
         const existingPendingInvoice = invoices.find(
-          (item) => String(item.dealId) === String(deal.id) && item.status !== 'paid'
+          (item) => normalizeId(item.dealId) === normalizeId(deal.id) && item.status !== 'paid'
         );
 
         if (existingPendingInvoice) {

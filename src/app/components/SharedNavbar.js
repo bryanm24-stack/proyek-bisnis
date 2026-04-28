@@ -134,6 +134,20 @@ export default function SharedNavbar() {
               }}>
               📋 Invoice
             </Link>
+
+            <Link 
+              href="/customer/favorites" 
+              style={{ 
+                fontSize: '14px', 
+                color: isActive('/customer/favorites') ? '#7c3aed' : '#666', 
+                textDecoration: 'none', 
+                fontWeight: isActive('/customer/favorites') ? '600' : '500',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                background: isActive('/customer/favorites') ? '#f0e6ff' : 'transparent'
+              }}>
+              ❤️ Favorit
+            </Link>
           </>
         )}
 
