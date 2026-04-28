@@ -293,33 +293,65 @@ export default function VendorProductForm({
   const handleImageUpload = (e) => {
     const files = e.target.files;
     if (files) {
-      // ✅ LIMIT: Maximum 5 images
       const maxImages = 5;
-      const filesToProcess = Array.from(files).slice(0, maxImages);
+      const currentCount = (formData.images || []).length;
+      const availableSlots = maxImages - currentCount;
       
-      // Convert files to Base64 for persistent storage (not Blob URL which expires)
+      if (availableSlots <= 0) {
+        alert(`⚠️ Sudah mencapai maksimal 5 foto. Hapus foto untuk menambah yang baru.`);
+        e.target.value = ''; // Reset file input
+        return;
+      }
+      
+      const filesToProcess = Array.from(files).slice(0, availableSlots);
+      
+      if (files.length > availableSlots) {
+        alert(`⚠️ Hanya bisa tambah ${availableSlots} foto lagi (sudah ${currentCount}/${maxImages}).`);
+      }
+      
+      // Convert files to Base64
       Promise.all(
         filesToProcess.map(file => {
           return new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = (event) => {
-              resolve(event.target.result); // Base64 string
+              resolve(event.target.result);
             };
             reader.readAsDataURL(file);
           });
         })
       ).then(base64Images => {
-        setFormData(prev => ({
-          ...prev,
-          images: base64Images
-        }));
+        setFormData(prev => {
+          const existingCount = (prev.images || []).length;
+          const remainingSlots = maxImages - existingCount;
+          const imagesToAdd = base64Images.slice(0, remainingSlots);
+          
+          return {
+            ...prev,
+            images: [...(prev.images || []), ...imagesToAdd]
+          };
+        });
+        e.target.value = ''; // Reset file input
       });
-      
-      // ⚠️ Warn user if they uploaded more than 5
-      if (files.length > maxImages) {
-        alert(`⚠️ Maksimal 5 foto. Anda memilih ${files.length} foto, hanya ${maxImages} yang digunakan.`);
-      }
     }
+  };
+
+  const handleRemoveImage = (idx) => {
+    setFormData(prev => ({
+      ...prev,
+      images: (prev.images || []).filter((_, i) => i !== idx)
+    }));
+  };
+
+  const handleRemoveItemImage = (itemId, imgIdx) => {
+    setFormData(prev => ({
+      ...prev,
+      items: (prev.items || []).map(item =>
+        item.id === itemId
+          ? { ...item, images: (item.images || []).filter((_, i) => i !== imgIdx) }
+          : item
+      )
+    }));
   };
 
   const mainCategories = Object.keys(normalizedCategoryTree);
@@ -472,15 +504,47 @@ export default function VendorProductForm({
 
   const handleItemImageUpload = (itemId, files) => {
     if (files && files.length > 0) {
-      const imageUrl = URL.createObjectURL(files[0]);
-      setFormData(prev => ({
-        ...prev,
-        items: (prev.items || []).map(item =>
-          item.id === itemId
-            ? { ...item, images: [imageUrl] }
-            : item
-        )
-      }));
+      const maxImages = 5;
+      const item = (formData.items || []).find(i => i.id === itemId);
+      const currentCount = (item?.images || []).length;
+      const availableSlots = maxImages - currentCount;
+      
+      if (availableSlots <= 0) {
+        alert(`⚠️ Item ini sudah mencapai maksimal 5 foto. Hapus foto untuk menambah yang baru.`);
+        return;
+      }
+      
+      const filesToProcess = Array.from(files).slice(0, availableSlots);
+      
+      if (files.length > availableSlots) {
+        alert(`⚠️ Item ini hanya bisa tambah ${availableSlots} foto lagi (sudah ${currentCount}/${maxImages}).`);
+      }
+      
+      // Convert files to Base64
+      Promise.all(
+        filesToProcess.map(file => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              resolve(event.target.result);
+            };
+            reader.readAsDataURL(file);
+          });
+        })
+      ).then(base64Images => {
+        setFormData(prev => ({
+          ...prev,
+          items: (prev.items || []).map(i => {
+            if (i.id === itemId) {
+              const existingCount = (i.images || []).length;
+              const remainingSlots = maxImages - existingCount;
+              const imagesToAdd = base64Images.slice(0, remainingSlots);
+              return { ...i, images: [...(i.images || []), ...imagesToAdd] };
+            }
+            return i;
+          })
+        }));
+      });
     }
   };
 
@@ -870,19 +934,55 @@ export default function VendorProductForm({
                       >
                         <td style={{ padding: '12px 14px', textAlign: 'center', verticalAlign: 'middle' }}>
                           <div style={{ position: 'relative', width: '60px', height: '60px', margin: '0 auto' }}>
-                            {item.images && item.images[0] ? (
-                              <img
-                                src={item.images[0]}
-                                alt="preview"
-                                style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover',
-                                  borderRadius: '6px',
-                                  border: '1px solid #d1d5db',
-                                  cursor: 'pointer'
-                                }}
-                              />
+                            {item.images && item.images.length > 0 ? (
+                              <div style={{ position: 'relative' }}>
+                                <img
+                                  src={item.images[0]}
+                                  alt="preview"
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                    borderRadius: '6px',
+                                    border: '1px solid #d1d5db',
+                                    cursor: 'pointer'
+                                  }}
+                                  title={`${item.images.length} foto`}
+                                />
+                                {item.images.length > 1 && (
+                                  <span style={{
+                                    position: 'absolute',
+                                    bottom: '2px',
+                                    right: '2px',
+                                    background: 'rgba(0,0,0,0.6)',
+                                    color: 'white',
+                                    fontSize: '10px',
+                                    padding: '2px 4px',
+                                    borderRadius: '3px'
+                                  }}>
+                                    +{item.images.length - 1}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveItemImage(item.id, 0)}
+                                  style={{
+                                    position: 'absolute',
+                                    top: '-8px',
+                                    right: '-8px',
+                                    width: '20px',
+                                    height: '20px',
+                                    borderRadius: '50%',
+                                    background: '#ef4444',
+                                    color: 'white',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: 'bold'
+                                  }}
+                                  title="Hapus foto"
+                                />
+                              </div>
                             ) : (
                               <div
                                 style={{
@@ -903,6 +1003,7 @@ export default function VendorProductForm({
                             )}
                             <input
                               type="file"
+                              multiple
                               accept="image/*"
                               onChange={(e) => handleItemImageUpload(item.id, e.target.files)}
                               style={{
@@ -916,6 +1017,53 @@ export default function VendorProductForm({
                               title="Klik untuk upload gambar"
                             />
                           </div>
+                          {item.images && item.images.length > 1 && (
+                            <div style={{
+                              marginTop: '8px',
+                              display: 'flex',
+                              gap: '4px',
+                              flexWrap: 'wrap',
+                              justifyContent: 'center'
+                            }}>
+                              {item.images.slice(1, 5).map((img, imgIdx) => (
+                                <div key={imgIdx + 1} style={{ position: 'relative', width: '30px', height: '30px' }}>
+                                  <img
+                                    src={img}
+                                    alt={`preview ${imgIdx + 1}`}
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover',
+                                      borderRadius: '3px',
+                                      border: '1px solid #d1d5db'
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveItemImage(item.id, imgIdx + 1)}
+                                    style={{
+                                      position: 'absolute',
+                                      top: '-6px',
+                                      right: '-6px',
+                                      width: '16px',
+                                      height: '16px',
+                                      borderRadius: '50%',
+                                      background: '#ef4444',
+                                      color: 'white',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      fontSize: '10px',
+                                      fontWeight: 'bold',
+                                      padding: 0
+                                    }}
+                                    title="Hapus"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
                           <input
@@ -1125,19 +1273,55 @@ export default function VendorProductForm({
                       >
                         <td style={{ padding: '12px 14px', textAlign: 'center', verticalAlign: 'middle' }}>
                           <div style={{ position: 'relative', width: '60px', height: '60px', margin: '0 auto' }}>
-                            {item.images && item.images[0] ? (
-                              <img
-                                src={item.images[0]}
-                                alt="preview"
-                                style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover',
-                                  borderRadius: '6px',
-                                  border: '1px solid #d1d5db',
-                                  cursor: 'pointer'
-                                }}
-                              />
+                            {item.images && item.images.length > 0 ? (
+                              <div style={{ position: 'relative' }}>
+                                <img
+                                  src={item.images[0]}
+                                  alt="preview"
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                    borderRadius: '6px',
+                                    border: '1px solid #d1d5db',
+                                    cursor: 'pointer'
+                                  }}
+                                  title={`${item.images.length} foto`}
+                                />
+                                {item.images.length > 1 && (
+                                  <span style={{
+                                    position: 'absolute',
+                                    bottom: '2px',
+                                    right: '2px',
+                                    background: 'rgba(0,0,0,0.6)',
+                                    color: 'white',
+                                    fontSize: '10px',
+                                    padding: '2px 4px',
+                                    borderRadius: '3px'
+                                  }}>
+                                    +{item.images.length - 1}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveItemImage(item.id, 0)}
+                                  style={{
+                                    position: 'absolute',
+                                    top: '-8px',
+                                    right: '-8px',
+                                    width: '20px',
+                                    height: '20px',
+                                    borderRadius: '50%',
+                                    background: '#ef4444',
+                                    color: 'white',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: 'bold'
+                                  }}
+                                  title="Hapus foto"
+                                />
+                              </div>
                             ) : (
                               <div
                                 style={{
@@ -1158,6 +1342,7 @@ export default function VendorProductForm({
                             )}
                             <input
                               type="file"
+                              multiple
                               accept="image/*"
                               onChange={(e) => handleItemImageUpload(item.id, e.target.files)}
                               style={{
@@ -1171,6 +1356,53 @@ export default function VendorProductForm({
                               title="Klik untuk upload gambar"
                             />
                           </div>
+                          {item.images && item.images.length > 1 && (
+                            <div style={{
+                              marginTop: '8px',
+                              display: 'flex',
+                              gap: '4px',
+                              flexWrap: 'wrap',
+                              justifyContent: 'center'
+                            }}>
+                              {item.images.slice(1, 5).map((img, imgIdx) => (
+                                <div key={imgIdx + 1} style={{ position: 'relative', width: '30px', height: '30px' }}>
+                                  <img
+                                    src={img}
+                                    alt={`preview ${imgIdx + 1}`}
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover',
+                                      borderRadius: '3px',
+                                      border: '1px solid #d1d5db'
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveItemImage(item.id, imgIdx + 1)}
+                                    style={{
+                                      position: 'absolute',
+                                      top: '-6px',
+                                      right: '-6px',
+                                      width: '16px',
+                                      height: '16px',
+                                      borderRadius: '50%',
+                                      background: '#ef4444',
+                                      color: 'white',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      fontSize: '10px',
+                                      fontWeight: 'bold',
+                                      padding: 0
+                                    }}
+                                    title="Hapus"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
                           <input
@@ -1372,12 +1604,40 @@ export default function VendorProductForm({
           {formData.images && formData.images.length > 0 && (
             <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '12px' }}>
               {formData.images.slice(0, 5).map((img, idx) => (
-                <img
+                <div
                   key={idx}
-                  src={img}
-                  alt={`preview ${idx}`}
-                  style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #ddd' }}
-                />
+                  style={{ position: 'relative', width: '100px', height: '100px' }}
+                >
+                  <img
+                    src={img}
+                    alt={`preview ${idx}`}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px', border: '1px solid #ddd' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveImage(idx)}
+                    style={{
+                      position: 'absolute',
+                      top: '-8px',
+                      right: '-8px',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 'bold'
+                    }}
+                    title="Hapus foto ini"
+                  >
+                    ×
+                  </button>
+                </div>
               ))}
             </div>
           )}
