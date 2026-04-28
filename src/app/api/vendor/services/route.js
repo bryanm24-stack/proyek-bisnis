@@ -114,6 +114,11 @@ export async function POST(request) {
       const parsedMinimumDays = Number.parseInt(minimumDays, 10);
       const parsedQuantity = Number.parseInt(quantity, 10);
 
+      // ✅ Validasi: Maximum 5 images
+      const validatedImages = images && Array.isArray(images)
+        ? images.slice(0, 5)
+        : [];
+
       const newService = {
         id: Date.now().toString(),
         vendorId,
@@ -138,8 +143,8 @@ export async function POST(request) {
         type: resolvedType,
         rating: 0,
         rentCount: 0,
-        images: images && images.length > 0
-          ? images
+        images: validatedImages && validatedImages.length > 0
+          ? validatedImages
           : ['https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=150&q=80']
       };
 

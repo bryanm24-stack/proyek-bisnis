@@ -10,6 +10,8 @@ export default function VendorProdukPage() {
   const [vendorItems, setVendorItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  // ✅ NEW: Track current image index for each item
+  const [currentImageIndex, setCurrentImageIndex] = useState({});
   const [promoModalOpen, setPromoModalOpen] = useState(false);
   const [selectedPromoItem, setSelectedPromoItem] = useState(null);
   const [promoSubmitting, setPromoSubmitting] = useState(false);
@@ -79,6 +81,25 @@ export default function VendorProdukPage() {
       console.error('Error deleting item:', error);
       alert('❌ Terjadi kesalahan');
     }
+  };
+
+  // ✅ NEW: Handle image navigation
+  const handleNextImage = (e, itemId, totalImages) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentImageIndex(prev => ({
+      ...prev,
+      [itemId]: ((prev[itemId] || 0) + 1) % totalImages
+    }));
+  };
+
+  const handlePrevImage = (e, itemId, totalImages) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentImageIndex(prev => ({
+      ...prev,
+      [itemId]: ((prev[itemId] || 0) - 1 + totalImages) % totalImages
+    }));
   };
 
   const openPromoModal = (item) => {
@@ -272,10 +293,147 @@ export default function VendorProdukPage() {
                   justifyContent: 'center',
                   color: '#999',
                   fontSize: '48px',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  position: 'relative'
                 }}>
-                  {item.images?.[0] ? (
-                    <img src={item.images[0]} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {item.images && item.images.length > 0 ? (
+                    <>
+                      {/* Image Display */}
+                      <img 
+                        src={item.images[currentImageIndex[item.id] || 0]} 
+                        alt={item.title} 
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'cover',
+                          transition: 'opacity 0.3s ease'
+                        }} 
+                      />
+                      
+                      {/* ✅ Carousel Controls (only show if > 1 image) */}
+                      {item.images.length > 1 && (
+                        <>
+                          {/* Prev Button */}
+                          <button
+                            onClick={(e) => handlePrevImage(e, item.id, item.images.length)}
+                            style={{
+                              position: 'absolute',
+                              left: '8px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              background: 'rgba(0,0,0,0.5)',
+                              color: 'white',
+                              border: 'none',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '50%',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '16px',
+                              zIndex: 10,
+                              transition: 'background 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.target.style.background = 'rgba(0,0,0,0.8)'}
+                            onMouseLeave={(e) => e.target.style.background = 'rgba(0,0,0,0.5)'}
+                            title="Foto sebelumnya"
+                          >
+                            ◀
+                          </button>
+                          
+                          {/* Next Button */}
+                          <button
+                            onClick={(e) => handleNextImage(e, item.id, item.images.length)}
+                            style={{
+                              position: 'absolute',
+                              right: '8px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              background: 'rgba(0,0,0,0.5)',
+                              color: 'white',
+                              border: 'none',
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '50%',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '16px',
+                              zIndex: 10,
+                              transition: 'background 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.target.style.background = 'rgba(0,0,0,0.8)'}
+                            onMouseLeave={(e) => e.target.style.background = 'rgba(0,0,0,0.5)'}
+                            title="Foto berikutnya"
+                          >
+                            ▶
+                          </button>
+                          
+                          {/* Image Counter/Dots */}
+                          <div
+                            style={{
+                              position: 'absolute',
+                              bottom: '8px',
+                              left: '50%',
+                              transform: 'translateX(-50%)',
+                              background: 'rgba(0,0,0,0.6)',
+                              color: 'white',
+                              padding: '4px 12px',
+                              borderRadius: '16px',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              zIndex: 10,
+                              display: 'flex',
+                              gap: '4px'
+                            }}
+                          >
+                            {item.images.map((_, idx) => (
+                              <span
+                                key={idx}
+                                style={{
+                                  width: '6px',
+                                  height: '6px',
+                                  borderRadius: '50%',
+                                  background: idx === (currentImageIndex[item.id] || 0) ? 'white' : 'rgba(255,255,255,0.5)',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCurrentImageIndex(prev => ({
+                                    ...prev,
+                                    [item.id]: idx
+                                  }));
+                                }}
+                                title={`Foto ${idx + 1}`}
+                              />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      
+                      {/* Photo count badge */}
+                      {item.images.length > 1 && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            background: 'rgba(0,0,0,0.7)',
+                            color: 'white',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            zIndex: 9
+                          }}
+                        >
+                          {(currentImageIndex[item.id] || 0) + 1}/{item.images.length}
+                        </div>
+                      )}
+                    </>
                   ) : '📦'}
                 </div>
 
