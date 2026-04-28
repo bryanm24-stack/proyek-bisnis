@@ -239,6 +239,10 @@ export default function VendorProductForm({
   const [draftSuperSubCategory, setDraftSuperSubCategory] = useState(formData.superSubCategory || '');
   const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
+  const [isVariasiModalOpen, setIsVariasiModalOpen] = useState(false);
+  const [editingVariasiId, setEditingVariasiId] = useState(null);
+  const [variationName, setVariationName] = useState('');
+  const [newOptionLabel, setNewOptionLabel] = useState('');
 
   // Gunakan categories dari props atau default tree global vendor
   const CATEGORIES = categories || ALL_VENDOR_CATEGORY_TREE;
@@ -474,11 +478,112 @@ export default function VendorProductForm({
     }));
   };
 
+  // ========== VARIASI HANDLERS ==========
+  const variations = formData.variations || {};
+  const variationCount = Object.keys(variations).length;
+
+  const handleOpenVariasiModal = () => {
+    setIsVariasiModalOpen(true);
+    setEditingVariasiId(null);
+    setVariationName('');
+    setNewOptionLabel('');
+  };
+
+  const handleAddVariation = () => {
+    if (!variationName.trim()) return;
+    
+    const newVariasiId = `variasi${Date.now()}`;
+    setFormData(prev => ({
+      ...prev,
+      variations: {
+        ...(prev.variations || {}),
+        [newVariasiId]: {
+          id: newVariasiId,
+          name: variationName,
+          options: []
+        }
+      }
+    }));
+    
+    setVariationName('');
+    setEditingVariasiId(newVariasiId);
+  };
+
+  const handleDeleteVariation = (variasiId) => {
+    setFormData(prev => ({
+      ...prev,
+      variations: Object.keys(prev.variations || {})
+        .filter(id => id !== variasiId)
+        .reduce((acc, id) => {
+          acc[id] = prev.variations[id];
+          return acc;
+        }, {})
+    }));
+  };
+
+  const handleRenameVariation = (variasiId, newName) => {
+    if (!newName.trim()) return;
+    
+    setFormData(prev => ({
+      ...prev,
+      variations: {
+        ...(prev.variations || {}),
+        [variasiId]: {
+          ...prev.variations[variasiId],
+          name: newName
+        }
+      }
+    }));
+  };
+
+  const handleAddOption = (variasiId) => {
+    if (!newOptionLabel.trim()) return;
+    
+    // Check duplikat
+    const currentOptions = formData.variations?.[variasiId]?.options || [];
+    const isDuplicate = currentOptions.some(opt => opt.label.toLowerCase() === newOptionLabel.toLowerCase());
+    
+    if (isDuplicate) {
+      alert('Opsi ini sudah ada! Gunakan nama opsi yang berbeda.');
+      return;
+    }
+    
+    const newOptionId = `opt${Date.now()}`;
+    setFormData(prev => ({
+      ...prev,
+      variations: {
+        ...(prev.variations || {}),
+        [variasiId]: {
+          ...prev.variations[variasiId],
+          options: [
+            ...(prev.variations[variasiId]?.options || []),
+            { id: newOptionId, label: newOptionLabel }
+          ]
+        }
+      }
+    }));
+    
+    setNewOptionLabel('');
+  };
+
+  const handleDeleteOption = (variasiId, optionId) => {
+    setFormData(prev => ({
+      ...prev,
+      variations: {
+        ...(prev.variations || {}),
+        [variasiId]: {
+          ...prev.variations[variasiId],
+          options: (prev.variations[variasiId]?.options || []).filter(opt => opt.id !== optionId)
+        }
+      }
+    }));
+  };
+
   const handleAddItemRow = () => {
     const newItemId = `item-${Date.now()}`;
     const newItem = isBarangCategory(formData.mainCategory)
-      ? { id: newItemId, namaBarang: '', hargaPcs: '', stok: '', images: [] }
-      : { id: newItemId, namaJasa: '', hargaSesi: '', images: [] };
+      ? { id: newItemId, namaBarang: '', hargaPcs: '', stok: '', images: [], variationValues: {} }
+      : { id: newItemId, namaJasa: '', hargaSesi: '', images: [], variationValues: {} };
 
     setFormData(prev => ({
       ...prev,
@@ -499,6 +604,24 @@ export default function VendorProductForm({
       items: (prev.items || []).map(item =>
         item.id === itemId ? { ...item, [fieldName]: value } : item
       )
+    }));
+  };
+
+  const handleItemVariationChange = (itemId, variasiId, optionId) => {
+    setFormData(prev => ({
+      ...prev,
+      items: (prev.items || []).map(item => {
+        if (item.id === itemId) {
+          return {
+            ...item,
+            variationValues: {
+              ...(item.variationValues || {}),
+              [variasiId]: optionId
+            }
+          };
+        }
+        return item;
+      })
     }));
   };
 
@@ -816,6 +939,26 @@ export default function VendorProductForm({
           </button>
         </div>
 
+        <button
+          type="button"
+          onClick={handleOpenVariasiModal}
+          style={{
+            width: '100%',
+            border: '1px solid #e5e7eb',
+            borderRadius: '10px',
+            padding: '14px 16px',
+            textAlign: 'left',
+            cursor: 'pointer',
+            background: '#fff'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <strong style={{ color: '#111827' }}>● Variasi</strong>
+            <span style={{ fontSize: '12px', color: '#6b7280' }}>{variationCount}</span>
+          </div>
+          <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#6b7280' }}>Klik untuk mengelola variasi {entityLabel.toLowerCase()} (opsional).</p>
+        </button>
+
         {/* Conditional Items Table - BARANG or JASA */}
         {isBarangCategory(formData.mainCategory) ? (
           // BARANG: Katalog Barang/Aset dengan detail per pcs
@@ -923,7 +1066,7 @@ export default function VendorProductForm({
                     </tr>
                   </thead>
                   <tbody>
-                    {(formData.items || []).map((item, idx) => (
+                    {(formData.items || []).map((item, idx) => [
                       <tr key={item.id} style={{ 
                         borderBottom: '1px solid #e5e7eb',
                         background: idx % 2 === 0 ? '#ffffff' : '#f9fafb',
@@ -1154,8 +1297,43 @@ export default function VendorProductForm({
                             ✕
                           </button>
                         </td>
-                      </tr>
-                    ))}
+                      </tr>,
+                      Object.keys(variations).length > 0 && (
+                        <tr key={`var-${item.id}`} style={{ background: '#f0f9ff', borderBottom: '1px solid #e5e7eb' }}>
+                          <td colSpan="5" style={{ padding: '12px 14px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                              {Object.entries(variations).map(([variasiId, variasi]) => (
+                                <div key={variasiId} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151' }}>
+                                    {variasi.name}
+                                  </label>
+                                  <select
+                                    value={item.variationValues?.[variasiId] || ''}
+                                    onChange={(e) => handleItemVariationChange(item.id, variasiId, e.target.value)}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 10px',
+                                      border: '1px solid #d1d5db',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      background: '#fff',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    <option value="">-- Pilih {variasi.name.toLowerCase()} --</option>
+                                    {(variasi.options || []).map((option) => (
+                                      <option key={option.id} value={option.id}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    ])}
                   </tbody>
                 </table>
               </div>
@@ -1262,7 +1440,7 @@ export default function VendorProductForm({
                     </tr>
                   </thead>
                   <tbody>
-                    {(formData.items || []).map((item, idx) => (
+                    {(formData.items || []).map((item, idx) => [
                       <tr key={item.id} style={{ 
                         borderBottom: '1px solid #e5e7eb',
                         background: idx % 2 === 0 ? '#ffffff' : '#f9fafb',
@@ -1474,8 +1652,43 @@ export default function VendorProductForm({
                             ✕
                           </button>
                         </td>
-                      </tr>
-                    ))}
+                      </tr>,
+                      Object.keys(variations).length > 0 && (
+                        <tr key={`var-${item.id}`} style={{ background: '#eff6ff', borderBottom: '1px solid #e5e7eb' }}>
+                          <td colSpan="4" style={{ padding: '12px 14px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                              {Object.entries(variations).map(([variasiId, variasi]) => (
+                                <div key={variasiId} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151' }}>
+                                    {variasi.name}
+                                  </label>
+                                  <select
+                                    value={item.variationValues?.[variasiId] || ''}
+                                    onChange={(e) => handleItemVariationChange(item.id, variasiId, e.target.value)}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 10px',
+                                      border: '1px solid #d1d5db',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      background: '#fff',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    <option value="">-- Pilih {variasi.name.toLowerCase()} --</option>
+                                    {(variasi.options || []).map((option) => (
+                                      <option key={option.id} value={option.id}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    ])}
                   </tbody>
                 </table>
               </div>
@@ -2046,6 +2259,240 @@ export default function VendorProductForm({
             <div style={{ padding: '14px 20px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button type="button" onClick={() => setIsDescriptionModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: '600', cursor: 'pointer' }}>Batal</button>
               <button type="button" onClick={() => setIsDescriptionModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: '700', cursor: 'pointer' }}>Simpan</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isVariasiModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(17, 24, 39, 0.45)',
+            zIndex: 1100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+          onClick={() => setIsVariasiModalOpen(false)}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '920px',
+              background: '#ffffff',
+              borderRadius: '14px',
+              border: '1px solid #e5e7eb',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              display: 'flex',
+              flexDirection: 'column',
+              maxHeight: '88vh',
+              overflow: 'hidden'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '22px', color: '#111827' }}>● Variasi {entityLabel}</h3>
+              <button type="button" onClick={() => setIsVariasiModalOpen(false)} style={{ border: 'none', background: 'transparent', fontSize: '26px', cursor: 'pointer', color: '#6b7280' }}>×</button>
+            </div>
+
+            <div style={{ padding: '10px 20px', fontSize: '12px', color: '#6b7280', borderBottom: '1px solid #f3f4f6' }}>
+              Buat variasi untuk memberikan pilihan kepada pelanggan. Misalnya: Jenis, Warna, Ukuran, dll.
+            </div>
+
+            <div style={{ overflowY: 'auto', padding: '12px 20px', flex: 1 }}>
+              {/* Existing Variations */}
+              {Object.entries(variations).map(([variasiId, variasi]) => (
+                <div key={variasiId} style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid #f3f4f6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: '600', color: '#374151', margin: 0 }}>
+                      Variasi {Object.keys(variations).indexOf(variasiId) + 1}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteVariation(variasiId)}
+                      style={{
+                        padding: '4px 8px',
+                        background: '#fee2e2',
+                        color: '#dc2626',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        fontWeight: '600'
+                      }}
+                    >
+                      🗑️ Hapus
+                    </button>
+                  </div>
+
+                  <input
+                    type="text"
+                    value={variasi.name}
+                    onChange={(e) => handleRenameVariation(variasiId, e.target.value)}
+                    placeholder="Contoh: Jenis, Warna, Ukuran"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      boxSizing: 'border-box',
+                      marginBottom: '12px',
+                      background: '#fff'
+                    }}
+                  />
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '8px' }}>
+                      Opsi ●
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                      {(variasi.options || []).map((option) => (
+                        <div key={option.id} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            value={option.label}
+                            disabled
+                            style={{
+                              flex: 1,
+                              padding: '8px 10px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              background: '#f9fafb',
+                              color: '#6b7280'
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOption(variasiId, option.id)}
+                            style={{
+                              padding: '6px 8px',
+                              background: '#fee2e2',
+                              color: '#dc2626',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {editingVariasiId === variasiId && (
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="text"
+                          value={newOptionLabel}
+                          onChange={(e) => setNewOptionLabel(e.target.value)}
+                          placeholder="Masukkan opsi baru"
+                          style={{
+                            flex: 1,
+                            padding: '8px 10px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            background: '#fff',
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleAddOption(variasiId)}
+                          style={{
+                            padding: '6px 12px',
+                            background: '#10b981',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    )}
+
+                    {editingVariasiId !== variasiId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingVariasiId(variasiId);
+                          setNewOptionLabel('');
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '6px 12px',
+                          background: '#f3f4f6',
+                          color: '#374151',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        + Tambah Opsi
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Add New Variation */}
+              {editingVariasiId === null && (
+                <div style={{ paddingBottom: '12px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '8px', display: 'block' }}>
+                    Tambah Variasi Baru
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      value={variationName}
+                      onChange={(e) => setVariationName(e.target.value)}
+                      placeholder="Contoh: Jenis, Warna, Ukuran"
+                      style={{
+                        flex: 1,
+                        padding: '10px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        background: '#fff',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddVariation}
+                      style={{
+                        padding: '10px 16px',
+                        background: '#5A45D1',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      + Tambah
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: '14px 20px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button type="button" onClick={() => setIsVariasiModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: '600', cursor: 'pointer' }}>Batal</button>
+              <button type="button" onClick={() => setIsVariasiModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: '700', cursor: 'pointer' }}>Simpan</button>
             </div>
           </div>
         </div>
