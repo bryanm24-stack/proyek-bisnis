@@ -788,16 +788,6 @@ export default function FavoritesPage() {
 
               {detailTab === 'description' && (
                 <div>
-                  {selectedService.shortDescription && (
-                    <div style={{ marginBottom: '20px' }}>
-                      <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600', color: '#666' }}>
-                        📌 Deskripsi Singkat
-                      </h4>
-                      <p style={{ margin: 0, lineHeight: '1.6', color: '#555' }}>
-                        {selectedService.shortDescription}
-                      </p>
-                    </div>
-                  )}
                   <div>
                     <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600', color: '#666' }}>
                       📝 Deskripsi Lengkap

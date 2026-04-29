@@ -612,7 +612,6 @@ export default function HomePageClient() {
 
   const filteredServices = getFilteredServices();
   const specificationEntries = getNonEmptyObjectEntries(selectedService?.specifications);
-  const descriptionTableEntries = getNonEmptyObjectEntries(selectedService?.descriptionTable);
   const checklistEntries = getNonEmptyObjectEntries(selectedService?.checklist);
   const locationLabel = selectedService?.location || selectedService?.lokasi || '-';
   const categoryPath = [
@@ -1194,32 +1193,12 @@ export default function HomePageClient() {
 
                   {detailTab === 'description' && (
                     <>
-                      {selectedService.shortDescription && (
-                        <div className="info-section">
-                          <h4>📌 Deskripsi Singkat</h4>
-                          <p style={{ lineHeight: '1.6', color: '#555' }}>{selectedService.shortDescription}</p>
-                        </div>
-                      )}
-
                       <div className="info-section">
                         <h4>📝 Deskripsi Lengkap</h4>
                         <p style={{ lineHeight: '1.6', color: '#555' }}>
                           {selectedService.detailDescription || selectedService.description}
                         </p>
                       </div>
-
-                      {descriptionTableEntries.length > 0 && (
-                        <div className="info-section">
-                          <h4>📋 Detail Produk/Jasa</h4>
-                          <div style={{ display: 'grid', gap: '10px' }}>
-                            {descriptionTableEntries.map(([key, value]) => (
-                              <div key={key}>
-                                <strong>{formatFieldLabel(key)}:</strong> {String(value)}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
 
                       {specificationEntries.length > 0 && (
                         <div className="info-section">
