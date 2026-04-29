@@ -23,6 +23,8 @@ export default function FavoritesPage() {
   const [chatData, setChatData] = useState(null);
   const [dealData, setDealData] = useState(null);
   const [showRatingForm, setShowRatingForm] = useState(false);
+  const [ratingValue, setRatingValue] = useState(5);
+  const [ratingReview, setRatingReview] = useState('');
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -169,6 +171,10 @@ export default function FavoritesPage() {
     setMessages([]);
     setNewMessage('');
     setChatData(null);
+    setDealData(null);
+    setShowRatingForm(false);
+    setRatingValue(5);
+    setRatingReview('');
   };
 
   const sendMessage = async () => {
@@ -219,6 +225,136 @@ export default function FavoritesPage() {
     } catch (error) {
       console.error('Error sending message:', error);
       alert('Error: ' + error.message);
+    }
+  };
+
+  const handleDealAction = async (action) => {
+    if (!selectedService || !user || !chatData?.id) return;
+
+    try {
+      const response = await fetch('/api/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          chatId: chatData.id,
+          customerId: user.id,
+          vendorId: selectedService.vendorId,
+          serviceId: selectedService.id
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        alert('Error: ' + (data.message || 'Gagal memproses deal'));
+        return;
+      }
+
+      if (data.data?.deal) {
+        setDealData(data.data.deal);
+        if (data.data.deal.status === 'cancelled') {
+          setShowRatingForm(false);
+        }
+      }
+
+      if (data.data?.chat) {
+        setChatData(data.data.chat);
+      }
+
+      alert(data.message);
+    } catch (error) {
+      console.error('Error processing deal:', error);
+      alert('Gagal memproses deal: ' + error.message);
+    }
+  };
+
+  const getDealStatusConfig = () => {
+    if (!dealData) {
+      return {
+        label: 'Belum ada status deal',
+        description: 'Transaksi diproses vendor. Kamu cukup lanjut negosiasi di chat.',
+        background: '#f3f4f6',
+        color: '#374151'
+      };
+    }
+
+    if (dealData.status === 'pending') {
+      return {
+        label: 'Menunggu konfirmasi vendor',
+        description: 'Vendor belum mengonfirmasi. Tunggu update dari vendor di chat ini.',
+        background: '#fff7ed',
+        color: '#c2410c'
+      };
+    }
+
+    if (dealData.status === 'agreed') {
+      return {
+        label: 'Deal disetujui',
+        description: 'Deal sudah disepakati. Kamu bisa lanjut ke pembayaran.',
+        background: '#dbeafe',
+        color: '#1d4ed8'
+      };
+    }
+
+    if (dealData.status === 'cancelled') {
+      return {
+        label: 'Deal dibatalkan',
+        description: 'Deal dibatalkan. Kamu bisa lanjut negosiasi ulang melalui chat.',
+        background: '#fee2e2',
+        color: '#b91c1c'
+      };
+    }
+
+    if (dealData.status === 'completed') {
+      return {
+        label: 'Transaksi selesai',
+        description: 'Transaksi sudah selesai. Kamu bisa lanjut isi review.',
+        background: '#dcfce7',
+        color: '#166534'
+      };
+    }
+
+    return {
+      label: `Status: ${dealData.status}`,
+      description: 'Status deal diperbarui secara otomatis dari sistem.',
+      background: '#f3f4f6',
+      color: '#374151'
+    };
+  };
+
+  const submitRating = async () => {
+    if (!ratingValue) {
+      alert('Silakan berikan rating');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/ratings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceId: selectedService.id,
+          customerId: user.id,
+          vendorId: selectedService.vendorId,
+          rating: ratingValue,
+          review: ratingReview
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        alert('Rating berhasil disimpan!');
+        closeChatModal();
+        
+        setServices(services.map(s =>
+          s.id === selectedService.id
+            ? { ...s, rating: data.data.updatedService.rating, rentCount: data.data.updatedService.rentCount }
+            : s
+        ));
+      }
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+      alert('Gagal menyimpan rating');
     }
   };
 
@@ -858,26 +994,11 @@ export default function FavoritesPage() {
                 messages.map((msg) => (
                   <div
                     key={msg.id}
-                    style={{
-                      marginBottom: '12px',
-                      display: 'flex',
-                      justifyContent: msg.senderId === user.id ? 'flex-end' : 'flex-start'
-                    }}
+                    className={`chat-message ${msg.senderId === user.id ? 'customer' : 'vendor'}`}
                   >
-                    <div
-                      style={{
-                        maxWidth: '70%',
-                        padding: '10px 16px',
-                        borderRadius: '8px',
-                        background: msg.senderId === user.id ? '#5A45D1' : '#f3f4f6',
-                        color: msg.senderId === user.id ? 'white' : '#1a1a1a',
-                        wordBreak: 'break-word'
-                      }}
-                    >
-                      <p style={{ margin: '0 0 4px 0', fontSize: '14px' }}>
-                        {msg.message}
-                      </p>
-                      <span style={{ fontSize: '11px', opacity: 0.7 }}>
+                    <div className="message-content">
+                      <p className="message-text">{msg.message}</p>
+                      <span className="message-time">
                         {new Date(msg.timestamp).toLocaleTimeString('id-ID', {
                           hour: '2-digit',
                           minute: '2-digit'
@@ -889,44 +1010,151 @@ export default function FavoritesPage() {
               )}
             </div>
 
+            {/* Rating Form */}
+            {showRatingForm && dealData?.status === 'completed' && (
+              <div className="rating-form">
+                <h3>Berikan Rating &amp; Review</h3>
+                <div className="rating-stars">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      className={`star ${star <= ratingValue ? 'active' : ''}`}
+                      onClick={() => setRatingValue(star)}
+                    >
+                      ⭐
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  className="rating-textarea"
+                  placeholder="Tulis review Anda (opsional)"
+                  value={ratingReview}
+                  onChange={(e) => setRatingReview(e.target.value)}
+                  maxLength={500}
+                />
+                <button className="btn-submit-rating" onClick={submitRating}>
+                  Kirim Rating
+                </button>
+              </div>
+            )}
+
             {/* Chat Input */}
-            <div className="chat-input-section" style={{ padding: '16px', borderTop: '1px solid #eee', display: 'flex', gap: '8px' }}>
-              <input
-                type="text"
-                className="chat-input"
-                placeholder="Ketik pesan..."
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                style={{
-                  flex: 1,
-                  padding: '10px 14px',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontFamily: 'inherit'
-                }}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    sendMessage();
-                  }
-                }}
-              />
-              <button 
-                className="btn-send"
-                onClick={sendMessage}
-                style={{
-                  padding: '10px 16px',
-                  background: '#5A45D1',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: '600'
-                }}
-              >
-                Kirim
-              </button>
-            </div>
+            {!showRatingForm && (
+              <div className="chat-input-section" style={{ flexDirection: 'column', gap: '10px' }}>
+                {(() => {
+                  const statusConfig = getDealStatusConfig();
+                  const finalPrice = dealData?.finalPrice || dealData?.originalPrice || 0;
+                  const dealDisabled = dealData?.status === 'agreed' || dealData?.status === 'cancelled';
+
+                  return (
+                    <div
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid #e5e7eb',
+                        background: statusConfig.background
+                      }}
+                    >
+                      <div style={{ fontSize: '12px', fontWeight: '700', color: statusConfig.color }}>
+                        {statusConfig.label}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#4b5563', marginTop: '3px' }}>
+                        {statusConfig.description}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleDealAction('accept')}
+                          disabled={dealDisabled}
+                          style={{
+                            flex: 1,
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #10b981',
+                            background: 'rgba(16, 185, 129, 0.08)',
+                            color: '#047857',
+                            fontWeight: '700',
+                            cursor: dealDisabled ? 'not-allowed' : 'pointer',
+                            opacity: dealDisabled ? 0.55 : 1
+                          }}
+                        >
+                          {dealData?.status === 'agreed' ? 'Deal Diterima' : 'Terima Deal'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDealAction('cancel')}
+                          disabled={dealData?.status === 'cancelled'}
+                          style={{
+                            flex: 1,
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #ef4444',
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            color: '#b91c1c',
+                            fontWeight: '700',
+                            cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
+                            opacity: dealData?.status === 'cancelled' ? 0.55 : 1
+                          }}
+                        >
+                          {dealData?.status === 'cancelled' ? 'Dibatalkan' : 'Cancel'}
+                        </button>
+                      </div>
+
+                      {dealData?.status === 'agreed' && (
+                        <div style={{ marginTop: '8px', fontSize: '12px', color: '#1e40af' }}>
+                          <div style={{ fontWeight: '700' }}>
+                            Harga akhir: Rp {Number(finalPrice).toLocaleString('id-ID')}
+                          </div>
+                          {dealData.discountGiven && dealData.discount && (
+                            <div style={{ marginTop: '2px' }}>
+                              Potongan: Rp {Number(dealData.discount.amount || 0).toLocaleString('id-ID')}
+                            </div>
+                          )}
+                          {dealData.id && (
+                            <button
+                              type="button"
+                              onClick={() => router.push(`/transaction/payment?dealId=${dealData.id}`)}
+                              style={{
+                                marginTop: '7px',
+                                padding: '7px 10px',
+                                border: '1px solid #1d4ed8',
+                                borderRadius: '8px',
+                                background: 'rgba(29, 78, 216, 0.09)',
+                                color: '#1d4ed8',
+                                fontWeight: '700',
+                                fontSize: '12px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Lanjut ke Pembayaran
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input
+                    type="text"
+                    className="chat-input"
+                    placeholder="Ketik pesan..."
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        sendMessage();
+                      }
+                    }}
+                  />
+                  <button className="btn-send" onClick={sendMessage}>
+                    Kirim
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1222,10 +1450,180 @@ export default function FavoritesPage() {
         .chat-messages {
           flex: 1;
           overflow-y: auto;
-          padding: 16px;
+          padding: 20px;
           display: flex;
           flex-direction: column;
           gap: 12px;
+          background-color: #f9fafb;
+        }
+
+        .chat-message {
+          display: flex;
+          margin-bottom: 12px;
+        }
+
+        .chat-message.customer {
+          justify-content: flex-end;
+        }
+
+        .chat-message.vendor {
+          justify-content: flex-start;
+        }
+
+        .message-content {
+          max-width: 70%;
+          padding: 12px 16px;
+          border-radius: 12px;
+          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          color: white;
+          box-shadow: 0 2px 8px rgba(124, 58, 237, 0.2);
+        }
+
+        .chat-message.vendor .message-content {
+          background-color: #e5e7eb;
+          color: #1a1a1a;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .message-text {
+          margin: 0 0 4px 0;
+          font-size: 14px;
+          word-wrap: break-word;
+          line-height: 1.4;
+        }
+
+        .message-time {
+          font-size: 11px;
+          opacity: 0.7;
+          display: block;
+          margin-top: 4px;
+        }
+
+        .chat-input-section {
+          display: flex;
+          gap: 12px;
+          padding: 16px 20px;
+          border-top: 1px solid #eee;
+          background: white;
+          border-radius: 0 0 16px 16px;
+        }
+
+        .chat-input {
+          flex: 1;
+          border: 1px solid #d1d5db;
+          border-radius: 8px;
+          padding: 10px 12px;
+          font-size: 14px;
+          font-family: inherit;
+          transition: all 0.3s ease;
+        }
+
+        .chat-input:focus {
+          outline: none;
+          border-color: #7c3aed;
+          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+        }
+
+        .btn-send {
+          padding: 10px 16px;
+          border: none;
+          border-radius: 8px;
+          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          color: white;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+
+        .btn-send:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 16px rgba(124, 58, 237, 0.3);
+        }
+
+        .btn-send:active {
+          transform: translateY(0);
+        }
+
+        .rating-form {
+          padding: 20px;
+          border-top: 1px solid #eee;
+          background: white;
+          border-radius: 0 0 16px 16px;
+        }
+
+        .rating-form h3 {
+          margin: 0 0 16px 0;
+          font-size: 16px;
+          color: #1a1a1a;
+          font-weight: 700;
+        }
+
+        .rating-stars {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 16px;
+          justify-content: center;
+        }
+
+        .star {
+          background: none;
+          border: none;
+          font-size: 32px;
+          cursor: pointer;
+          opacity: 0.3;
+          transition: opacity 0.2s, transform 0.2s;
+        }
+
+        .star:hover {
+          transform: scale(1.1);
+          opacity: 0.7;
+        }
+
+        .star.active {
+          opacity: 1;
+          transform: scale(1.15);
+        }
+
+        .rating-textarea {
+          width: 100%;
+          border: 1px solid #d1d5db;
+          border-radius: 8px;
+          padding: 12px;
+          font-size: 14px;
+          font-family: inherit;
+          resize: vertical;
+          min-height: 80px;
+          margin-bottom: 12px;
+          box-sizing: border-box;
+          transition: all 0.3s ease;
+        }
+
+        .rating-textarea:focus {
+          outline: none;
+          border-color: #7c3aed;
+          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+        }
+
+        .btn-submit-rating {
+          width: 100%;
+          padding: 12px;
+          border: none;
+          border-radius: 8px;
+          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          color: white;
+          font-weight: 600;
+          font-size: 16px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+
+        .btn-submit-rating:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 16px rgba(124, 58, 237, 0.3);
+        }
+
+        .btn-submit-rating:active {
+          transform: translateY(0);
         }
       `}</style>
     </>
