@@ -238,14 +238,10 @@ export default function VendorProductForm({
   const [draftSubCategory, setDraftSubCategory] = useState(formData.subCategory || '');
   const [draftSuperSubCategory, setDraftSuperSubCategory] = useState(formData.superSubCategory || '');
   const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
-  const [isVariasiModalOpen, setIsVariasiModalOpen] = useState(false);
   const [editingVariasiId, setEditingVariasiId] = useState(null);
   const [variationName, setVariationName] = useState('');
   const [newOptionLabel, setNewOptionLabel] = useState('');
-  const [manualSpecKey, setManualSpecKey] = useState('');
-  const [manualSpecValue, setManualSpecValue] = useState('');
   const [deletedSpecFields, setDeletedSpecFields] = useState(new Set());
-  const [customSpecFields, setCustomSpecFields] = useState({});
 
   // Gunakan categories dari props atau default tree global vendor
   const CATEGORIES = categories || ALL_VENDOR_CATEGORY_TREE;
@@ -493,61 +489,9 @@ export default function VendorProductForm({
     });
   };
 
-  const handleAddManualSpec = () => {
-    if (!manualSpecKey.trim() || !manualSpecValue.trim()) {
-      alert('Nama dan nilai spesifikasi tidak boleh kosong!');
-      return;
-    }
-
-    const customKey = `custom_${Date.now()}`;
-    setCustomSpecFields(prev => ({
-      ...prev,
-      [customKey]: {
-        label: manualSpecKey,
-        value: manualSpecValue
-      }
-    }));
-
-    setFormData(prev => ({
-      ...prev,
-      specifications: {
-        ...(prev.specifications || {}),
-        [customKey]: manualSpecValue
-      }
-    }));
-
-    setManualSpecKey('');
-    setManualSpecValue('');
-  };
-
-  const handleDeleteCustomSpec = (customKey) => {
-    setCustomSpecFields(prev => {
-      const newCustom = { ...prev };
-      delete newCustom[customKey];
-      return newCustom;
-    });
-
-    setFormData(prev => ({
-      ...prev,
-      specifications: Object.keys(prev.specifications || {})
-        .filter(key => key !== customKey)
-        .reduce((acc, key) => {
-          acc[key] = prev.specifications[key];
-          return acc;
-        }, {})
-    }));
-  };
-
   // ========== VARIASI HANDLERS ==========
   const variations = formData.variations || {};
   const variationCount = Object.keys(variations).length;
-
-  const handleOpenVariasiModal = () => {
-    setIsVariasiModalOpen(true);
-    setEditingVariasiId(null);
-    setVariationName('');
-    setNewOptionLabel('');
-  };
 
   const handleAddVariation = () => {
     if (!variationName.trim()) return;
@@ -577,7 +521,20 @@ export default function VendorProductForm({
         .reduce((acc, id) => {
           acc[id] = prev.variations[id];
           return acc;
-        }, {})
+        }, {}),
+      items: (prev.items || []).map((item) => {
+        if (!item.variationValues || !Object.prototype.hasOwnProperty.call(item.variationValues, variasiId)) {
+          return item;
+        }
+
+        const nextVariationValues = { ...item.variationValues };
+        delete nextVariationValues[variasiId];
+
+        return {
+          ...item,
+          variationValues: nextVariationValues
+        };
+      })
     }));
   };
 
@@ -955,25 +912,18 @@ export default function VendorProductForm({
           <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#6b7280' }}>Klik untuk isi spesifikasi {entityLabel.toLowerCase()} via popup.</p>
         </button>
 
-        <button
-          type="button"
-          onClick={handleOpenVariasiModal}
-          style={{
-            width: '100%',
-            border: '1px solid #e5e7eb',
-            borderRadius: '10px',
-            padding: '14px 16px',
-            textAlign: 'left',
-            cursor: 'pointer',
-            background: '#fff'
-          }}
-        >
+        <div style={{
+          border: '1px solid #e5e7eb',
+          borderRadius: '10px',
+          padding: '14px 16px',
+          background: '#f9fafb'
+        }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <strong style={{ color: '#111827' }}>● Variasi</strong>
-            <span style={{ fontSize: '12px', color: '#6b7280' }}>{variationCount}</span>
+            <span style={{ fontSize: '12px', color: '#6b7280' }}>{variationCount} variasi aktif</span>
           </div>
-          <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#6b7280' }}>Klik untuk mengelola variasi {entityLabel.toLowerCase()} (opsional).</p>
-        </button>
+          <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#6b7280' }}>Kelola variasi langsung dari popup spesifikasi.</p>
+        </div>
 
         {/* Conditional Items Table - BARANG or JASA */}
         {isBarangCategory(formData.mainCategory) ? (
@@ -2212,44 +2162,30 @@ export default function VendorProductForm({
                     </tr>
                   ))}
 
-                  {/* Custom Fields */}
-                  {Object.entries(customSpecFields).map(([customKey, customField]) => (
-                    <tr key={customKey} style={{ borderBottom: '1px solid #f3f4f6', background: '#fef3c7' }}>
-                      <td style={{ width: '34%', minWidth: '220px', padding: '12px 10px', fontSize: '13px', color: '#374151', fontWeight: '600', verticalAlign: 'top' }}>
-                        {customField.label}
-                      </td>
-                      <td style={{ padding: '10px', flex: 1 }}>
-                        <input
-                          type="text"
-                          value={specs[customKey] || ''}
-                          onChange={(e) => {
-                            handleSpecFieldChange(customKey, e.target.value);
-                            setCustomSpecFields(prev => ({
-                              ...prev,
-                              [customKey]: {
-                                ...prev[customKey],
-                                value: e.target.value
-                              }
-                            }));
-                          }}
-                          placeholder="Nilai spesifikasi"
-                          style={{
-                            width: '100%',
-                            padding: '10px 12px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '8px',
-                            fontSize: '13px',
-                            boxSizing: 'border-box',
-                            background: '#fff'
-                          }}
-                        />
-                      </td>
-                      <td style={{ padding: '10px 5px', textAlign: 'center' }}>
+                </tbody>
+              </table>
+
+              <div style={{ marginTop: '16px', padding: '16px', border: '1px solid #e5e7eb', borderRadius: '12px', background: '#f8fafc' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#111827' }}>Variasi {entityLabel}</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>Kelola variasi langsung dari popup spesifikasi.</div>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', whiteSpace: 'nowrap' }}>{variationCount} variasi</div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {Object.entries(variations).map(([variasiId, variasi]) => (
+                    <div key={variasiId} style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px', background: '#fff' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '12px' }}>
+                        <label style={{ fontSize: '13px', fontWeight: '600', color: '#374151', margin: 0 }}>
+                          Variasi {Object.keys(variations).indexOf(variasiId) + 1}
+                        </label>
                         <button
                           type="button"
-                          onClick={() => handleDeleteCustomSpec(customKey)}
+                          onClick={() => handleDeleteVariation(variasiId)}
                           style={{
-                            padding: '6px 10px',
+                            padding: '4px 8px',
                             background: '#fee2e2',
                             color: '#dc2626',
                             border: 'none',
@@ -2261,308 +2197,190 @@ export default function VendorProductForm({
                         >
                           🗑️ Hapus
                         </button>
-                      </td>
-                    </tr>
-                  ))}
+                      </div>
 
-                  {/* Add New Custom Field */}
-                  <tr style={{ borderBottom: '1px solid #f3f4f6', background: '#dbeafe' }}>
-                    <td style={{ padding: '12px 10px', fontSize: '12px', color: '#0c4a6e', fontWeight: '600' }}>
-                      Tambah Field
-                    </td>
-                    <td style={{ padding: '10px' }}>
                       <input
                         type="text"
-                        value={manualSpecKey}
-                        onChange={(e) => setManualSpecKey(e.target.value)}
-                        placeholder="Nama field (cth: Ukuran/Size)"
+                        value={variasi.name}
+                        onChange={(e) => handleRenameVariation(variasiId, e.target.value)}
+                        placeholder="Contoh: Jenis, Warna, Ukuran"
                         style={{
                           width: '100%',
                           padding: '10px 12px',
-                          border: '1px solid #93c5fd',
+                          border: '1px solid #d1d5db',
                           borderRadius: '8px',
                           fontSize: '13px',
                           boxSizing: 'border-box',
-                          background: '#fff',
-                          marginBottom: '8px'
-                        }}
-                      />
-                      <input
-                        type="text"
-                        value={manualSpecValue}
-                        onChange={(e) => setManualSpecValue(e.target.value)}
-                        placeholder="Nilai field"
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          border: '1px solid #93c5fd',
-                          borderRadius: '8px',
-                          fontSize: '13px',
-                          boxSizing: 'border-box',
+                          marginBottom: '12px',
                           background: '#fff'
                         }}
                       />
-                    </td>
-                    <td style={{ padding: '10px 5px', textAlign: 'center', verticalAlign: 'middle' }}>
+
+                      <div style={{ marginBottom: '12px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '8px' }}>
+                          Opsi ●
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                          {(variasi.options || []).map((option) => (
+                            <div key={option.id} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              <input
+                                type="text"
+                                value={option.label}
+                                disabled
+                                style={{
+                                  flex: 1,
+                                  padding: '8px 10px',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  background: '#f9fafb',
+                                  color: '#6b7280'
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteOption(variasiId, option.id)}
+                                style={{
+                                  padding: '6px 8px',
+                                  background: '#fee2e2',
+                                  color: '#dc2626',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        {editingVariasiId === variasiId && (
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <input
+                              type="text"
+                              value={newOptionLabel}
+                              onChange={(e) => setNewOptionLabel(e.target.value)}
+                              placeholder="Masukkan opsi baru"
+                              style={{
+                                flex: 1,
+                                padding: '8px 10px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                background: '#fff',
+                                boxSizing: 'border-box'
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddOption(variasiId)}
+                              style={{
+                                padding: '6px 12px',
+                                background: '#10b981',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
+
+                        {editingVariasiId !== variasiId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingVariasiId(variasiId);
+                              setNewOptionLabel('');
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '6px 12px',
+                              background: '#f3f4f6',
+                              color: '#374151',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            + Tambah Opsi
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  <div style={{ paddingTop: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: '600', color: '#374151', margin: 0 }}>
+                        Tambah Variasi Baru
+                      </label>
                       <button
                         type="button"
-                        onClick={handleAddManualSpec}
+                        onClick={() => setEditingVariasiId(null)}
                         style={{
                           padding: '6px 10px',
-                          background: '#dbeafe',
+                          background: '#eff6ff',
                           color: '#2563eb',
-                          border: '1px solid #93c5fd',
+                          border: '1px solid #bfdbfe',
                           borderRadius: '6px',
                           fontSize: '12px',
                           cursor: 'pointer',
                           fontWeight: '600'
                         }}
                       >
-                        ➕ Tambah
+                        + Tambah Variasi
                       </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="text"
+                        value={variationName}
+                        onChange={(e) => setVariationName(e.target.value)}
+                        placeholder="Contoh: Jenis, Warna, Ukuran"
+                        style={{
+                          flex: 1,
+                          padding: '10px 12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          background: '#fff',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddVariation}
+                        style={{
+                          padding: '10px 16px',
+                          background: '#5A45D1',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Simpan
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div style={{ padding: '14px 20px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button type="button" onClick={() => setIsSpecModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: '600', cursor: 'pointer' }}>Batal</button>
               <button type="button" onClick={() => setIsSpecModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: '700', cursor: 'pointer' }}>Simpan</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isVariasiModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(17, 24, 39, 0.45)',
-            zIndex: 1100,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px'
-          }}
-          onClick={() => setIsVariasiModalOpen(false)}
-        >
-          <div
-            style={{
-              width: '100%',
-              maxWidth: '920px',
-              background: '#ffffff',
-              borderRadius: '14px',
-              border: '1px solid #e5e7eb',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-              display: 'flex',
-              flexDirection: 'column',
-              maxHeight: '88vh',
-              overflow: 'hidden'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '22px', color: '#111827' }}>● Variasi {entityLabel}</h3>
-              <button type="button" onClick={() => setIsVariasiModalOpen(false)} style={{ border: 'none', background: 'transparent', fontSize: '26px', cursor: 'pointer', color: '#6b7280' }}>×</button>
-            </div>
-
-            <div style={{ padding: '10px 20px', fontSize: '12px', color: '#6b7280', borderBottom: '1px solid #f3f4f6' }}>
-              Buat variasi untuk memberikan pilihan kepada pelanggan. Misalnya: Jenis, Warna, Ukuran, dll.
-            </div>
-
-            <div style={{ overflowY: 'auto', padding: '12px 20px', flex: 1 }}>
-              {/* Existing Variations */}
-              {Object.entries(variations).map(([variasiId, variasi]) => (
-                <div key={variasiId} style={{ marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid #f3f4f6' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <label style={{ fontSize: '13px', fontWeight: '600', color: '#374151', margin: 0 }}>
-                      Variasi {Object.keys(variations).indexOf(variasiId) + 1}
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteVariation(variasiId)}
-                      style={{
-                        padding: '4px 8px',
-                        background: '#fee2e2',
-                        color: '#dc2626',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        fontWeight: '600'
-                      }}
-                    >
-                      🗑️ Hapus
-                    </button>
-                  </div>
-
-                  <input
-                    type="text"
-                    value={variasi.name}
-                    onChange={(e) => handleRenameVariation(variasiId, e.target.value)}
-                    placeholder="Contoh: Jenis, Warna, Ukuran"
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      fontSize: '13px',
-                      boxSizing: 'border-box',
-                      marginBottom: '12px',
-                      background: '#fff'
-                    }}
-                  />
-
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '8px' }}>
-                      Opsi ●
-                    </label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                      {(variasi.options || []).map((option) => (
-                        <div key={option.id} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                          <input
-                            type="text"
-                            value={option.label}
-                            disabled
-                            style={{
-                              flex: 1,
-                              padding: '8px 10px',
-                              border: '1px solid #d1d5db',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              background: '#f9fafb',
-                              color: '#6b7280'
-                            }}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteOption(variasiId, option.id)}
-                            style={{
-                              padding: '6px 8px',
-                              background: '#fee2e2',
-                              color: '#dc2626',
-                              border: 'none',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    {editingVariasiId === variasiId && (
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <input
-                          type="text"
-                          value={newOptionLabel}
-                          onChange={(e) => setNewOptionLabel(e.target.value)}
-                          placeholder="Masukkan opsi baru"
-                          style={{
-                            flex: 1,
-                            padding: '8px 10px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '6px',
-                            fontSize: '12px',
-                            background: '#fff',
-                            boxSizing: 'border-box'
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleAddOption(variasiId)}
-                          style={{
-                            padding: '6px 12px',
-                            background: '#10b981',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '6px',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          +
-                        </button>
-                      </div>
-                    )}
-
-                    {editingVariasiId !== variasiId && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingVariasiId(variasiId);
-                          setNewOptionLabel('');
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '6px 12px',
-                          background: '#f3f4f6',
-                          color: '#374151',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        + Tambah Opsi
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              {/* Add New Variation */}
-              {editingVariasiId === null && (
-                <div style={{ paddingBottom: '12px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '8px', display: 'block' }}>
-                    Tambah Variasi Baru
-                  </label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="text"
-                      value={variationName}
-                      onChange={(e) => setVariationName(e.target.value)}
-                      placeholder="Contoh: Jenis, Warna, Ukuran"
-                      style={{
-                        flex: 1,
-                        padding: '10px 12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '8px',
-                        fontSize: '13px',
-                        background: '#fff',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddVariation}
-                      style={{
-                        padding: '10px 16px',
-                        background: '#5A45D1',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '13px',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      + Tambah
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div style={{ padding: '14px 20px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button type="button" onClick={() => setIsVariasiModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: '600', cursor: 'pointer' }}>Batal</button>
-              <button type="button" onClick={() => setIsVariasiModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: '700', cursor: 'pointer' }}>Simpan</button>
             </div>
           </div>
         </div>
