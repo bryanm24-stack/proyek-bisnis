@@ -1190,13 +1190,6 @@ export default function HomePageClient() {
 
                   {detailTab === 'description' && (
                     <>
-                      {selectedService.shortDescription && (
-                        <div className="info-section">
-                          <h4>📌 Deskripsi Singkat</h4>
-                          <p style={{ lineHeight: '1.6', color: '#555' }}>{selectedService.shortDescription}</p>
-                        </div>
-                      )}
-
                       <div className="info-section">
                         <h4>📝 Deskripsi Lengkap</h4>
                         <p style={{ lineHeight: '1.6', color: '#555' }}>

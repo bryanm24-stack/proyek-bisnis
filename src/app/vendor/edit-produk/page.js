@@ -113,7 +113,6 @@ function EditProdukPageContent() {
       missingFields.push('Super-Sub Kategori');
     }
     if (!formData.title) missingFields.push('Nama Item');
-    if (!formData.shortDescription) missingFields.push('Deskripsi Singkat');
     if (!formData.price) missingFields.push('Harga per Hari');
     if (!formData.location) missingFields.push('Lokasi Pickup');
 

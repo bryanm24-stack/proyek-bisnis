@@ -81,7 +81,6 @@ export default function TambahProdukPage() {
     if (!formData.subCategory) missingFields.push('Sub Kategori');
     if (currentSuperSubOptions.length > 0 && !formData.superSubCategory) missingFields.push('Super-Sub Kategori');
     if (!formData.title) missingFields.push('Nama Item');
-    if (!formData.shortDescription) missingFields.push('Deskripsi Singkat');
     if (!formData.price) missingFields.push('Harga per Hari');
     if (!formData.location) missingFields.push('Lokasi Pickup');
 

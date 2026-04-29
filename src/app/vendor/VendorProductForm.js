@@ -238,11 +238,14 @@ export default function VendorProductForm({
   const [draftSubCategory, setDraftSubCategory] = useState(formData.subCategory || '');
   const [draftSuperSubCategory, setDraftSuperSubCategory] = useState(formData.superSubCategory || '');
   const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
-  const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
   const [isVariasiModalOpen, setIsVariasiModalOpen] = useState(false);
   const [editingVariasiId, setEditingVariasiId] = useState(null);
   const [variationName, setVariationName] = useState('');
   const [newOptionLabel, setNewOptionLabel] = useState('');
+  const [manualSpecKey, setManualSpecKey] = useState('');
+  const [manualSpecValue, setManualSpecValue] = useState('');
+  const [deletedSpecFields, setDeletedSpecFields] = useState(new Set());
+  const [customSpecFields, setCustomSpecFields] = useState({});
 
   // Gunakan categories dari props atau default tree global vendor
   const CATEGORIES = categories || ALL_VENDOR_CATEGORY_TREE;
@@ -475,6 +478,63 @@ export default function VendorProductForm({
         ...(prev.descriptionTable || {}),
         [fieldKey]: value
       }
+    }));
+  };
+
+  const handleDeleteSpec = (fieldKey) => {
+    setDeletedSpecFields(prev => new Set([...prev, fieldKey]));
+  };
+
+  const handleRestoreSpec = (fieldKey) => {
+    setDeletedSpecFields(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(fieldKey);
+      return newSet;
+    });
+  };
+
+  const handleAddManualSpec = () => {
+    if (!manualSpecKey.trim() || !manualSpecValue.trim()) {
+      alert('Nama dan nilai spesifikasi tidak boleh kosong!');
+      return;
+    }
+
+    const customKey = `custom_${Date.now()}`;
+    setCustomSpecFields(prev => ({
+      ...prev,
+      [customKey]: {
+        label: manualSpecKey,
+        value: manualSpecValue
+      }
+    }));
+
+    setFormData(prev => ({
+      ...prev,
+      specifications: {
+        ...(prev.specifications || {}),
+        [customKey]: manualSpecValue
+      }
+    }));
+
+    setManualSpecKey('');
+    setManualSpecValue('');
+  };
+
+  const handleDeleteCustomSpec = (customKey) => {
+    setCustomSpecFields(prev => {
+      const newCustom = { ...prev };
+      delete newCustom[customKey];
+      return newCustom;
+    });
+
+    setFormData(prev => ({
+      ...prev,
+      specifications: Object.keys(prev.specifications || {})
+        .filter(key => key !== customKey)
+        .reduce((acc, key) => {
+          acc[key] = prev.specifications[key];
+          return acc;
+        }, {})
     }));
   };
 
@@ -851,30 +911,6 @@ export default function VendorProductForm({
           />
         </div>
 
-        {/* Deskripsi Singkat */}
-        <div>
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            ✍️ Deskripsi Singkat {entityLabel}
-          </label>
-          <textarea
-            name="shortDescription"
-            placeholder="Jelaskan singkat tentang item ini..."
-            value={formData.shortDescription || ''}
-            onChange={handleInputChange}
-            rows="2"
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #ddd',
-              borderRadius: '8px',
-              fontSize: '14px',
-              boxSizing: 'border-box',
-              fontFamily: 'inherit'
-            }}
-            required
-          />
-        </div>
-
         {/* Deskripsi Lengkap */}
         <div>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
@@ -899,45 +935,25 @@ export default function VendorProductForm({
         </div>
 
         {/* Shortcut Popup Tabel */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <button
-            type="button"
-            onClick={() => setIsSpecModalOpen(true)}
-            style={{
-              border: '1px solid #e5e7eb',
-              borderRadius: '10px',
-              padding: '14px 16px',
-              textAlign: 'left',
-              cursor: 'pointer',
-              background: '#fff'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong style={{ color: '#111827' }}>🧩 Tabel Spesifikasi {entityLabel}</strong>
-              <span style={{ fontSize: '12px', color: '#6b7280' }}>{completedRequiredSpecCount}/{requiredSpecCount}</span>
-            </div>
-            <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#6b7280' }}>Klik untuk isi spesifikasi {entityLabel.toLowerCase()} via popup.</p>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsDescriptionModalOpen(true)}
-            style={{
-              border: '1px solid #e5e7eb',
-              borderRadius: '10px',
-              padding: '14px 16px',
-              textAlign: 'left',
-              cursor: 'pointer',
-              background: '#fff'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong style={{ color: '#111827' }}>📄 Tabel Deskripsi {entityLabel}</strong>
-              <span style={{ fontSize: '12px', color: '#6b7280' }}>{completedDescriptionCount}/{requiredDescriptionCount}</span>
-            </div>
-            <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#6b7280' }}>Klik untuk isi deskripsi {entityLabel.toLowerCase()} via popup.</p>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setIsSpecModalOpen(true)}
+          style={{
+            width: '100%',
+            border: '1px solid #e5e7eb',
+            borderRadius: '10px',
+            padding: '14px 16px',
+            textAlign: 'left',
+            cursor: 'pointer',
+            background: '#fff'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <strong style={{ color: '#111827' }}>🧩 Tabel Spesifikasi {entityLabel}</strong>
+            <span style={{ fontSize: '12px', color: '#6b7280' }}>{completedRequiredSpecCount}/{requiredSpecCount}</span>
+          </div>
+          <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#6b7280' }}>Klik untuk isi spesifikasi {entityLabel.toLowerCase()} via popup.</p>
+        </button>
 
         <button
           type="button"
@@ -2150,12 +2166,15 @@ export default function VendorProductForm({
             <div style={{ overflowY: 'auto', padding: '12px 20px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
-                  {activeSpecTemplate.map((field) => (
+                  {/* Template Fields (filtered by deleted fields) */}
+                  {activeSpecTemplate
+                    .filter(field => !deletedSpecFields.has(field.key))
+                    .map((field) => (
                     <tr key={field.key} style={{ borderBottom: '1px solid #f3f4f6' }}>
                       <td style={{ width: '34%', minWidth: '220px', padding: '12px 10px', fontSize: '13px', color: '#374151', fontWeight: '600', verticalAlign: 'top' }}>
                         {field.label}
                       </td>
-                      <td style={{ padding: '10px' }}>
+                      <td style={{ padding: '10px', flex: 1 }}>
                         <input
                           type="text"
                           value={specs[field.key] || ''}
@@ -2172,72 +2191,48 @@ export default function VendorProductForm({
                           }}
                         />
                       </td>
+                      <td style={{ padding: '10px 5px', textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSpec(field.key)}
+                          style={{
+                            padding: '6px 10px',
+                            background: '#fee2e2',
+                            color: '#dc2626',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            fontWeight: '600'
+                          }}
+                        >
+                          🗑️ Hapus
+                        </button>
+                      </td>
                     </tr>
                   ))}
-                </tbody>
-              </table>
-            </div>
 
-            <div style={{ padding: '14px 20px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button type="button" onClick={() => setIsSpecModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: '600', cursor: 'pointer' }}>Batal</button>
-              <button type="button" onClick={() => setIsSpecModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: '700', cursor: 'pointer' }}>Simpan</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isDescriptionModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(17, 24, 39, 0.45)',
-            zIndex: 1100,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px'
-          }}
-          onClick={() => setIsDescriptionModalOpen(false)}
-        >
-          <div
-            style={{
-              width: '100%',
-              maxWidth: '920px',
-              background: '#ffffff',
-              borderRadius: '14px',
-              border: '1px solid #e5e7eb',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-              display: 'flex',
-              flexDirection: 'column',
-              maxHeight: '88vh',
-              overflow: 'hidden'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '22px', color: '#111827' }}>Tabel Deskripsi {entityLabel}</h3>
-              <button type="button" onClick={() => setIsDescriptionModalOpen(false)} style={{ border: 'none', background: 'transparent', fontSize: '26px', cursor: 'pointer', color: '#6b7280' }}>×</button>
-            </div>
-
-            <div style={{ padding: '10px 20px', fontSize: '12px', color: '#6b7280', borderBottom: '1px solid #f3f4f6' }}>
-              Isi deskripsi detail {entityLabel.toLowerCase()} lalu Simpan untuk lanjut.
-            </div>
-
-            <div style={{ overflowY: 'auto', padding: '12px 20px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody>
-                  {activeDescriptionTemplate.map((field) => (
-                    <tr key={field.key} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  {/* Custom Fields */}
+                  {Object.entries(customSpecFields).map(([customKey, customField]) => (
+                    <tr key={customKey} style={{ borderBottom: '1px solid #f3f4f6', background: '#fef3c7' }}>
                       <td style={{ width: '34%', minWidth: '220px', padding: '12px 10px', fontSize: '13px', color: '#374151', fontWeight: '600', verticalAlign: 'top' }}>
-                        {field.label}
+                        {customField.label}
                       </td>
-                      <td style={{ padding: '10px' }}>
-                        <textarea
-                          value={descriptionTable[field.key] || ''}
-                          onChange={(e) => handleDescriptionFieldChange(field.key, e.target.value)}
-                          placeholder={field.placeholder}
-                          rows={2}
+                      <td style={{ padding: '10px', flex: 1 }}>
+                        <input
+                          type="text"
+                          value={specs[customKey] || ''}
+                          onChange={(e) => {
+                            handleSpecFieldChange(customKey, e.target.value);
+                            setCustomSpecFields(prev => ({
+                              ...prev,
+                              [customKey]: {
+                                ...prev[customKey],
+                                value: e.target.value
+                              }
+                            }));
+                          }}
+                          placeholder="Nilai spesifikasi"
                           style={{
                             width: '100%',
                             padding: '10px 12px',
@@ -2245,20 +2240,95 @@ export default function VendorProductForm({
                             borderRadius: '8px',
                             fontSize: '13px',
                             boxSizing: 'border-box',
-                            background: '#fff',
-                            fontFamily: 'inherit'
+                            background: '#fff'
                           }}
                         />
                       </td>
+                      <td style={{ padding: '10px 5px', textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCustomSpec(customKey)}
+                          style={{
+                            padding: '6px 10px',
+                            background: '#fee2e2',
+                            color: '#dc2626',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            fontWeight: '600'
+                          }}
+                        >
+                          🗑️ Hapus
+                        </button>
+                      </td>
                     </tr>
                   ))}
+
+                  {/* Add New Custom Field */}
+                  <tr style={{ borderBottom: '1px solid #f3f4f6', background: '#dbeafe' }}>
+                    <td style={{ padding: '12px 10px', fontSize: '12px', color: '#0c4a6e', fontWeight: '600' }}>
+                      Tambah Field
+                    </td>
+                    <td style={{ padding: '10px' }}>
+                      <input
+                        type="text"
+                        value={manualSpecKey}
+                        onChange={(e) => setManualSpecKey(e.target.value)}
+                        placeholder="Nama field (cth: Ukuran/Size)"
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          border: '1px solid #93c5fd',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          boxSizing: 'border-box',
+                          background: '#fff',
+                          marginBottom: '8px'
+                        }}
+                      />
+                      <input
+                        type="text"
+                        value={manualSpecValue}
+                        onChange={(e) => setManualSpecValue(e.target.value)}
+                        placeholder="Nilai field"
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          border: '1px solid #93c5fd',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          boxSizing: 'border-box',
+                          background: '#fff'
+                        }}
+                      />
+                    </td>
+                    <td style={{ padding: '10px 5px', textAlign: 'center', verticalAlign: 'middle' }}>
+                      <button
+                        type="button"
+                        onClick={handleAddManualSpec}
+                        style={{
+                          padding: '6px 10px',
+                          background: '#dbeafe',
+                          color: '#2563eb',
+                          border: '1px solid #93c5fd',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          fontWeight: '600'
+                        }}
+                      >
+                        ➕ Tambah
+                      </button>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
 
             <div style={{ padding: '14px 20px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button type="button" onClick={() => setIsDescriptionModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: '600', cursor: 'pointer' }}>Batal</button>
-              <button type="button" onClick={() => setIsDescriptionModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: '700', cursor: 'pointer' }}>Simpan</button>
+              <button type="button" onClick={() => setIsSpecModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: '600', cursor: 'pointer' }}>Batal</button>
+              <button type="button" onClick={() => setIsSpecModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: '700', cursor: 'pointer' }}>Simpan</button>
             </div>
           </div>
         </div>
