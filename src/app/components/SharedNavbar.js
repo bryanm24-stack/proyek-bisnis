@@ -168,6 +168,20 @@ export default function SharedNavbar() {
             </Link>
 
             <Link 
+              href="/vendor/favorites" 
+              style={{ 
+                fontSize: '14px', 
+                color: isActive('/vendor/favorites') ? '#7c3aed' : '#666', 
+                textDecoration: 'none', 
+                fontWeight: isActive('/vendor/favorites') ? '600' : '500',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                background: isActive('/vendor/favorites') ? '#f0e6ff' : 'transparent'
+              }}>
+              ❤️ Favorit
+            </Link>
+
+            <Link 
               href="/vendor/produk" 
               style={{ 
                 fontSize: '14px', 
