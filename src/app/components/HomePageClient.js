@@ -733,9 +733,6 @@ export default function HomePageClient() {
                     onClick={() => toggleFavorite(service, isFavorited(service.id))}
                     disabled={favoriteLoading[service.id]}
                     style={{
-                      position: 'absolute',
-                      top: '12px',
-                      right: '12px',
                       background: isFavorited(service.id) ? '#FF6B6B' : 'rgba(255,255,255,0.9)',
                       border: 'none',
                       width: '40px',
