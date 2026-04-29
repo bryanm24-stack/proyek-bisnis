@@ -50,6 +50,7 @@ export async function POST(request) {
       descriptionTable,
       checklist,
       items,
+      variations,
       // Fields untuk barang
       namaBarang,
       jenisBarang,
@@ -140,6 +141,7 @@ export async function POST(request) {
         descriptionTable: descriptionTable && typeof descriptionTable === 'object' ? descriptionTable : {},
         checklist: checklist && typeof checklist === 'object' ? checklist : {},
         items: items && Array.isArray(items) ? items : [],
+        variations: variations && typeof variations === 'object' ? variations : {},
         type: resolvedType,
         rating: 0,
         rentCount: 0,

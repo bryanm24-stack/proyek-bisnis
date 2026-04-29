@@ -903,6 +903,11 @@ export default function HomePageClient() {
                     <p className="vendor-short-desc">
                       {shortDesc}
                     </p>
+                    {service.variations && Object.keys(service.variations).length > 0 && (
+                      <p className="vendor-variations" style={{ fontSize: '13px', color: '#374151', marginTop: '6px' }}>
+                        Variasi: {Object.values(service.variations).slice(0,2).map(v => `${v.name} (${(v.options||[]).length})`).join(' • ')}
+                      </p>
+                    )}
                     
                     <div className="vendor-stats">
                       <div className="stat-rating">

@@ -121,6 +121,7 @@ export default function TambahProdukPage() {
         descriptionTable: formData.descriptionTable || {},
         checklist: formData.checklist || {},
         items: formData.items || [],
+        variations: formData.variations || {},
         // ✅ FIXED: Accept all valid image formats (base64, http, https, blob)
         images: (formData.images || [])
           .filter(img => typeof img === 'string' && (img.startsWith('data:') || img.startsWith('http') || img.startsWith('blob:')))
