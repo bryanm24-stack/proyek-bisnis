@@ -34,7 +34,7 @@ export default function FavoritesPage() {
     const parsedUser = JSON.parse(userData);
     setUser(parsedUser);
 
-    if (parsedUser.role !== 'customer') {
+    if (!['customer', 'vendor'].includes(parsedUser.role)) {
       router.push('/');
       return;
     }
