@@ -614,7 +614,6 @@ export default function HomePageClient() {
   const specificationEntries = getNonEmptyObjectEntries(selectedService?.specifications);
   const descriptionTableEntries = getNonEmptyObjectEntries(selectedService?.descriptionTable);
   const variationEntries = getNonEmptyObjectEntries(selectedService?.variations);
-  const checklistEntries = getNonEmptyObjectEntries(selectedService?.checklist);
   const locationLabel = selectedService?.location || selectedService?.lokasi || '-';
   const categoryPath = [
     selectedService?.mainCategory,
@@ -1241,17 +1240,6 @@ export default function HomePageClient() {
                               </div>
                             ))}
                           </div>
-                        </div>
-                      )}
-
-                      {checklistEntries.length > 0 && (
-                        <div className="info-section">
-                          <h4>✅ Checklist</h4>
-                          <ul style={{ margin: '0', paddingLeft: '18px' }}>
-                            {checklistEntries.map(([key, value]) => (
-                              <li key={key}>{String(value) === 'true' ? formatFieldLabel(key) : String(value)}</li>
-                            ))}
-                          </ul>
                         </div>
                       )}
 

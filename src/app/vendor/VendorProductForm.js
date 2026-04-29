@@ -241,6 +241,7 @@ export default function VendorProductForm({
   const [editingVariasiId, setEditingVariasiId] = useState(null);
   const [variationName, setVariationName] = useState('');
   const [newOptionLabel, setNewOptionLabel] = useState('');
+  const [specOptionDrafts, setSpecOptionDrafts] = useState({});
   const [deletedSpecFields, setDeletedSpecFields] = useState(new Set());
 
   // Gunakan categories dari props atau default tree global vendor
@@ -427,12 +428,14 @@ export default function VendorProductForm({
     : CHECKLIST_BY_TYPE.barang;
 
   const specs = formData.specifications || {};
+  const specificationOptions = formData.specificationOptions || {};
   const descriptionTable = formData.descriptionTable || {};
   const checklist = formData.checklist || {};
   const requiredSpecCount = activeSpecTemplate.filter(field => field.required).length;
   const completedRequiredSpecCount = activeSpecTemplate
     .filter(field => field.required)
     .filter(field => Boolean((specs[field.key] || '').toString().trim())).length;
+  const activeSpecOptionFields = activeSpecTemplate.filter((field) => (specificationOptions[field.key]?.options || []).length > 0);
   const requiredDescriptionCount = activeDescriptionTemplate.filter(field => field.required).length;
   const completedDescriptionCount = activeDescriptionTemplate
     .filter(field => field.required)
@@ -487,6 +490,58 @@ export default function VendorProductForm({
       newSet.delete(fieldKey);
       return newSet;
     });
+  };
+
+  const handleSpecOptionDraftChange = (fieldKey, value) => {
+    setSpecOptionDrafts(prev => ({
+      ...prev,
+      [fieldKey]: value
+    }));
+  };
+
+  const handleAddSpecOption = (fieldKey) => {
+    const draftValue = (specOptionDrafts[fieldKey] || '').trim();
+    if (!draftValue) return;
+
+    const currentOptions = specificationOptions[fieldKey]?.options || [];
+    const isDuplicate = currentOptions.some((option) => option.label.toLowerCase() === draftValue.toLowerCase());
+    if (isDuplicate) {
+      alert('Opsi spesifikasi ini sudah ada. Gunakan nama opsi yang berbeda.');
+      return;
+    }
+
+    const newOptionId = `specopt${Date.now()}`;
+    setFormData(prev => ({
+      ...prev,
+      specificationOptions: {
+        ...(prev.specificationOptions || {}),
+        [fieldKey]: {
+          ...(prev.specificationOptions?.[fieldKey] || {}),
+          options: [
+            ...(prev.specificationOptions?.[fieldKey]?.options || []),
+            { id: newOptionId, label: draftValue }
+          ]
+        }
+      }
+    }));
+
+    setSpecOptionDrafts(prev => ({
+      ...prev,
+      [fieldKey]: ''
+    }));
+  };
+
+  const handleDeleteSpecOption = (fieldKey, optionId) => {
+    setFormData(prev => ({
+      ...prev,
+      specificationOptions: {
+        ...(prev.specificationOptions || {}),
+        [fieldKey]: {
+          ...(prev.specificationOptions?.[fieldKey] || {}),
+          options: (prev.specificationOptions?.[fieldKey]?.options || []).filter((option) => option.id !== optionId)
+        }
+      }
+    }));
   };
 
   // ========== VARIASI HANDLERS ==========
@@ -596,11 +651,31 @@ export default function VendorProductForm({
     }));
   };
 
+  const handleItemSpecOptionChange = (itemId, fieldKey, optionId) => {
+    setFormData(prev => ({
+      ...prev,
+      items: (prev.items || []).map(item => {
+        if (item.id !== itemId) {
+          return item;
+        }
+
+        return {
+          ...item,
+          specOptionValues: {
+            ...(item.specOptionValues || {}),
+            [fieldKey]: optionId
+          }
+        };
+      })
+    }));
+  };
+
   const handleAddItemRow = () => {
     const newItemId = `item-${Date.now()}`;
+    const baseSpecOptionValues = Object.fromEntries(activeSpecOptionFields.map((field) => [field.key, '']));
     const newItem = isBarangCategory(formData.mainCategory)
-      ? { id: newItemId, namaBarang: '', hargaPcs: '', stok: '', images: [], variationValues: {} }
-      : { id: newItemId, namaJasa: '', hargaSesi: '', images: [], variationValues: {} };
+      ? { id: newItemId, namaBarang: '', hargaPcs: '', stok: '', images: [], variationValues: {}, specOptionValues: baseSpecOptionValues }
+      : { id: newItemId, namaJasa: '', hargaSesi: '', images: [], variationValues: {}, specOptionValues: baseSpecOptionValues };
 
     setFormData(prev => ({
       ...prev,
@@ -777,6 +852,66 @@ export default function VendorProductForm({
       };
     });
   }, [activeDescriptionTemplate, activeRequirementChecklist, activeSpecTemplate, setFormData]);
+
+  useEffect(() => {
+    setFormData(prev => {
+      const variationEntries = Object.entries(prev.variations || {});
+      const currentOptionKeys = new Set(activeSpecOptionFields.map((field) => field.key));
+      const optionIdsByField = new Map(
+        activeSpecOptionFields.map((field) => [
+          field.key,
+          new Set((specificationOptions[field.key]?.options || []).map((option) => option.id))
+        ])
+      );
+
+      let hasChanges = false;
+      const nextItems = (prev.items || []).map((item) => {
+        const currentVariationValues = item.variationValues || {};
+        const nextVariationValues = {};
+        const currentSpecOptionValues = item.specOptionValues || {};
+        const nextSpecOptionValues = {};
+
+        variationEntries.forEach(([variationId, variation]) => {
+          const optionId = currentVariationValues[variationId];
+          if (optionId && (variation.options || []).some((option) => option.id === optionId)) {
+            nextVariationValues[variationId] = optionId;
+          }
+        });
+
+        activeSpecOptionFields.forEach((field) => {
+          const optionId = currentSpecOptionValues[field.key];
+          if (optionId && optionIdsByField.get(field.key)?.has(optionId)) {
+            nextSpecOptionValues[field.key] = optionId;
+          }
+        });
+
+        const currentVariationSignature = JSON.stringify(currentVariationValues);
+        const nextVariationSignature = JSON.stringify(nextVariationValues);
+        const currentSpecOptionSignature = JSON.stringify(currentSpecOptionValues);
+        const nextSpecOptionSignature = JSON.stringify(nextSpecOptionValues);
+
+        if (currentVariationSignature !== nextVariationSignature || currentSpecOptionSignature !== nextSpecOptionSignature || Object.keys(currentSpecOptionValues).some((key) => !currentOptionKeys.has(key))) {
+          hasChanges = true;
+          return {
+            ...item,
+            variationValues: nextVariationValues,
+            specOptionValues: nextSpecOptionValues
+          };
+        }
+
+        return item;
+      });
+
+      if (!hasChanges) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        items: nextItems
+      };
+    });
+  }, [activeSpecOptionFields, formData.variations, setFormData, specificationOptions]);
 
   return (
     <div style={{ background: 'white', padding: '40px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
@@ -1298,6 +1433,45 @@ export default function VendorProductForm({
                             </div>
                           </td>
                         </tr>
+                      ),
+                      activeSpecOptionFields.length > 0 && (
+                        <tr key={`specopt-${item.id}`} style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                          <td colSpan="5" style={{ padding: '12px 14px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                              {activeSpecOptionFields.map((field) => {
+                                const fieldOptions = specificationOptions[field.key]?.options || [];
+
+                                return (
+                                  <div key={field.key} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151' }}>
+                                      {field.label}
+                                    </label>
+                                    <select
+                                      value={item.specOptionValues?.[field.key] || ''}
+                                      onChange={(e) => handleItemSpecOptionChange(item.id, field.key, e.target.value)}
+                                      style={{
+                                        width: '100%',
+                                        padding: '8px 10px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        fontSize: '12px',
+                                        background: '#fff',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      <option value="">-- Pilih {field.label.toLowerCase()} --</option>
+                                      {fieldOptions.map((option) => (
+                                        <option key={option.id} value={option.id}>
+                                          {option.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        </tr>
                       )
                     ])}
                   </tbody>
@@ -1650,6 +1824,45 @@ export default function VendorProductForm({
                                   </select>
                                 </div>
                               ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ),
+                      activeSpecOptionFields.length > 0 && (
+                        <tr key={`specopt-${item.id}`} style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                          <td colSpan="4" style={{ padding: '12px 14px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                              {activeSpecOptionFields.map((field) => {
+                                const fieldOptions = specificationOptions[field.key]?.options || [];
+
+                                return (
+                                  <div key={field.key} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151' }}>
+                                      {field.label}
+                                    </label>
+                                    <select
+                                      value={item.specOptionValues?.[field.key] || ''}
+                                      onChange={(e) => handleItemSpecOptionChange(item.id, field.key, e.target.value)}
+                                      style={{
+                                        width: '100%',
+                                        padding: '8px 10px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        fontSize: '12px',
+                                        background: '#fff',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      <option value="">-- Pilih {field.label.toLowerCase()} --</option>
+                                      {fieldOptions.map((option) => (
+                                        <option key={option.id} value={option.id}>
+                                          {option.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </td>
                         </tr>
@@ -2114,17 +2327,36 @@ export default function VendorProductForm({
             </div>
 
             <div style={{ overflowY: 'auto', padding: '12px 20px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody>
-                  {/* Template Fields (filtered by deleted fields) */}
-                  {activeSpecTemplate
-                    .filter(field => !deletedSpecFields.has(field.key))
-                    .map((field) => (
-                    <tr key={field.key} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td style={{ width: '34%', minWidth: '220px', padding: '12px 10px', fontSize: '13px', color: '#374151', fontWeight: '600', verticalAlign: 'top' }}>
-                        {field.label}
-                      </td>
-                      <td style={{ padding: '10px', flex: 1 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {activeSpecTemplate
+                  .filter(field => !deletedSpecFields.has(field.key))
+                  .map((field) => {
+                    const fieldOptions = specificationOptions[field.key]?.options || [];
+
+                    return (
+                      <div key={field.key} style={{ border: '1px solid #e5e7eb', borderRadius: '12px', padding: '14px', background: '#fff' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+                          <label style={{ fontSize: '13px', fontWeight: '700', color: '#374151', margin: 0 }}>
+                            {field.label}
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSpec(field.key)}
+                            style={{
+                              padding: '4px 8px',
+                              background: '#fee2e2',
+                              color: '#dc2626',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              fontWeight: '600'
+                            }}
+                          >
+                            🗑️ Hapus
+                          </button>
+                        </div>
+
                         <input
                           type="text"
                           value={specs[field.key] || ''}
@@ -2140,30 +2372,93 @@ export default function VendorProductForm({
                             background: '#fff'
                           }}
                         />
-                      </td>
-                      <td style={{ padding: '10px 5px', textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteSpec(field.key)}
-                          style={{
-                            padding: '6px 10px',
-                            background: '#fee2e2',
-                            color: '#dc2626',
-                            border: 'none',
-                            borderRadius: '6px',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            fontWeight: '600'
-                          }}
-                        >
-                          🗑️ Hapus
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
 
-                </tbody>
-              </table>
+                        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed #e5e7eb' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: '600', color: '#374151' }}>
+                              Opsi Spesifikasi
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                              {fieldOptions.length} opsi
+                            </div>
+                          </div>
+
+                          {fieldOptions.length > 0 && (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px', marginBottom: '10px' }}>
+                              {fieldOptions.map((option) => (
+                                <div key={option.id} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                  <input
+                                    type="text"
+                                    value={option.label}
+                                    disabled
+                                    style={{
+                                      flex: 1,
+                                      padding: '8px 10px',
+                                      border: '1px solid #d1d5db',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      background: '#f9fafb',
+                                      color: '#6b7280'
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSpecOption(field.key, option.id)}
+                                    style={{
+                                      padding: '6px 8px',
+                                      background: '#fee2e2',
+                                      color: '#dc2626',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <input
+                              type="text"
+                              value={specOptionDrafts[field.key] || ''}
+                              onChange={(e) => handleSpecOptionDraftChange(field.key, e.target.value)}
+                              placeholder="Masukkan opsi baru"
+                              style={{
+                                flex: 1,
+                                padding: '10px 12px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '8px',
+                                fontSize: '13px',
+                                background: '#fff',
+                                boxSizing: 'border-box'
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddSpecOption(field.key)}
+                              style={{
+                                padding: '10px 16px',
+                                background: '#10b981',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              + Tambah Opsi
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
 
               <div style={{ marginTop: '16px', padding: '16px', border: '1px solid #e5e7eb', borderRadius: '12px', background: '#f8fafc' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '12px' }}>

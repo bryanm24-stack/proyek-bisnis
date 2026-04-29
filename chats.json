@@ -46,5 +46,39 @@
     ],
     "createdAt": "2026-04-23T16:54:33.496Z",
     "dealStatus": null
+  },
+  {
+    "id": "1777493750510",
+    "serviceId": "1704067202000",
+    "serviceTitle": "Paket Kursi & Meja Serbaguna",
+    "vendorId": "3",
+    "vendorName": "Orange Vendor",
+    "customerId": "4",
+    "customerName": "Strawberry Customer",
+    "messages": [
+      {
+        "id": "1777493750510",
+        "senderId": "4",
+        "senderName": "Strawberry Customer",
+        "message": "beli",
+        "timestamp": "2026-04-29T20:15:50.510Z"
+      },
+      {
+        "id": "1777493756588",
+        "senderId": "4",
+        "senderName": "Strawberry Customer",
+        "message": "sewa deh",
+        "timestamp": "2026-04-29T20:15:56.588Z"
+      },
+      {
+        "id": "1777493796515",
+        "senderId": "3",
+        "senderName": "Orange Vendor",
+        "message": "iya silahkah",
+        "timestamp": "2026-04-29T20:16:36.515Z"
+      }
+    ],
+    "createdAt": "2026-04-29T20:15:50.510Z",
+    "dealStatus": "agreed"
   }
 ]
