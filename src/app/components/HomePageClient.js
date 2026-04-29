@@ -613,6 +613,7 @@ export default function HomePageClient() {
   const filteredServices = getFilteredServices();
   const specificationEntries = getNonEmptyObjectEntries(selectedService?.specifications);
   const descriptionTableEntries = getNonEmptyObjectEntries(selectedService?.descriptionTable);
+  const variationEntries = getNonEmptyObjectEntries(selectedService?.variations);
   const checklistEntries = getNonEmptyObjectEntries(selectedService?.checklist);
   const locationLabel = selectedService?.location || selectedService?.lokasi || '-';
   const categoryPath = [
@@ -903,11 +904,6 @@ export default function HomePageClient() {
                     <p className="vendor-short-desc">
                       {shortDesc}
                     </p>
-                    {service.variations && Object.keys(service.variations).length > 0 && (
-                      <p className="vendor-variations" style={{ fontSize: '13px', color: '#374151', marginTop: '6px' }}>
-                        Variasi: {Object.values(service.variations).slice(0,2).map(v => `${v.name} (${(v.options||[]).length})`).join(' • ')}
-                      </p>
-                    )}
                     
                     <div className="vendor-stats">
                       <div className="stat-rating">
@@ -1217,6 +1213,27 @@ export default function HomePageClient() {
                                 <strong>{formatFieldLabel(key)}:</strong> {String(value)}
                               </div>
                             ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {variationEntries.length > 0 && (
+                        <div className="info-section">
+                          <h4>🎚️ Variasi</h4>
+                          <div style={{ display: 'grid', gap: '10px' }}>
+                            {variationEntries.map(([key, variation]) => {
+                              const variationName = variation?.name || formatFieldLabel(key);
+                              const optionLabels = Array.isArray(variation?.options)
+                                ? variation.options.map((option) => option.label).filter(Boolean)
+                                : [];
+
+                              return (
+                                <div key={key}>
+                                  <strong>{variationName}:</strong>{' '}
+                                  {optionLabels.length > 0 ? optionLabels.join(', ') : 'Belum ada opsi'}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
