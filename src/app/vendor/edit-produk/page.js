@@ -113,7 +113,6 @@ function EditProdukPageContent() {
       missingFields.push('Super-Sub Kategori');
     }
     if (!formData.title) missingFields.push('Nama Item');
-    if (!formData.price) missingFields.push('Harga per Hari');
     if (!formData.location) missingFields.push('Lokasi Pickup');
 
     if (missingFields.length > 0) {
@@ -141,7 +140,7 @@ function EditProdukPageContent() {
         shortDescription: formData.shortDescription,
         detailDescription: formData.description,
         description: formData.description,
-        price: parseInt(formData.price),
+        price: formData.price ? parseInt(formData.price) : undefined,
         minimumDays: parseInt(formData.minimumDays),
         quantity: derivedQuantity,
         rentalPolicy: formData.rentalPolicy,

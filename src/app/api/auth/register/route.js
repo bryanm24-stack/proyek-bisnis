@@ -11,7 +11,9 @@ export async function POST(request) {
     const filePath = path.join(process.cwd(), 'users.json');
     
     // Baca isi file
-    const fileData = await fs.readFile(filePath, 'utf-8');
+    let fileData = await fs.readFile(filePath, 'utf-8');
+    // Remove BOM if present
+    fileData = fileData.replace(/^\uFEFF/, '').trim();
     const users = JSON.parse(fileData);
 
     // Cek apakah username sudah terdaftar
