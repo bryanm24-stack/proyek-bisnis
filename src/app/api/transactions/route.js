@@ -4,6 +4,32 @@ import path from 'path';
 const transactionsFile = path.join(process.cwd(), 'transactions.json');
 const invoicesFile = path.join(process.cwd(), 'invoices.json');
 const dealsFile = path.join(process.cwd(), 'deals.json');
+const chatsFile = path.join(process.cwd(), 'chats.json');
+
+const buildRentalTimeline = (startDate, durationDays) => {
+  const parsedStartDate = startDate ? new Date(`${startDate}T00:00:00.000Z`) : null;
+  const parsedDurationDays = Number(durationDays || 0);
+
+  if (!parsedStartDate || Number.isNaN(parsedStartDate.getTime()) || parsedDurationDays <= 0) {
+    return {
+      borrowDate: startDate || null,
+      expectedReturnDate: null,
+      returnDeadline: null
+    };
+  }
+
+  const expectedReturnDate = new Date(parsedStartDate);
+  expectedReturnDate.setUTCDate(expectedReturnDate.getUTCDate() + parsedDurationDays);
+
+  const returnDeadline = new Date(expectedReturnDate);
+  returnDeadline.setUTCDate(returnDeadline.getUTCDate() - 1);
+
+  return {
+    borrowDate: parsedStartDate.toISOString(),
+    expectedReturnDate: expectedReturnDate.toISOString(),
+    returnDeadline: returnDeadline.toISOString()
+  };
+};
 
 // Ensure JSON files exist
 const ensureTransactionsFile = () => {
@@ -64,6 +90,18 @@ export async function POST(request) {
       identityVerification,
       createdAt: new Date().toISOString()
     };
+
+    const rentalTimeline = buildRentalTimeline(body.startDate, body.durationDays);
+    newTransaction.borrowDate = rentalTimeline.borrowDate;
+    newTransaction.expectedReturnDate = rentalTimeline.expectedReturnDate;
+    newTransaction.returnDeadline = rentalTimeline.returnDeadline;
+    newTransaction.returnStatus = 'pending';
+    newTransaction.actualReturnDate = null;
+    newTransaction.daysLate = 0;
+    newTransaction.lateCharge = 0;
+    newTransaction.returnCondition = null;
+    newTransaction.returnNotes = '';
+    newTransaction.lastReminderSent = null;
     
     transactions.push(newTransaction);
     
@@ -152,13 +190,47 @@ export async function POST(request) {
             remainingPayment: isPayAfter ? body.remainingPayment : 0,
             invoiceStatus: isPayAfter ? 'pending' : 'paid',
             paymentDeadline: isPayAfter ? paymentDeadlineDate.toISOString() : null,
-            invoiceId: newInvoice.id
+            invoiceId: newInvoice.id,
+            borrowDate: rentalTimeline.borrowDate || deals[dealIndex].borrowDate || null,
+            expectedReturnDate: rentalTimeline.expectedReturnDate || deals[dealIndex].expectedReturnDate || null,
+            returnDeadline: rentalTimeline.returnDeadline || deals[dealIndex].returnDeadline || null,
+            returnStatus: deals[dealIndex].returnStatus || 'pending',
+            actualReturnDate: deals[dealIndex].actualReturnDate || null,
+            daysLate: deals[dealIndex].daysLate || 0,
+            lateCharge: deals[dealIndex].lateCharge || 0,
+            returnCondition: deals[dealIndex].returnCondition || null,
+            returnNotes: deals[dealIndex].returnNotes || '',
+            lastReminderSent: deals[dealIndex].lastReminderSent || null,
+            durationDays: body.durationDays,
+            startDate: body.startDate
           };
           fs.writeFileSync(dealsFile, JSON.stringify(deals, null, 2));
         }
       } catch (dealError) {
         console.warn('Could not update deal:', dealError);
       }
+
+        // Close the related chat after payment is successful so the conversation stops.
+        try {
+          if (body.dealId) {
+            const chatsData = fs.readFileSync(chatsFile, 'utf-8');
+            const chats = JSON.parse(chatsData);
+            const relatedDeal = JSON.parse(fs.readFileSync(dealsFile, 'utf-8')).find((item) => item.id === body.dealId);
+            const chatIndex = chats.findIndex((item) => item.id === relatedDeal?.chatId);
+
+            if (chatIndex !== -1) {
+              chats[chatIndex] = {
+                ...chats[chatIndex],
+                dealStatus: 'closed',
+                closedAt: new Date().toISOString(),
+                closedReason: 'payment_completed'
+              };
+              fs.writeFileSync(chatsFile, JSON.stringify(chats, null, 2));
+            }
+          }
+        } catch (chatError) {
+          console.warn('Could not close chat after payment:', chatError);
+        }
     }
     
     return Response.json({ success: true, transaction: newTransaction }, { status: 201 });

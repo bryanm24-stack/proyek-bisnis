@@ -254,7 +254,17 @@ export async function POST(request) {
           discountGiven: false,
           discount: { type: null, value: 0, amount: 0 },
           originalPrice: originalPrice,
-          finalPrice: originalPrice
+          finalPrice: originalPrice,
+          borrowDate: null,
+          expectedReturnDate: null,
+          actualReturnDate: null,
+          returnDeadline: null,
+          returnStatus: 'pending',
+          daysLate: 0,
+          lateCharge: 0,
+          returnCondition: null,
+          returnNotes: '',
+          lastReminderSent: null
         };
 
         deals.push(newDeal);
@@ -275,6 +285,16 @@ export async function POST(request) {
         // ensure discount fields exist
         if (typeof existingDeal.discountGiven === 'undefined') existingDeal.discountGiven = false;
         if (!existingDeal.discount) existingDeal.discount = { type: null, value: 0, amount: 0 };
+        if (typeof existingDeal.borrowDate === 'undefined') existingDeal.borrowDate = null;
+        if (typeof existingDeal.expectedReturnDate === 'undefined') existingDeal.expectedReturnDate = null;
+        if (typeof existingDeal.actualReturnDate === 'undefined') existingDeal.actualReturnDate = null;
+        if (typeof existingDeal.returnDeadline === 'undefined') existingDeal.returnDeadline = null;
+        if (typeof existingDeal.returnStatus === 'undefined') existingDeal.returnStatus = 'pending';
+        if (typeof existingDeal.daysLate === 'undefined') existingDeal.daysLate = 0;
+        if (typeof existingDeal.lateCharge === 'undefined') existingDeal.lateCharge = 0;
+        if (typeof existingDeal.returnCondition === 'undefined') existingDeal.returnCondition = null;
+        if (typeof existingDeal.returnNotes === 'undefined') existingDeal.returnNotes = '';
+        if (typeof existingDeal.lastReminderSent === 'undefined') existingDeal.lastReminderSent = null;
         // load original price if missing
         if (typeof existingDeal.originalPrice === 'undefined' || existingDeal.originalPrice === null) {
           try {
