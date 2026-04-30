@@ -68,6 +68,13 @@ export async function GET(request) {
         service,
         otherUser,
         chat,
+        borrowDate: deal.borrowDate || null,
+        expectedReturnDate: deal.expectedReturnDate || null,
+        actualReturnDate: deal.actualReturnDate || null,
+        returnDeadline: deal.returnDeadline || null,
+        returnStatus: deal.returnStatus || 'pending',
+        daysLate: deal.daysLate || 0,
+        lateCharge: deal.lateCharge || 0,
         customerConfirmed: deal.customerConfirmed || false,
         vendorConfirmed: deal.vendorConfirmed || false,
         complains: deal.complains || []

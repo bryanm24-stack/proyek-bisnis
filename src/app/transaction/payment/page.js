@@ -85,9 +85,7 @@ function PaymentContent() {
           throw new Error(`API error: ${response.status}`);
         }
         const deals = await response.json();
-        console.log('All deals:', deals);
         const currentDeal = deals.find(d => d.id === dealId);
-        console.log(`Looking for deal: ${dealId}`, currentDeal);
         setDeal(currentDeal);
       } catch (error) {
         console.error('Error fetching deal:', error);
@@ -199,6 +197,16 @@ function PaymentContent() {
         totalAmount: totalAmount,
         status: 'success',
         timestamp: new Date().toISOString(),
+        borrowDate: startDate,
+        expectedReturnDate: expectedReturnDate ? expectedReturnDate.toISOString() : null,
+        returnDeadline: expectedReturnDate ? new Date(expectedReturnDate.getTime() - (24 * 60 * 60 * 1000)).toISOString() : null,
+        returnStatus: 'pending',
+        actualReturnDate: null,
+        daysLate: 0,
+        lateCharge: 0,
+        returnCondition: null,
+        returnNotes: '',
+        lastReminderSent: null,
         identityVerification,
         promo: appliedPromo
           ? {
@@ -335,7 +343,20 @@ function PaymentContent() {
   const downPayment = Math.round(totalAmount * 0.2); // 20% down payment
   const remainingPayment = totalAmount - downPayment; // 80% remaining
   const isService = deal?.itemName?.toLowerCase().includes('jasa') || false;
-  const quantityLabel = isService ? 'Hari' : 'Unit';
+  const quantityLabel = isService ? 'Hari' : 'Item';
+  const borrowDateLabel = startDate
+    ? new Date(`${startDate}T00:00:00.000Z`).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
+    : '-';
+  const expectedReturnDate = startDate
+    ? (() => {
+        const result = new Date(`${startDate}T00:00:00.000Z`);
+        result.setUTCDate(result.getUTCDate() + durationDays);
+        return result;
+      })()
+    : null;
+  const expectedReturnDateLabel = expectedReturnDate
+    ? expectedReturnDate.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
+    : '-';
 
   useEffect(() => {
     if (appliedPromo) {
@@ -378,13 +399,6 @@ function PaymentContent() {
 
       {/* Main Content */}
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '40px 20px' }}>
-        {/* Debug Info - Remove later */}
-        {deal && (
-          <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '12px', marginBottom: '20px', fontSize: '12px', fontFamily: 'monospace', color: '#b91c1c' }}>
-            <strong>DEBUG DEAL:</strong> ID={deal.id} | Price={deal.totalPrice} | Vendor={deal.vendorName} | Item={deal.itemName}
-          </div>
-        )}
-
         {step === 'detail' ? (
           // STEP 1: Detail Pesanan
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '32px' }}>
@@ -430,7 +444,7 @@ function PaymentContent() {
               {/* Detail Pesanan */}
               <div style={{ background: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                 <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#1f2937', marginBottom: '24px' }}>Detail Pesanan</h2>
-                <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>Tentukan jumlah dan durasi sewa</p>
+                <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>Tentukan jumlah dan durasi peminjaman</p>
 
                 <div style={{ marginBottom: '20px', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', background: '#fafafa' }}>
                   <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Kode Promo</label>
@@ -493,14 +507,13 @@ function PaymentContent() {
                   )}
                 </div>
 
-                {/* Durasi Sewa */}
+                {/* Durasi Hari */}
                 <div style={{ marginBottom: '20px' }}>
-                  <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Durasi Sewa ({quantityLabel})</label>
+                  <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Durasi Hari</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <button onClick={() => setDurationDays(Math.max(1, durationDays - 1))} style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '18px', fontWeight: '700', color: '#7c3aed' }}>−</button>
                     <input type="number" value={durationDays} onChange={(e) => setDurationDays(Math.max(1, parseInt(e.target.value) || 1))} style={{ width: '80px', textAlign: 'center', border: '1px solid #ddd', borderRadius: '8px', padding: '8px', fontSize: '14px', fontWeight: '600' }} min="1" />
                     <button onClick={() => setDurationDays(durationDays + 1)} style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '18px', fontWeight: '700', color: '#7c3aed' }}>+</button>
-                    <span style={{ fontSize: '14px', color: '#6b7280', marginLeft: '12px' }}>{quantityLabel}</span>
                   </div>
                 </div>
 
@@ -514,6 +527,16 @@ function PaymentContent() {
                 <div>
                   <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Tanggal Mulai Sewa</label>
                   <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ width: '100%', border: '1px solid #ddd', borderRadius: '8px', padding: '12px', fontSize: '14px' }} />
+                  <div style={{ marginTop: '10px', padding: '12px', background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', color: '#374151' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '6px' }}>
+                      <span style={{ color: '#6b7280' }}>Tanggal pinjam</span>
+                      <strong>{borrowDateLabel}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                      <span style={{ color: '#6b7280' }}>Estimasi kembali</span>
+                      <strong>{expectedReturnDateLabel}</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -533,7 +556,7 @@ function PaymentContent() {
                     <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>{quantity}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '13px', color: '#6b7280' }}>Durasi sewa</span>
+                    <span style={{ fontSize: '13px', color: '#6b7280' }}>Durasi hari</span>
                     <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>{durationDays} {quantityLabel}</span>
                   </div>
                 </div>
