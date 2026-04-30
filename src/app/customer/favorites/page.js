@@ -434,11 +434,15 @@ export default function FavoritesPage() {
 
         {/* Services Grid */}
         {loading ? (
-          <p style={{ textAlign: 'center', padding: '40px', color: '#999' }}>Memuat layanan...</p>
+          <div className="vendor-grid">
+            <p style={{ padding: '40px', color: '#999' }}>Memuat layanan...</p>
+          </div>
         ) : filteredServices.length === 0 ? (
-          <p style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-            Belum ada layanan favorit di kategori ini
-          </p>
+          <div className="vendor-grid">
+            <p style={{ padding: '40px', color: '#999' }}>
+              Belum ada layanan favorit di kategori ini
+            </p>
+          </div>
         ) : (
           <div className="vendor-grid">
             {filteredServices.map(service => {

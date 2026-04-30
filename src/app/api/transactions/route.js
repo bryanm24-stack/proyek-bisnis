@@ -48,6 +48,66 @@ export async function POST(request) {
     const transactionsData = fs.readFileSync(transactionsFile, 'utf-8');
     let transactions = JSON.parse(transactionsData);
     
+    // AVAILABILITY CHECK - Validasi stok sebelum payment diproses
+    if (body.serviceId && body.quantity && body.startDate) {
+      try {
+        const servicesFile = path.join(process.cwd(), 'services.json');
+        let servicesData = fs.readFileSync(servicesFile, 'utf-8');
+        servicesData = servicesData.replace(/^\uFEFF/, '').trim();
+        const services = JSON.parse(servicesData);
+
+        const service = services.find(s => String(s.id) === String(body.serviceId));
+        if (service) {
+          const totalQuantity = Number(service.quantity) || Number(service.jumlahBarang) || 0;
+          
+          // Calculate end date if not provided
+          let endDate = body.endDate;
+          if (!endDate && body.startDate && body.durationDays) {
+            const start = new Date(body.startDate);
+            const end = new Date(start);
+            end.setDate(end.getDate() + (Number(body.durationDays) || 1));
+            endDate = end.toISOString().split('T')[0];
+          }
+
+          // Check for overlapping bookings
+          const startDateTime = new Date(body.startDate);
+          const endDateTime = new Date(endDate || body.startDate);
+          
+          let bookedQuantity = 0;
+          const bookings = service.bookings || [];
+          
+          for (const booking of bookings) {
+            if (booking.status === 'cancelled') continue;
+            
+            const bookingStart = new Date(booking.startDate);
+            const bookingEnd = new Date(booking.endDate);
+            
+            // Check for overlap
+            if (bookingStart < endDateTime && bookingEnd > startDateTime) {
+              bookedQuantity += booking.quantity || 0;
+            }
+          }
+
+          const availableQuantity = totalQuantity - bookedQuantity;
+          
+          if (availableQuantity < body.quantity) {
+            console.warn(`AVAILABILITY CHECK FAILED: Service ${body.serviceId} - Available: ${availableQuantity}, Requested: ${body.quantity}`);
+            return Response.json({
+              success: false,
+              error: 'Stok tidak mencukupi',
+              message: `Stok barang tidak cukup untuk periode ini. Tersedia: ${availableQuantity} dari ${body.quantity} yang diminta`,
+              availableQuantity,
+              requestedQuantity: body.quantity,
+              status: 'availability_check_failed'
+            }, { status: 400 });
+          }
+        }
+      } catch (availabilityError) {
+        console.warn('Availability check warning:', availabilityError.message);
+        // Don't fail on availability check errors, continue with transaction
+      }
+    }
+    
     // Add new transaction
     const identityVerification = body.identityVerification
       ? {
@@ -158,6 +218,66 @@ export async function POST(request) {
         }
       } catch (dealError) {
         console.warn('Could not update deal:', dealError);
+      }
+    }
+
+    // RESERVE BOOKING - Buat booking record saat payment sukses (full payment atau down payment)
+    if (body.status === 'success' && body.serviceId && body.quantity && body.startDate) {
+      try {
+        const servicesFile = path.join(process.cwd(), 'services.json');
+        let servicesData = fs.readFileSync(servicesFile, 'utf-8');
+        servicesData = servicesData.replace(/^\uFEFF/, '').trim();
+        const services = JSON.parse(servicesData);
+
+        const serviceIndex = services.findIndex(s => String(s.id) === String(body.serviceId));
+        if (serviceIndex !== -1) {
+          const service = services[serviceIndex];
+
+          // Initialize bookings array if not exists
+          if (!service.bookings) {
+            service.bookings = [];
+          }
+
+          // Calculate end date
+          let endDate = body.endDate;
+          if (!endDate && body.durationDays) {
+            const start = new Date(body.startDate);
+            const end = new Date(start);
+            end.setDate(end.getDate() + Number(body.durationDays));
+            endDate = end.toISOString().split('T')[0];
+          }
+
+          // Create booking record
+          const newBooking = {
+            id: `BOOKING-${Date.now()}`,
+            transactionId: body.id,
+            dealId: body.dealId,
+            quantity: Number(body.quantity),
+            startDate: body.startDate,
+            endDate: endDate || body.startDate,
+            status: 'confirmed',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+
+          service.bookings.push(newBooking);
+
+          // Recalculate availableQuantity
+          const totalQuantity = Number(service.quantity) || Number(service.jumlahBarang) || 0;
+          let bookedQuantity = 0;
+          for (const booking of service.bookings) {
+            if (booking.status !== 'cancelled' && booking.status !== 'completed') {
+              bookedQuantity += booking.quantity || 0;
+            }
+          }
+          service.availableQuantity = Math.max(0, totalQuantity - bookedQuantity);
+
+          fs.writeFileSync(servicesFile, JSON.stringify(services, null, 2));
+          console.log(`Booking reserved: Transaction ${body.id}, Service ${body.serviceId}, Qty: ${body.quantity}`);
+        }
+      } catch (reservationError) {
+        console.warn('Reservation creation warning:', reservationError.message);
+        // Don't fail transaction if reservation fails
       }
     }
     

@@ -36,6 +36,8 @@ function PaymentContent() {
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [discountAmount, setDiscountAmount] = useState(0);
   const [paymentType, setPaymentType] = useState('full'); // 'full' or 'pay_after'
+  const [availabilityCheck, setAvailabilityCheck] = useState(null); // null, 'checking', 'available', 'unavailable'
+  const [availabilityMessage, setAvailabilityMessage] = useState('');
 
   const generateRandomQR = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -141,6 +143,12 @@ function PaymentContent() {
   const handlePayment = async (e) => {
     e.preventDefault();
 
+    // AVAILABILITY CHECK - Validasi ketersediaan sebelum payment
+    if (availabilityCheck !== 'available') {
+      alert('❌ Barang tidak tersedia untuk periode ini. Silakan ubah tanggal atau jumlah barang.');
+      return;
+    }
+
     if (paymentMethod === 'card' && !validateCardDetails()) {
       return;
     }
@@ -167,6 +175,7 @@ function PaymentContent() {
         id: `TRX-${Date.now()}`,
         dealId: dealId,
         userId: user.id,
+        serviceId: deal?.serviceId || deal?.id,
         paymentMethod: paymentMethod,
         basePrice: basePrice,
         quantity: quantity,
@@ -174,6 +183,12 @@ function PaymentContent() {
         durationDays: durationDays,
         notes: notes,
         startDate: startDate,
+        endDate: (() => {
+          const start = new Date(startDate);
+          const end = new Date(start);
+          end.setDate(end.getDate() + durationDays);
+          return end.toISOString().split('T')[0];
+        })(),
         paymentType: paymentType,
         amount: paymentType === 'pay_after' ? downPayment : discountedSubtotal,
         downPayment: paymentType === 'pay_after' ? downPayment : null,
@@ -206,6 +221,13 @@ function PaymentContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(transactionData)
       });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        alert(`❌ ${result.message || result.error || 'Gagal memproses pembayaran'}`);
+        return;
+      }
 
       if (response.ok) {
         localStorage.removeItem('verificationData');
@@ -261,6 +283,50 @@ function PaymentContent() {
     setPromoMessage('Promo dihapus.');
   };
 
+  // AVAILABILITY CHECK - Validasi ketersediaan barang
+  const checkAvailability = async (qty, duration, startDt) => {
+    if (!deal?.id || !qty || !startDt) {
+      setAvailabilityCheck(null);
+      setAvailabilityMessage('');
+      return;
+    }
+
+    try {
+      setAvailabilityCheck('checking');
+      
+      // Calculate end date
+      const startDateTime = new Date(startDt);
+      const endDateTime = new Date(startDateTime);
+      endDateTime.setDate(endDateTime.getDate() + (Number(duration) || 1));
+      const endDateStr = endDateTime.toISOString().split('T')[0];
+
+      const response = await fetch('/api/availability/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceId: deal.serviceId || deal.id,
+          quantity: Number(qty),
+          startDate: startDt,
+          endDate: endDateStr
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success && result.available) {
+        setAvailabilityCheck('available');
+        setAvailabilityMessage(`✅ Stok tersedia: ${result.availableQuantity} dari ${result.totalQuantity} unit`);
+      } else {
+        setAvailabilityCheck('unavailable');
+        setAvailabilityMessage(`❌ ${result.message || 'Stok tidak tersedia untuk periode ini'}`);
+      }
+    } catch (error) {
+      console.error('Availability check error:', error);
+      setAvailabilityCheck('unavailable');
+      setAvailabilityMessage('Gagal mengecek ketersediaan');
+    }
+  };
+
   const serviceFee = 25000;
   const basePrice = deal?.totalPrice || 0;
   const totalPrice = basePrice * quantity * durationDays;
@@ -278,6 +344,15 @@ function PaymentContent() {
       setPromoMessage('Subtotal berubah, silakan terapkan ulang kode promo.');
     }
   }, [quantity, durationDays, basePrice, appliedPromo]);
+
+  // CHECK AVAILABILITY - Saat quantity, duration, atau startDate berubah
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      checkAvailability(quantity, durationDays, startDate);
+    }, 500); // Debounce 500ms
+
+    return () => clearTimeout(timer);
+  }, [quantity, durationDays, startDate, deal]);
 
   if (isLoading) {
     return <div style={{ padding: '40px', textAlign: 'center', minHeight: '100vh', background: '#f5f3ff' }}>⏳ Loading...</div>;
@@ -299,18 +374,7 @@ function PaymentContent() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f5f3ff' }}>
-      {/* Navbar */}
-      <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', padding: '16px 24px' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Link href="/" style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '24px', lineHeight: '1' }}>🛡️</span>
-            RentGuard
-          </Link>
-          <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', color: '#666' }}>
-            ← Kembali
-          </button>
-        </div>
-      </div>
+      <SharedNavbar />
 
       {/* Main Content */}
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '40px 20px' }}>
@@ -410,6 +474,23 @@ function PaymentContent() {
                     <button onClick={() => setQuantity(quantity + 1)} style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '18px', fontWeight: '700', color: '#7c3aed' }}>+</button>
                     <span style={{ fontSize: '14px', color: '#6b7280', marginLeft: '12px' }}>item</span>
                   </div>
+
+                  {/* AVAILABILITY STATUS */}
+                  {availabilityMessage && (
+                    <div style={{
+                      marginTop: '12px',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      background: availabilityCheck === 'available' ? '#dcfce7' : '#fee2e2',
+                      color: availabilityCheck === 'available' ? '#15803d' : '#b91c1c',
+                      border: `1px solid ${availabilityCheck === 'available' ? '#86efac' : '#fca5a5'}`
+                    }}>
+                      {availabilityCheck === 'checking' && '⏳ Memeriksa ketersediaan...'}
+                      {availabilityMessage}
+                    </div>
+                  )}
                 </div>
 
                 {/* Durasi Sewa */}
