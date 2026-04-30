@@ -153,6 +153,17 @@ export default function CustomerOngoingPage() {
           <div className={styles.dealsList}>
             {ongoingDeals.map(deal => {
               const imageUrl = deal.service?.image || (deal.service?.images && deal.service.images.length > 0 ? deal.service.images[0] : 'https://via.placeholder.com/300x200?text=' + encodeURIComponent(deal.service?.title || 'Service'));
+              const borrowDateLabel = deal.borrowDate
+                ? new Date(deal.borrowDate).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' })
+                : '-';
+              const expectedReturnDateLabel = deal.expectedReturnDate
+                ? new Date(deal.expectedReturnDate).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' })
+                : '-';
+              const returnStatusLabel = deal.returnStatus === 'late'
+                ? 'Terlambat'
+                : deal.returnStatus === 'returned'
+                  ? 'Sudah Dikembalikan'
+                  : 'Menunggu Pengembalian';
               
               return (
               <div key={deal.id} className={styles.dealCard}>
@@ -177,6 +188,17 @@ export default function CustomerOngoingPage() {
                     </span>
                     <span className={deal.vendorConfirmed ? styles.confirmed : styles.pending}>
                       {deal.vendorConfirmed ? '✓ Vendor Confirm' : '⊘ Vendor Belum Confirm'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className={styles.dealStatus}>
+                  <span className={styles.statusLabel}>Tanggal Peminjaman:</span>
+                  <div className={styles.statusContainer}>
+                    <span className={styles.confirmed}>Mulai: {borrowDateLabel}</span>
+                    <span className={styles.pending}>Kembali: {expectedReturnDateLabel}</span>
+                    <span className={deal.returnStatus === 'returned' ? styles.confirmed : styles.pending}>
+                      {returnStatusLabel}
                     </span>
                   </div>
                 </div>

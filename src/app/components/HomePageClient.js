@@ -402,6 +402,10 @@ export default function HomePageClient() {
     if (!newMessage.trim()) return;
     if (!selectedService) return;
     if (!user) return;
+    if (chatData?.dealStatus === 'closed') {
+      alert('Chat sudah ditutup setelah pembayaran selesai.');
+      return;
+    }
 
     try {
       console.log('[sendMessage] Sending:', newMessage);
@@ -1511,7 +1515,7 @@ export default function HomePageClient() {
                 {(() => {
                   const statusConfig = getDealStatusConfig();
                   const finalPrice = dealData?.finalPrice || dealData?.originalPrice || 0;
-                  const dealDisabled = dealData?.status === 'agreed' || dealData?.status === 'cancelled';
+                  const dealDisabled = dealData?.status === 'agreed' || dealData?.status === 'cancelled' || chatData?.dealStatus === 'closed';
 
                   return (
                     <div
@@ -1528,6 +1532,11 @@ export default function HomePageClient() {
                       <div style={{ fontSize: '12px', color: '#4b5563', marginTop: '3px' }}>
                         {statusConfig.description}
                       </div>
+                      {chatData?.dealStatus === 'closed' && (
+                        <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: '700', color: '#92400e' }}>
+                          Chat sudah ditutup setelah pembayaran selesai.
+                        </div>
+                      )}
 
                       <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                         <button
@@ -1610,6 +1619,7 @@ export default function HomePageClient() {
                     placeholder="Ketik pesan..."
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
+                    disabled={chatData?.dealStatus === 'closed'}
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         sendMessage();

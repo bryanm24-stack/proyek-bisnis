@@ -133,6 +133,10 @@ export default function VendorChatsPage() {
 
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
+    if (selectedChat?.dealStatus === 'closed') {
+      alert('Chat sudah ditutup setelah pembayaran selesai.');
+      return;
+    }
 
     try {
       const response = await fetch('/api/chat', {
@@ -680,11 +684,17 @@ export default function VendorChatsPage() {
                 display: 'flex',
                 gap: '10px'
               }}>
+                {selectedChat?.dealStatus === 'closed' && (
+                  <div style={{ marginBottom: '10px', padding: '10px 12px', borderRadius: '8px', background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e', fontSize: '13px', width: '100%' }}>
+                    Chat sudah ditutup setelah pembayaran selesai.
+                  </div>
+                )}
                 <input
                   type="text"
                   placeholder="Ketik pesan..."
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
+                  disabled={selectedChat?.dealStatus === 'closed'}
                   onKeyPress={(e) => {
                     if (e.key === 'Enter') {
                       sendMessage();
@@ -696,11 +706,14 @@ export default function VendorChatsPage() {
                     border: '1px solid #ddd',
                     borderRadius: '8px',
                     fontSize: '14px',
-                    fontFamily: 'inherit'
+                    fontFamily: 'inherit',
+                    opacity: selectedChat?.dealStatus === 'closed' ? 0.6 : 1,
+                    cursor: selectedChat?.dealStatus === 'closed' ? 'not-allowed' : 'text'
                   }}
                 />
                 <button
                   onClick={sendMessage}
+                  disabled={selectedChat?.dealStatus === 'closed'}
                   style={{
                     padding: '10px 16px',
                     border: 'none',
@@ -708,7 +721,8 @@ export default function VendorChatsPage() {
                     background: '#5A45D1',
                     color: 'white',
                     fontWeight: '600',
-                    cursor: 'pointer'
+                    cursor: selectedChat?.dealStatus === 'closed' ? 'not-allowed' : 'pointer',
+                    opacity: selectedChat?.dealStatus === 'closed' ? 0.6 : 1
                   }}
                 >
                   Kirim
