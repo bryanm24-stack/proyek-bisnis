@@ -6,15 +6,25 @@ import { useRouter, usePathname } from 'next/navigation';
 
 export default function SharedNavbar() {
   const [user, setUser] = useState(null);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
+    setIsHydrated(true);
     const userData = localStorage.getItem('user');
-    if (userData) {
+
+    if (!userData) {
+      setUser(null);
+      return;
+    }
+
+    try {
       setUser(JSON.parse(userData));
+    } catch {
+      setUser(null);
     }
   }, []);
 
@@ -56,7 +66,7 @@ export default function SharedNavbar() {
     return pathname === href || pathname.startsWith(href + '/');
   };
 
-  if (!user) {
+  if (!isHydrated || !user) {
     return null;
   }
 
@@ -124,6 +134,20 @@ export default function SharedNavbar() {
               }}>
               📋 Invoice
             </Link>
+
+            <Link 
+              href="/customer/favorites" 
+              style={{ 
+                fontSize: '14px', 
+                color: isActive('/customer/favorites') ? '#7c3aed' : '#666', 
+                textDecoration: 'none', 
+                fontWeight: isActive('/customer/favorites') ? '600' : '500',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                background: isActive('/customer/favorites') ? '#f0e6ff' : 'transparent'
+              }}>
+              ❤️ Favorit
+            </Link>
           </>
         )}
 
@@ -141,6 +165,20 @@ export default function SharedNavbar() {
                 background: isActive('/vendor/invoices') ? '#f0e6ff' : 'transparent'
               }}>
               📋 Invoice
+            </Link>
+
+            <Link 
+              href="/vendor/favorites" 
+              style={{ 
+                fontSize: '14px', 
+                color: isActive('/vendor/favorites') ? '#7c3aed' : '#666', 
+                textDecoration: 'none', 
+                fontWeight: isActive('/vendor/favorites') ? '600' : '500',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                background: isActive('/vendor/favorites') ? '#f0e6ff' : 'transparent'
+              }}>
+              ❤️ Favorit
             </Link>
 
             <Link 

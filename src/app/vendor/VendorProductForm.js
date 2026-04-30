@@ -232,18 +232,17 @@ export default function VendorProductForm({
   categories = null,
   isEditing = false
 }) {
-  const [selectedMainCategory, setSelectedMainCategory] = useState(formData.mainCategory || '');
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
   const [draftMainCategory, setDraftMainCategory] = useState(formData.mainCategory || '');
   const [draftSubCategory, setDraftSubCategory] = useState(formData.subCategory || '');
   const [draftSuperSubCategory, setDraftSuperSubCategory] = useState(formData.superSubCategory || '');
   const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
-  const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
-
-  useEffect(() => {
-    setSelectedMainCategory(formData.mainCategory || '');
-  }, [formData.mainCategory]);
+  const [editingVariasiId, setEditingVariasiId] = useState(null);
+  const [variationName, setVariationName] = useState('');
+  const [newOptionLabel, setNewOptionLabel] = useState('');
+  const [specOptionDrafts, setSpecOptionDrafts] = useState({});
+  const [deletedSpecFields, setDeletedSpecFields] = useState(new Set());
 
   // Gunakan categories dari props atau default tree global vendor
   const CATEGORIES = categories || ALL_VENDOR_CATEGORY_TREE;
@@ -258,7 +257,7 @@ export default function VendorProductForm({
   };
 
   const openCategoryPicker = () => {
-    setDraftMainCategory(formData.mainCategory || selectedMainCategory || '');
+    setDraftMainCategory(formData.mainCategory || '');
     setDraftSubCategory(formData.subCategory || '');
     setDraftSuperSubCategory(formData.superSubCategory || '');
     setCategorySearch('');
@@ -284,7 +283,6 @@ export default function VendorProductForm({
   const handleConfirmCategory = () => {
     if (!draftMainCategory) return;
 
-    setSelectedMainCategory(draftMainCategory);
     setFormData(prev => ({
       ...prev,
       mainCategory: draftMainCategory,
@@ -299,12 +297,65 @@ export default function VendorProductForm({
   const handleImageUpload = (e) => {
     const files = e.target.files;
     if (files) {
-      const imageUrls = Array.from(files).map(file => URL.createObjectURL(file));
-      setFormData(prev => ({
-        ...prev,
-        images: imageUrls
-      }));
+      const maxImages = 5;
+      const currentCount = (formData.images || []).length;
+      const availableSlots = maxImages - currentCount;
+      
+      if (availableSlots <= 0) {
+        alert(`⚠️ Sudah mencapai maksimal 5 foto. Hapus foto untuk menambah yang baru.`);
+        e.target.value = ''; // Reset file input
+        return;
+      }
+      
+      const filesToProcess = Array.from(files).slice(0, availableSlots);
+      
+      if (files.length > availableSlots) {
+        alert(`⚠️ Hanya bisa tambah ${availableSlots} foto lagi (sudah ${currentCount}/${maxImages}).`);
+      }
+      
+      // Convert files to Base64
+      Promise.all(
+        filesToProcess.map(file => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              resolve(event.target.result);
+            };
+            reader.readAsDataURL(file);
+          });
+        })
+      ).then(base64Images => {
+        setFormData(prev => {
+          const existingCount = (prev.images || []).length;
+          const remainingSlots = maxImages - existingCount;
+          const imagesToAdd = base64Images.slice(0, remainingSlots);
+          
+          return {
+            ...prev,
+            images: [...(prev.images || []), ...imagesToAdd]
+          };
+        });
+        e.target.value = ''; // Reset file input
+      });
     }
+  };
+
+  const handleRemoveImage = (idx) => {
+    setFormData(prev => ({
+      ...prev,
+      images: (prev.images || []).filter((_, i) => i !== idx)
+    }));
+  };
+
+  const handleRemoveItemImage = (itemId, imgIdx) => {
+    setFormData(prev => ({
+      ...prev,
+      items: (prev.items || []).map(item =>
+        item.id === itemId
+          ? { ...item, images: (item.images || []).filter((_, i) => i !== imgIdx) }
+          : item
+      )
+    }));
   };
 
   const mainCategories = Object.keys(normalizedCategoryTree);
@@ -364,6 +415,7 @@ export default function VendorProductForm({
   const isJasaSelected = serviceMainCategorySet.has(formData.mainCategory);
   const entityLabel = isJasaSelected ? 'Jasa' : 'Barang';
   const activeCategoryPath = getCategoryPath(formData.mainCategory, formData.subCategory, formData.superSubCategory);
+  const selectedMainCategory = formData.mainCategory || '';
   const hasValidSelectedMainCategory = !!selectedMainCategory && mainCategories.includes(selectedMainCategory);
   const activeSpecTemplate = isJasaSelected
     ? resolveJasaSpecGroup(activeCategoryPath)
@@ -376,12 +428,14 @@ export default function VendorProductForm({
     : CHECKLIST_BY_TYPE.barang;
 
   const specs = formData.specifications || {};
+  const specificationOptions = formData.specificationOptions || {};
   const descriptionTable = formData.descriptionTable || {};
   const checklist = formData.checklist || {};
   const requiredSpecCount = activeSpecTemplate.filter(field => field.required).length;
   const completedRequiredSpecCount = activeSpecTemplate
     .filter(field => field.required)
     .filter(field => Boolean((specs[field.key] || '').toString().trim())).length;
+  const activeSpecOptionFields = activeSpecTemplate.filter((field) => (specificationOptions[field.key]?.options || []).length > 0);
   const requiredDescriptionCount = activeDescriptionTemplate.filter(field => field.required).length;
   const completedDescriptionCount = activeDescriptionTemplate
     .filter(field => field.required)
@@ -426,11 +480,202 @@ export default function VendorProductForm({
     }));
   };
 
+  const handleDeleteSpec = (fieldKey) => {
+    setDeletedSpecFields(prev => new Set([...prev, fieldKey]));
+  };
+
+  const handleRestoreSpec = (fieldKey) => {
+    setDeletedSpecFields(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(fieldKey);
+      return newSet;
+    });
+  };
+
+  const handleSpecOptionDraftChange = (fieldKey, value) => {
+    setSpecOptionDrafts(prev => ({
+      ...prev,
+      [fieldKey]: value
+    }));
+  };
+
+  const handleAddSpecOption = (fieldKey) => {
+    const draftValue = (specOptionDrafts[fieldKey] || '').trim();
+    if (!draftValue) return;
+
+    const currentOptions = specificationOptions[fieldKey]?.options || [];
+    const isDuplicate = currentOptions.some((option) => option.label.toLowerCase() === draftValue.toLowerCase());
+    if (isDuplicate) {
+      alert('Opsi spesifikasi ini sudah ada. Gunakan nama opsi yang berbeda.');
+      return;
+    }
+
+    const newOptionId = `specopt${Date.now()}`;
+    setFormData(prev => ({
+      ...prev,
+      specificationOptions: {
+        ...(prev.specificationOptions || {}),
+        [fieldKey]: {
+          ...(prev.specificationOptions?.[fieldKey] || {}),
+          options: [
+            ...(prev.specificationOptions?.[fieldKey]?.options || []),
+            { id: newOptionId, label: draftValue }
+          ]
+        }
+      }
+    }));
+
+    setSpecOptionDrafts(prev => ({
+      ...prev,
+      [fieldKey]: ''
+    }));
+  };
+
+  const handleDeleteSpecOption = (fieldKey, optionId) => {
+    setFormData(prev => ({
+      ...prev,
+      specificationOptions: {
+        ...(prev.specificationOptions || {}),
+        [fieldKey]: {
+          ...(prev.specificationOptions?.[fieldKey] || {}),
+          options: (prev.specificationOptions?.[fieldKey]?.options || []).filter((option) => option.id !== optionId)
+        }
+      }
+    }));
+  };
+
+  // ========== VARIASI HANDLERS ==========
+  const variations = formData.variations || {};
+  const variationCount = Object.keys(variations).length;
+
+  const handleAddVariation = () => {
+    if (!variationName.trim()) return;
+    
+    const newVariasiId = `variasi${Date.now()}`;
+    setFormData(prev => ({
+      ...prev,
+      variations: {
+        ...(prev.variations || {}),
+        [newVariasiId]: {
+          id: newVariasiId,
+          name: variationName,
+          options: []
+        }
+      }
+    }));
+    
+    setVariationName('');
+    setEditingVariasiId(newVariasiId);
+  };
+
+  const handleDeleteVariation = (variasiId) => {
+    setFormData(prev => ({
+      ...prev,
+      variations: Object.keys(prev.variations || {})
+        .filter(id => id !== variasiId)
+        .reduce((acc, id) => {
+          acc[id] = prev.variations[id];
+          return acc;
+        }, {}),
+      items: (prev.items || []).map((item) => {
+        if (!item.variationValues || !Object.prototype.hasOwnProperty.call(item.variationValues, variasiId)) {
+          return item;
+        }
+
+        const nextVariationValues = { ...item.variationValues };
+        delete nextVariationValues[variasiId];
+
+        return {
+          ...item,
+          variationValues: nextVariationValues
+        };
+      })
+    }));
+  };
+
+  const handleRenameVariation = (variasiId, newName) => {
+    if (!newName.trim()) return;
+    
+    setFormData(prev => ({
+      ...prev,
+      variations: {
+        ...(prev.variations || {}),
+        [variasiId]: {
+          ...prev.variations[variasiId],
+          name: newName
+        }
+      }
+    }));
+  };
+
+  const handleAddOption = (variasiId) => {
+    if (!newOptionLabel.trim()) return;
+    
+    // Check duplikat
+    const currentOptions = formData.variations?.[variasiId]?.options || [];
+    const isDuplicate = currentOptions.some(opt => opt.label.toLowerCase() === newOptionLabel.toLowerCase());
+    
+    if (isDuplicate) {
+      alert('Opsi ini sudah ada! Gunakan nama opsi yang berbeda.');
+      return;
+    }
+    
+    const newOptionId = `opt${Date.now()}`;
+    setFormData(prev => ({
+      ...prev,
+      variations: {
+        ...(prev.variations || {}),
+        [variasiId]: {
+          ...prev.variations[variasiId],
+          options: [
+            ...(prev.variations[variasiId]?.options || []),
+            { id: newOptionId, label: newOptionLabel }
+          ]
+        }
+      }
+    }));
+    
+    setNewOptionLabel('');
+  };
+
+  const handleDeleteOption = (variasiId, optionId) => {
+    setFormData(prev => ({
+      ...prev,
+      variations: {
+        ...(prev.variations || {}),
+        [variasiId]: {
+          ...prev.variations[variasiId],
+          options: (prev.variations[variasiId]?.options || []).filter(opt => opt.id !== optionId)
+        }
+      }
+    }));
+  };
+
+  const handleItemSpecOptionChange = (itemId, fieldKey, optionId) => {
+    setFormData(prev => ({
+      ...prev,
+      items: (prev.items || []).map(item => {
+        if (item.id !== itemId) {
+          return item;
+        }
+
+        return {
+          ...item,
+          specOptionValues: {
+            ...(item.specOptionValues || {}),
+            [fieldKey]: optionId
+          }
+        };
+      })
+    }));
+  };
+
   const handleAddItemRow = () => {
     const newItemId = `item-${Date.now()}`;
+    const baseSpecOptionValues = Object.fromEntries(activeSpecOptionFields.map((field) => [field.key, '']));
     const newItem = isBarangCategory(formData.mainCategory)
-      ? { id: newItemId, namaBarang: '', hargaPcs: '', stok: '', images: [] }
-      : { id: newItemId, namaJasa: '', hargaSesi: '', images: [] };
+      ? { id: newItemId, namaBarang: '', hargaPcs: '', stok: '', images: [], variationValues: {}, specOptionValues: baseSpecOptionValues }
+      : { id: newItemId, namaJasa: '', hargaSesi: '', images: [], variationValues: {}, specOptionValues: baseSpecOptionValues };
 
     setFormData(prev => ({
       ...prev,
@@ -454,17 +699,67 @@ export default function VendorProductForm({
     }));
   };
 
+  const handleItemVariationChange = (itemId, variasiId, optionId) => {
+    setFormData(prev => ({
+      ...prev,
+      items: (prev.items || []).map(item => {
+        if (item.id === itemId) {
+          return {
+            ...item,
+            variationValues: {
+              ...(item.variationValues || {}),
+              [variasiId]: optionId
+            }
+          };
+        }
+        return item;
+      })
+    }));
+  };
+
   const handleItemImageUpload = (itemId, files) => {
     if (files && files.length > 0) {
-      const imageUrl = URL.createObjectURL(files[0]);
-      setFormData(prev => ({
-        ...prev,
-        items: (prev.items || []).map(item =>
-          item.id === itemId
-            ? { ...item, images: [imageUrl] }
-            : item
-        )
-      }));
+      const maxImages = 5;
+      const item = (formData.items || []).find(i => i.id === itemId);
+      const currentCount = (item?.images || []).length;
+      const availableSlots = maxImages - currentCount;
+      
+      if (availableSlots <= 0) {
+        alert(`⚠️ Item ini sudah mencapai maksimal 5 foto. Hapus foto untuk menambah yang baru.`);
+        return;
+      }
+      
+      const filesToProcess = Array.from(files).slice(0, availableSlots);
+      
+      if (files.length > availableSlots) {
+        alert(`⚠️ Item ini hanya bisa tambah ${availableSlots} foto lagi (sudah ${currentCount}/${maxImages}).`);
+      }
+      
+      // Convert files to Base64
+      Promise.all(
+        filesToProcess.map(file => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              resolve(event.target.result);
+            };
+            reader.readAsDataURL(file);
+          });
+        })
+      ).then(base64Images => {
+        setFormData(prev => ({
+          ...prev,
+          items: (prev.items || []).map(i => {
+            if (i.id === itemId) {
+              const existingCount = (i.images || []).length;
+              const remainingSlots = maxImages - existingCount;
+              const imagesToAdd = base64Images.slice(0, remainingSlots);
+              return { ...i, images: [...(i.images || []), ...imagesToAdd] };
+            }
+            return i;
+          })
+        }));
+      });
     }
   };
 
@@ -472,7 +767,6 @@ export default function VendorProductForm({
     if (!formData.mainCategory) return;
 
     if (!mainCategories.includes(formData.mainCategory)) {
-      setSelectedMainCategory('');
       setFormData(prev => ({
         ...prev,
         mainCategory: '',
@@ -559,6 +853,66 @@ export default function VendorProductForm({
     });
   }, [activeDescriptionTemplate, activeRequirementChecklist, activeSpecTemplate, setFormData]);
 
+  useEffect(() => {
+    setFormData(prev => {
+      const variationEntries = Object.entries(prev.variations || {});
+      const currentOptionKeys = new Set(activeSpecOptionFields.map((field) => field.key));
+      const optionIdsByField = new Map(
+        activeSpecOptionFields.map((field) => [
+          field.key,
+          new Set((specificationOptions[field.key]?.options || []).map((option) => option.id))
+        ])
+      );
+
+      let hasChanges = false;
+      const nextItems = (prev.items || []).map((item) => {
+        const currentVariationValues = item.variationValues || {};
+        const nextVariationValues = {};
+        const currentSpecOptionValues = item.specOptionValues || {};
+        const nextSpecOptionValues = {};
+
+        variationEntries.forEach(([variationId, variation]) => {
+          const optionId = currentVariationValues[variationId];
+          if (optionId && (variation.options || []).some((option) => option.id === optionId)) {
+            nextVariationValues[variationId] = optionId;
+          }
+        });
+
+        activeSpecOptionFields.forEach((field) => {
+          const optionId = currentSpecOptionValues[field.key];
+          if (optionId && optionIdsByField.get(field.key)?.has(optionId)) {
+            nextSpecOptionValues[field.key] = optionId;
+          }
+        });
+
+        const currentVariationSignature = JSON.stringify(currentVariationValues);
+        const nextVariationSignature = JSON.stringify(nextVariationValues);
+        const currentSpecOptionSignature = JSON.stringify(currentSpecOptionValues);
+        const nextSpecOptionSignature = JSON.stringify(nextSpecOptionValues);
+
+        if (currentVariationSignature !== nextVariationSignature || currentSpecOptionSignature !== nextSpecOptionSignature || Object.keys(currentSpecOptionValues).some((key) => !currentOptionKeys.has(key))) {
+          hasChanges = true;
+          return {
+            ...item,
+            variationValues: nextVariationValues,
+            specOptionValues: nextSpecOptionValues
+          };
+        }
+
+        return item;
+      });
+
+      if (!hasChanges) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        items: nextItems
+      };
+    });
+  }, [activeSpecOptionFields, formData.variations, setFormData, specificationOptions]);
+
   return (
     <div style={{ background: 'white', padding: '40px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
       <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '32px', color: '#1f2937' }}>
@@ -594,10 +948,10 @@ export default function VendorProductForm({
       )}
 
       <form onSubmit={onSubmit} style={{ display: 'grid', gap: '24px' }}>
-        {/* Kategori Utama */}
+        {/* Jasa atau Barang */}
         <div>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            📦 Kategori Utama *
+            🧭 Jasa atau Barang
           </label>
           <button
             type="button"
@@ -622,14 +976,14 @@ export default function VendorProductForm({
             <span style={{ color: '#6b7280', marginLeft: '8px' }}>▼</span>
           </button>
           <p style={{ marginTop: '8px', marginBottom: 0, fontSize: '12px', color: hasValidSelectedMainCategory ? '#6b7280' : '#dc2626' }}>
-            Pilih kategori, sub kategori, dan super-sub kategori (jika tersedia).
+            Pilih kategori jasa/barang, sub kategori, dan super-sub kategori (jika tersedia).
           </p>
         </div>
 
         {/* Nama Barang/Jasa */}
         <div>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            📝 Nama {entityLabel} *
+            📝 Nama {entityLabel}
           </label>
           <input
             type="text"
@@ -644,30 +998,6 @@ export default function VendorProductForm({
               borderRadius: '8px',
               fontSize: '14px',
               boxSizing: 'border-box'
-            }}
-            required
-          />
-        </div>
-
-        {/* Deskripsi Singkat */}
-        <div>
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            ✍️ Deskripsi Singkat {entityLabel} *
-          </label>
-          <textarea
-            name="shortDescription"
-            placeholder="Jelaskan singkat tentang item ini..."
-            value={formData.shortDescription || ''}
-            onChange={handleInputChange}
-            rows="2"
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #ddd',
-              borderRadius: '8px',
-              fontSize: '14px',
-              boxSizing: 'border-box',
-              fontFamily: 'inherit'
             }}
             required
           />
@@ -697,49 +1027,42 @@ export default function VendorProductForm({
         </div>
 
         {/* Shortcut Popup Tabel */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <button
-            type="button"
-            onClick={() => setIsSpecModalOpen(true)}
-            style={{
-              border: '1px solid #e5e7eb',
-              borderRadius: '10px',
-              padding: '14px 16px',
-              textAlign: 'left',
-              cursor: 'pointer',
-              background: '#fff'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong style={{ color: '#111827' }}>🧩 Tabel Spesifikasi {entityLabel}</strong>
-              <span style={{ fontSize: '12px', color: '#6b7280' }}>{completedRequiredSpecCount}/{requiredSpecCount}</span>
-            </div>
-            <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#6b7280' }}>Klik untuk isi spesifikasi {entityLabel.toLowerCase()} via popup.</p>
-          </button>
+        <button
+          type="button"
+          onClick={() => setIsSpecModalOpen(true)}
+          style={{
+            width: '100%',
+            border: '1px solid #e5e7eb',
+            borderRadius: '10px',
+            padding: '14px 16px',
+            textAlign: 'left',
+            cursor: 'pointer',
+            background: '#fff'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <strong style={{ color: '#111827' }}>🧩 Tabel Spesifikasi {entityLabel}</strong>
+            <span style={{ fontSize: '12px', color: '#6b7280' }}>{completedRequiredSpecCount}/{requiredSpecCount}</span>
+          </div>
+          <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#6b7280' }}>Klik untuk isi spesifikasi {entityLabel.toLowerCase()} via popup.</p>
+        </button>
 
-          <button
-            type="button"
-            onClick={() => setIsDescriptionModalOpen(true)}
-            style={{
-              border: '1px solid #e5e7eb',
-              borderRadius: '10px',
-              padding: '14px 16px',
-              textAlign: 'left',
-              cursor: 'pointer',
-              background: '#fff'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong style={{ color: '#111827' }}>📄 Tabel Deskripsi {entityLabel}</strong>
-              <span style={{ fontSize: '12px', color: '#6b7280' }}>{completedDescriptionCount}/{requiredDescriptionCount}</span>
-            </div>
-            <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#6b7280' }}>Klik untuk isi deskripsi {entityLabel.toLowerCase()} via popup.</p>
-          </button>
+        <div style={{
+          border: '1px solid #e5e7eb',
+          borderRadius: '10px',
+          padding: '14px 16px',
+          background: '#f9fafb'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <strong style={{ color: '#111827' }}>● Variasi</strong>
+            <span style={{ fontSize: '12px', color: '#6b7280' }}>{variationCount} variasi aktif</span>
+          </div>
+          <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#6b7280' }}>Kelola variasi langsung dari popup spesifikasi.</p>
         </div>
 
         {/* Conditional Items Table - BARANG or JASA */}
         {isBarangCategory(formData.mainCategory) ? (
-          // BARANG: Tabel Per Unit dengan Nama Barang | Harga/Pcs | Stok
+          // BARANG: Katalog Barang/Aset dengan detail per pcs
           <div style={{ 
             border: '1px solid #e5e7eb', 
             borderRadius: '12px', 
@@ -749,7 +1072,7 @@ export default function VendorProductForm({
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <label style={{ fontSize: '15px', fontWeight: '700', color: '#111827', margin: 0 }}>
-                📦 Detail {entityLabel} - Per Unit/Pcs
+                📦 Katalog Barang / Aset
               </label>
               <button
                 type="button"
@@ -784,7 +1107,7 @@ export default function VendorProductForm({
                 border: '1px dashed #d1d5db'
               }}>
                 <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
-                  Belum ada detail {entityLabel.toLowerCase()} ditambahkan. Klik tombol "Tambah Baris" untuk memulai.
+                  Belum ada detail {entityLabel.toLowerCase()} ditambahkan. Klik tombol &quot;Tambah Baris&quot; untuk memulai.
                 </p>
               </div>
             ) : (
@@ -844,7 +1167,7 @@ export default function VendorProductForm({
                     </tr>
                   </thead>
                   <tbody>
-                    {(formData.items || []).map((item, idx) => (
+                    {(formData.items || []).map((item, idx) => [
                       <tr key={item.id} style={{ 
                         borderBottom: '1px solid #e5e7eb',
                         background: idx % 2 === 0 ? '#ffffff' : '#f9fafb',
@@ -855,19 +1178,55 @@ export default function VendorProductForm({
                       >
                         <td style={{ padding: '12px 14px', textAlign: 'center', verticalAlign: 'middle' }}>
                           <div style={{ position: 'relative', width: '60px', height: '60px', margin: '0 auto' }}>
-                            {item.images && item.images[0] ? (
-                              <img
-                                src={item.images[0]}
-                                alt="preview"
-                                style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover',
-                                  borderRadius: '6px',
-                                  border: '1px solid #d1d5db',
-                                  cursor: 'pointer'
-                                }}
-                              />
+                            {item.images && item.images.length > 0 ? (
+                              <div style={{ position: 'relative' }}>
+                                <img
+                                  src={item.images[0]}
+                                  alt="preview"
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                    borderRadius: '6px',
+                                    border: '1px solid #d1d5db',
+                                    cursor: 'pointer'
+                                  }}
+                                  title={`${item.images.length} foto`}
+                                />
+                                {item.images.length > 1 && (
+                                  <span style={{
+                                    position: 'absolute',
+                                    bottom: '2px',
+                                    right: '2px',
+                                    background: 'rgba(0,0,0,0.6)',
+                                    color: 'white',
+                                    fontSize: '10px',
+                                    padding: '2px 4px',
+                                    borderRadius: '3px'
+                                  }}>
+                                    +{item.images.length - 1}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveItemImage(item.id, 0)}
+                                  style={{
+                                    position: 'absolute',
+                                    top: '-8px',
+                                    right: '-8px',
+                                    width: '20px',
+                                    height: '20px',
+                                    borderRadius: '50%',
+                                    background: '#ef4444',
+                                    color: 'white',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: 'bold'
+                                  }}
+                                  title="Hapus foto"
+                                />
+                              </div>
                             ) : (
                               <div
                                 style={{
@@ -888,6 +1247,7 @@ export default function VendorProductForm({
                             )}
                             <input
                               type="file"
+                              multiple
                               accept="image/*"
                               onChange={(e) => handleItemImageUpload(item.id, e.target.files)}
                               style={{
@@ -901,6 +1261,53 @@ export default function VendorProductForm({
                               title="Klik untuk upload gambar"
                             />
                           </div>
+                          {item.images && item.images.length > 1 && (
+                            <div style={{
+                              marginTop: '8px',
+                              display: 'flex',
+                              gap: '4px',
+                              flexWrap: 'wrap',
+                              justifyContent: 'center'
+                            }}>
+                              {item.images.slice(1, 5).map((img, imgIdx) => (
+                                <div key={imgIdx + 1} style={{ position: 'relative', width: '30px', height: '30px' }}>
+                                  <img
+                                    src={img}
+                                    alt={`preview ${imgIdx + 1}`}
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover',
+                                      borderRadius: '3px',
+                                      border: '1px solid #d1d5db'
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveItemImage(item.id, imgIdx + 1)}
+                                    style={{
+                                      position: 'absolute',
+                                      top: '-6px',
+                                      right: '-6px',
+                                      width: '16px',
+                                      height: '16px',
+                                      borderRadius: '50%',
+                                      background: '#ef4444',
+                                      color: 'white',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      fontSize: '10px',
+                                      fontWeight: 'bold',
+                                      padding: 0
+                                    }}
+                                    title="Hapus"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
                           <input
@@ -991,19 +1398,93 @@ export default function VendorProductForm({
                             ✕
                           </button>
                         </td>
-                      </tr>
-                    ))}
+                      </tr>,
+                      Object.keys(variations).length > 0 && (
+                        <tr key={`var-${item.id}`} style={{ background: '#f0f9ff', borderBottom: '1px solid #e5e7eb' }}>
+                          <td colSpan="5" style={{ padding: '12px 14px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                              {Object.entries(variations).map(([variasiId, variasi]) => (
+                                <div key={variasiId} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151' }}>
+                                    {variasi.name}
+                                  </label>
+                                  <select
+                                    value={item.variationValues?.[variasiId] || ''}
+                                    onChange={(e) => handleItemVariationChange(item.id, variasiId, e.target.value)}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 10px',
+                                      border: '1px solid #d1d5db',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      background: '#fff',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    <option value="">-- Pilih {variasi.name.toLowerCase()} --</option>
+                                    {(variasi.options || []).map((option) => (
+                                      <option key={option.id} value={option.id}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ),
+                      activeSpecOptionFields.length > 0 && (
+                        <tr key={`specopt-${item.id}`} style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                          <td colSpan="5" style={{ padding: '12px 14px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                              {activeSpecOptionFields.map((field) => {
+                                const fieldOptions = specificationOptions[field.key]?.options || [];
+
+                                return (
+                                  <div key={field.key} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151' }}>
+                                      {field.label}
+                                    </label>
+                                    <select
+                                      value={item.specOptionValues?.[field.key] || ''}
+                                      onChange={(e) => handleItemSpecOptionChange(item.id, field.key, e.target.value)}
+                                      style={{
+                                        width: '100%',
+                                        padding: '8px 10px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        fontSize: '12px',
+                                        background: '#fff',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      <option value="">-- Pilih {field.label.toLowerCase()} --</option>
+                                      {fieldOptions.map((option) => (
+                                        <option key={option.id} value={option.id}>
+                                          {option.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    ])}
                   </tbody>
                 </table>
               </div>
             )}
 
             <p style={{ margin: '12px 0 0', fontSize: '12px', color: '#6b7280' }}>
-              💡 Tip: Masukkan setiap varian/tipe barang dengan harga satuan dan stok tersedia. Contoh: Laptop A (3 unit @2jt), Laptop B (2 unit @1.5jt)
+              💡 Tip: Masukkan setiap varian/tipe barang/aset dengan harga per pcs. Contoh: Laptop A (3 unit @2jt), Laptop B (2 unit @1.5jt)
             </p>
           </div>
         ) : (
-          // JASA: Tabel Sederhana dengan Nama Jasa/Paket | Harga Per Hari/Sesi
+          // JASA: Katalog product dan harga
           <div style={{ 
             border: '1px solid #e5e7eb', 
             borderRadius: '12px', 
@@ -1013,7 +1494,7 @@ export default function VendorProductForm({
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <label style={{ fontSize: '15px', fontWeight: '700', color: '#111827', margin: 0 }}>
-                💼 Paket {entityLabel}
+                🗂️ Katalog Product & Harga
               </label>
               <button
                 type="button"
@@ -1048,7 +1529,7 @@ export default function VendorProductForm({
                 border: '1px dashed #d1d5db'
               }}>
                 <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
-                  Belum ada paket {entityLabel.toLowerCase()} ditambahkan. Klik tombol "Tambah Paket" untuk memulai.
+                  Belum ada paket {entityLabel.toLowerCase()} ditambahkan. Klik tombol &quot;Tambah Paket&quot; untuk memulai.
                 </p>
               </div>
             ) : (
@@ -1099,7 +1580,7 @@ export default function VendorProductForm({
                     </tr>
                   </thead>
                   <tbody>
-                    {(formData.items || []).map((item, idx) => (
+                    {(formData.items || []).map((item, idx) => [
                       <tr key={item.id} style={{ 
                         borderBottom: '1px solid #e5e7eb',
                         background: idx % 2 === 0 ? '#ffffff' : '#f9fafb',
@@ -1110,19 +1591,55 @@ export default function VendorProductForm({
                       >
                         <td style={{ padding: '12px 14px', textAlign: 'center', verticalAlign: 'middle' }}>
                           <div style={{ position: 'relative', width: '60px', height: '60px', margin: '0 auto' }}>
-                            {item.images && item.images[0] ? (
-                              <img
-                                src={item.images[0]}
-                                alt="preview"
-                                style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover',
-                                  borderRadius: '6px',
-                                  border: '1px solid #d1d5db',
-                                  cursor: 'pointer'
-                                }}
-                              />
+                            {item.images && item.images.length > 0 ? (
+                              <div style={{ position: 'relative' }}>
+                                <img
+                                  src={item.images[0]}
+                                  alt="preview"
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                    borderRadius: '6px',
+                                    border: '1px solid #d1d5db',
+                                    cursor: 'pointer'
+                                  }}
+                                  title={`${item.images.length} foto`}
+                                />
+                                {item.images.length > 1 && (
+                                  <span style={{
+                                    position: 'absolute',
+                                    bottom: '2px',
+                                    right: '2px',
+                                    background: 'rgba(0,0,0,0.6)',
+                                    color: 'white',
+                                    fontSize: '10px',
+                                    padding: '2px 4px',
+                                    borderRadius: '3px'
+                                  }}>
+                                    +{item.images.length - 1}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveItemImage(item.id, 0)}
+                                  style={{
+                                    position: 'absolute',
+                                    top: '-8px',
+                                    right: '-8px',
+                                    width: '20px',
+                                    height: '20px',
+                                    borderRadius: '50%',
+                                    background: '#ef4444',
+                                    color: 'white',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: 'bold'
+                                  }}
+                                  title="Hapus foto"
+                                />
+                              </div>
                             ) : (
                               <div
                                 style={{
@@ -1143,6 +1660,7 @@ export default function VendorProductForm({
                             )}
                             <input
                               type="file"
+                              multiple
                               accept="image/*"
                               onChange={(e) => handleItemImageUpload(item.id, e.target.files)}
                               style={{
@@ -1156,6 +1674,53 @@ export default function VendorProductForm({
                               title="Klik untuk upload gambar"
                             />
                           </div>
+                          {item.images && item.images.length > 1 && (
+                            <div style={{
+                              marginTop: '8px',
+                              display: 'flex',
+                              gap: '4px',
+                              flexWrap: 'wrap',
+                              justifyContent: 'center'
+                            }}>
+                              {item.images.slice(1, 5).map((img, imgIdx) => (
+                                <div key={imgIdx + 1} style={{ position: 'relative', width: '30px', height: '30px' }}>
+                                  <img
+                                    src={img}
+                                    alt={`preview ${imgIdx + 1}`}
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover',
+                                      borderRadius: '3px',
+                                      border: '1px solid #d1d5db'
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveItemImage(item.id, imgIdx + 1)}
+                                    style={{
+                                      position: 'absolute',
+                                      top: '-6px',
+                                      right: '-6px',
+                                      width: '16px',
+                                      height: '16px',
+                                      borderRadius: '50%',
+                                      background: '#ef4444',
+                                      color: 'white',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      fontSize: '10px',
+                                      fontWeight: 'bold',
+                                      padding: 0
+                                    }}
+                                    title="Hapus"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
                           <input
@@ -1227,43 +1792,98 @@ export default function VendorProductForm({
                             ✕
                           </button>
                         </td>
-                      </tr>
-                    ))}
+                      </tr>,
+                      Object.keys(variations).length > 0 && (
+                        <tr key={`var-${item.id}`} style={{ background: '#eff6ff', borderBottom: '1px solid #e5e7eb' }}>
+                          <td colSpan="4" style={{ padding: '12px 14px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                              {Object.entries(variations).map(([variasiId, variasi]) => (
+                                <div key={variasiId} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151' }}>
+                                    {variasi.name}
+                                  </label>
+                                  <select
+                                    value={item.variationValues?.[variasiId] || ''}
+                                    onChange={(e) => handleItemVariationChange(item.id, variasiId, e.target.value)}
+                                    style={{
+                                      width: '100%',
+                                      padding: '8px 10px',
+                                      border: '1px solid #d1d5db',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      background: '#fff',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    <option value="">-- Pilih {variasi.name.toLowerCase()} --</option>
+                                    {(variasi.options || []).map((option) => (
+                                      <option key={option.id} value={option.id}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ),
+                      activeSpecOptionFields.length > 0 && (
+                        <tr key={`specopt-${item.id}`} style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                          <td colSpan="4" style={{ padding: '12px 14px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                              {activeSpecOptionFields.map((field) => {
+                                const fieldOptions = specificationOptions[field.key]?.options || [];
+
+                                return (
+                                  <div key={field.key} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151' }}>
+                                      {field.label}
+                                    </label>
+                                    <select
+                                      value={item.specOptionValues?.[field.key] || ''}
+                                      onChange={(e) => handleItemSpecOptionChange(item.id, field.key, e.target.value)}
+                                      style={{
+                                        width: '100%',
+                                        padding: '8px 10px',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        fontSize: '12px',
+                                        background: '#fff',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      <option value="">-- Pilih {field.label.toLowerCase()} --</option>
+                                      {fieldOptions.map((option) => (
+                                        <option key={option.id} value={option.id}>
+                                          {option.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    ])}
                   </tbody>
                 </table>
               </div>
             )}
 
             <p style={{ margin: '12px 0 0', fontSize: '12px', color: '#6b7280' }}>
-              💡 Tip: Bisa tambahkan paket berbeda dengan harga berbeda. Contoh: "Half Day (8 jam)", "Full Day (12 jam)", "Custom Duration"
+              💡 Tip: Bisa tambahkan paket berbeda dengan harga berbeda. Contoh: &quot;Half Day (8 jam)&quot;, &quot;Full Day (12 jam)&quot;, &quot;Custom Duration&quot;
             </p>
           </div>
         )}
-
-        {/* Checklist Kelengkapan */}
-        <div style={{ border: '1px dashed #d1d5db', borderRadius: '10px', padding: '16px', background: '#ffffff' }}>
-          <label style={{ display: 'block', fontSize: '15px', fontWeight: '700', marginBottom: '10px', color: '#111827' }}>
-            ✅ Checklist Kelengkapan Listing
-          </label>
-          <div style={{ display: 'grid', gap: '8px' }}>
-            {activeRequirementChecklist.map((item) => (
-              <label key={item} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#374151' }}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(checklist[item])}
-                  onChange={(e) => handleChecklistChange(item, e.target.checked)}
-                />
-                {item}
-              </label>
-            ))}
-          </div>
-        </div>
 
         {/* Harga Sewa */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div>
             <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-              💰 Harga per Hari (Rp) *
+              💰 Harga per Hari (Rp)
             </label>
             <input
               type="number"
@@ -1286,7 +1906,7 @@ export default function VendorProductForm({
 
           <div>
             <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-              📅 Durasi Minimum Sewa (hari) *
+              📅 Durasi Minimum Sewa (hari)
             </label>
             <input
               type="number"
@@ -1306,30 +1926,6 @@ export default function VendorProductForm({
               required
             />
           </div>
-        </div>
-
-        {/* Stok/Jumlah Tersedia */}
-        <div>
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            📊 Jumlah {entityLabel} Tersedia *
-          </label>
-          <input
-            type="number"
-            name="quantity"
-            placeholder="Contoh: 5"
-            value={formData.quantity || ''}
-            onChange={handleInputChange}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #ddd',
-              borderRadius: '8px',
-              fontSize: '14px',
-              boxSizing: 'border-box'
-            }}
-            min="1"
-            required
-          />
         </div>
 
         {/* Kebijakan Sewa */}
@@ -1358,7 +1954,7 @@ export default function VendorProductForm({
         {/* Lokasi Pickup */}
         <div>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            📍 Lokasi Pickup/Pengiriman *
+            📍 Lokasi Pickup/Pengiriman
           </label>
           <input
             type="text"
@@ -1400,12 +1996,40 @@ export default function VendorProductForm({
           {formData.images && formData.images.length > 0 && (
             <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '12px' }}>
               {formData.images.slice(0, 5).map((img, idx) => (
-                <img
+                <div
                   key={idx}
-                  src={img}
-                  alt={`preview ${idx}`}
-                  style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #ddd' }}
-                />
+                  style={{ position: 'relative', width: '100px', height: '100px' }}
+                >
+                  <img
+                    src={img}
+                    alt={`preview ${idx}`}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px', border: '1px solid #ddd' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveImage(idx)}
+                    style={{
+                      position: 'absolute',
+                      top: '-8px',
+                      right: '-8px',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 'bold'
+                    }}
+                    title="Hapus foto ini"
+                  >
+                    ×
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -1703,14 +2327,36 @@ export default function VendorProductForm({
             </div>
 
             <div style={{ overflowY: 'auto', padding: '12px 20px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody>
-                  {activeSpecTemplate.map((field) => (
-                    <tr key={field.key} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td style={{ width: '34%', minWidth: '220px', padding: '12px 10px', fontSize: '13px', color: '#374151', fontWeight: '600', verticalAlign: 'top' }}>
-                        {field.label}{field.required ? ' *' : ''}
-                      </td>
-                      <td style={{ padding: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {activeSpecTemplate
+                  .filter(field => !deletedSpecFields.has(field.key))
+                  .map((field) => {
+                    const fieldOptions = specificationOptions[field.key]?.options || [];
+
+                    return (
+                      <div key={field.key} style={{ border: '1px solid #e5e7eb', borderRadius: '12px', padding: '14px', background: '#fff' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+                          <label style={{ fontSize: '13px', fontWeight: '700', color: '#374151', margin: 0 }}>
+                            {field.label}
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSpec(field.key)}
+                            style={{
+                              padding: '4px 8px',
+                              background: '#fee2e2',
+                              color: '#dc2626',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              fontWeight: '600'
+                            }}
+                          >
+                            🗑️ Hapus
+                          </button>
+                        </div>
+
                         <input
                           type="text"
                           value={specs[field.key] || ''}
@@ -1726,94 +2372,310 @@ export default function VendorProductForm({
                             background: '#fff'
                           }}
                         />
-                      </td>
-                    </tr>
+
+                        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed #e5e7eb' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: '600', color: '#374151' }}>
+                              Opsi Spesifikasi
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                              {fieldOptions.length} opsi
+                            </div>
+                          </div>
+
+                          {fieldOptions.length > 0 && (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px', marginBottom: '10px' }}>
+                              {fieldOptions.map((option) => (
+                                <div key={option.id} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                  <input
+                                    type="text"
+                                    value={option.label}
+                                    disabled
+                                    style={{
+                                      flex: 1,
+                                      padding: '8px 10px',
+                                      border: '1px solid #d1d5db',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      background: '#f9fafb',
+                                      color: '#6b7280'
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSpecOption(field.key, option.id)}
+                                    style={{
+                                      padding: '6px 8px',
+                                      background: '#fee2e2',
+                                      color: '#dc2626',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <input
+                              type="text"
+                              value={specOptionDrafts[field.key] || ''}
+                              onChange={(e) => handleSpecOptionDraftChange(field.key, e.target.value)}
+                              placeholder="Masukkan opsi baru"
+                              style={{
+                                flex: 1,
+                                padding: '10px 12px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '8px',
+                                fontSize: '13px',
+                                background: '#fff',
+                                boxSizing: 'border-box'
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddSpecOption(field.key)}
+                              style={{
+                                padding: '10px 16px',
+                                background: '#10b981',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              + Tambah Opsi
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <div style={{ marginTop: '16px', padding: '16px', border: '1px solid #e5e7eb', borderRadius: '12px', background: '#f8fafc' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#111827' }}>Variasi {entityLabel}</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>Kelola variasi langsung dari popup spesifikasi.</div>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', whiteSpace: 'nowrap' }}>{variationCount} variasi</div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {Object.entries(variations).map(([variasiId, variasi]) => (
+                    <div key={variasiId} style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px', background: '#fff' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '12px' }}>
+                        <label style={{ fontSize: '13px', fontWeight: '600', color: '#374151', margin: 0 }}>
+                          Variasi {Object.keys(variations).indexOf(variasiId) + 1}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteVariation(variasiId)}
+                          style={{
+                            padding: '4px 8px',
+                            background: '#fee2e2',
+                            color: '#dc2626',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            fontWeight: '600'
+                          }}
+                        >
+                          🗑️ Hapus
+                        </button>
+                      </div>
+
+                      <input
+                        type="text"
+                        value={variasi.name}
+                        onChange={(e) => handleRenameVariation(variasiId, e.target.value)}
+                        placeholder="Contoh: Jenis, Warna, Ukuran"
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          boxSizing: 'border-box',
+                          marginBottom: '12px',
+                          background: '#fff'
+                        }}
+                      />
+
+                      <div style={{ marginBottom: '12px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '8px' }}>
+                          Opsi ●
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                          {(variasi.options || []).map((option) => (
+                            <div key={option.id} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              <input
+                                type="text"
+                                value={option.label}
+                                disabled
+                                style={{
+                                  flex: 1,
+                                  padding: '8px 10px',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  background: '#f9fafb',
+                                  color: '#6b7280'
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteOption(variasiId, option.id)}
+                                style={{
+                                  padding: '6px 8px',
+                                  background: '#fee2e2',
+                                  color: '#dc2626',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        {editingVariasiId === variasiId && (
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <input
+                              type="text"
+                              value={newOptionLabel}
+                              onChange={(e) => setNewOptionLabel(e.target.value)}
+                              placeholder="Masukkan opsi baru"
+                              style={{
+                                flex: 1,
+                                padding: '8px 10px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                background: '#fff',
+                                boxSizing: 'border-box'
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddOption(variasiId)}
+                              style={{
+                                padding: '6px 12px',
+                                background: '#10b981',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
+
+                        {editingVariasiId !== variasiId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingVariasiId(variasiId);
+                              setNewOptionLabel('');
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '6px 12px',
+                              background: '#f3f4f6',
+                              color: '#374151',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            + Tambah Opsi
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+
+                  <div style={{ paddingTop: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: '600', color: '#374151', margin: 0 }}>
+                        Tambah Variasi Baru
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setEditingVariasiId(null)}
+                        style={{
+                          padding: '6px 10px',
+                          background: '#eff6ff',
+                          color: '#2563eb',
+                          border: '1px solid #bfdbfe',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          fontWeight: '600'
+                        }}
+                      >
+                        + Tambah Variasi
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="text"
+                        value={variationName}
+                        onChange={(e) => setVariationName(e.target.value)}
+                        placeholder="Contoh: Jenis, Warna, Ukuran"
+                        style={{
+                          flex: 1,
+                          padding: '10px 12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          background: '#fff',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddVariation}
+                        style={{
+                          padding: '10px 16px',
+                          background: '#5A45D1',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Simpan
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div style={{ padding: '14px 20px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button type="button" onClick={() => setIsSpecModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: '600', cursor: 'pointer' }}>Batal</button>
               <button type="button" onClick={() => setIsSpecModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: '700', cursor: 'pointer' }}>Simpan</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isDescriptionModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(17, 24, 39, 0.45)',
-            zIndex: 1100,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px'
-          }}
-          onClick={() => setIsDescriptionModalOpen(false)}
-        >
-          <div
-            style={{
-              width: '100%',
-              maxWidth: '920px',
-              background: '#ffffff',
-              borderRadius: '14px',
-              border: '1px solid #e5e7eb',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-              display: 'flex',
-              flexDirection: 'column',
-              maxHeight: '88vh',
-              overflow: 'hidden'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '22px', color: '#111827' }}>Tabel Deskripsi {entityLabel}</h3>
-              <button type="button" onClick={() => setIsDescriptionModalOpen(false)} style={{ border: 'none', background: 'transparent', fontSize: '26px', cursor: 'pointer', color: '#6b7280' }}>×</button>
-            </div>
-
-            <div style={{ padding: '10px 20px', fontSize: '12px', color: '#6b7280', borderBottom: '1px solid #f3f4f6' }}>
-              Isi deskripsi detail {entityLabel.toLowerCase()} lalu Simpan untuk lanjut.
-            </div>
-
-            <div style={{ overflowY: 'auto', padding: '12px 20px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody>
-                  {activeDescriptionTemplate.map((field) => (
-                    <tr key={field.key} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td style={{ width: '34%', minWidth: '220px', padding: '12px 10px', fontSize: '13px', color: '#374151', fontWeight: '600', verticalAlign: 'top' }}>
-                        {field.label}{field.required ? ' *' : ''}
-                      </td>
-                      <td style={{ padding: '10px' }}>
-                        <textarea
-                          value={descriptionTable[field.key] || ''}
-                          onChange={(e) => handleDescriptionFieldChange(field.key, e.target.value)}
-                          placeholder={field.placeholder}
-                          rows={2}
-                          style={{
-                            width: '100%',
-                            padding: '10px 12px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '8px',
-                            fontSize: '13px',
-                            boxSizing: 'border-box',
-                            background: '#fff',
-                            fontFamily: 'inherit'
-                          }}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div style={{ padding: '14px 20px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button type="button" onClick={() => setIsDescriptionModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: '600', cursor: 'pointer' }}>Batal</button>
-              <button type="button" onClick={() => setIsDescriptionModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: '700', cursor: 'pointer' }}>Simpan</button>
             </div>
           </div>
         </div>

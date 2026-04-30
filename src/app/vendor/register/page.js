@@ -33,7 +33,7 @@ export default function VendorRegisterPage() {
 
     // Cek apakah user sudah vendor
     if (parsedUser.role === 'vendor') {
-      router.push('/vendor');
+      router.push('/vendor/produk');
       return;
     }
 
@@ -300,7 +300,7 @@ export default function VendorRegisterPage() {
               <p style={{ margin: 0, color: '#166534', fontWeight: '500' }}>
                 Selamat! Anda sudah terdaftar sebagai vendor.
               </p>
-              <Link href="/vendor" style={{
+              <Link href="/vendor/produk" style={{
                 display: 'inline-block',
                 marginTop: '12px',
                 padding: '10px 20px',
@@ -310,7 +310,7 @@ export default function VendorRegisterPage() {
                 borderRadius: '6px',
                 fontWeight: '600'
               }}>
-                → Pergi ke Dashboard Vendor
+                → Pergi ke Barang/Jasa Saya
               </Link>
             </div>
           )}

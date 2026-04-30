@@ -1,18 +1,27 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 export default function SharedFooter() {
   const [user, setUser] = useState(null);
-  const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
-    if (userData) {
+
+    if (!userData) {
+      setUser(null);
+      return;
+    }
+
+    try {
       setUser(JSON.parse(userData));
+    } catch {
+      setUser(null);
     }
   }, []);
+
+  const currentYear = new Date().getFullYear();
 
   return (
     <footer style={{
@@ -79,81 +88,50 @@ export default function SharedFooter() {
             </div>
           </div>
 
-          {/* For Vendors - Hanya tampilkan untuk customer */}
-          {!user || user.role === 'customer' ? (
-            <div>
-              <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '700' }}>
-                Untuk Vendor
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {[
-                  { label: '📝 Daftar Vendor', href: '/vendor/register' },
-                  { label: '📊 Dashboard', href: '/vendor' },
-                  { label: '📦 Kelola Item', href: '/vendor' },
-                  { label: '💬 Chat Customer', href: '/vendor/chats' },
-                  { label: '📋 Invoice Penjualan', href: '/vendor/invoices' }
-                ].map((link, idx) => (
-                  <Link
-                    key={idx}
-                    href={link.href}
-                    style={{
-                      color: 'rgba(255,255,255,0.85)',
-                      textDecoration: 'none',
-                      fontSize: '14px',
-                      transition: 'all 0.2s',
-                      cursor: 'pointer'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.color = 'white';
-                      e.target.style.paddingLeft = '8px';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.color = 'rgba(255,255,255,0.85)';
-                      e.target.style.paddingLeft = '0';
-                    }}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
+          {/* Quick Navigation */}
+          <div>
+            <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '700' }}>
+              Navigasi Cepat
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {[
+                { label: '🏠 Home', href: '/' },
+                ...(user?.role === 'vendor'
+                  ? [
+                      { label: '📦 Barang/Jasa Saya', href: '/vendor/produk' },
+                      { label: '💬 Chat', href: '/vendor/chats' },
+                      { label: '📋 Invoice', href: '/vendor/invoices' }
+                    ]
+                  : [
+                      { label: '📝 Daftar Vendor', href: '/vendor/register' },
+                      { label: '💬 Chat', href: '/customer/chats' },
+                      { label: '📋 Invoice', href: '/customer/invoices' }
+                    ])
+              ].map((link, idx) => (
+                <Link
+                  key={idx}
+                  href={link.href}
+                  style={{
+                    color: 'rgba(255,255,255,0.85)',
+                    textDecoration: 'none',
+                    fontSize: '14px',
+                    transition: 'all 0.2s',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.color = 'white';
+                    e.target.style.paddingLeft = '8px';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.color = 'rgba(255,255,255,0.85)';
+                    e.target.style.paddingLeft = '0';
+                  }}
+                >
+                  {link.label}
+                </Link>
+              ))}
             </div>
-          ) : (
-            <div>
-              <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '700' }}>
-                Vendor Tools
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {[
-                  { label: '📊 Dashboard', href: '/vendor' },
-                  { label: '📦 Kelola Item', href: '/vendor' },
-                  { label: '💬 Chat Customer', href: '/vendor/chats' },
-                  { label: '📋 Invoice Penjualan', href: '/vendor/invoices' }
-                ].map((link, idx) => (
-                  <Link
-                    key={idx}
-                    href={link.href}
-                    style={{
-                      color: 'rgba(255,255,255,0.85)',
-                      textDecoration: 'none',
-                      fontSize: '14px',
-                      transition: 'all 0.2s',
-                      cursor: 'pointer'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.color = 'white';
-                      e.target.style.paddingLeft = '8px';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.color = 'rgba(255,255,255,0.85)';
-                      e.target.style.paddingLeft = '0';
-                    }}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
+          </div>
 
           {/* Support & Info */}
           <div>

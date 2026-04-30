@@ -8,8 +8,14 @@ export async function POST(request) {
     const body = await request.json();
     const { email, password } = body;
 
+    if (!email || !password) {
+      return NextResponse.json({ success: false, message: 'Email dan password harus diisi!' }, { status: 400 });
+    }
+
     const filePath = path.join(process.cwd(), 'users.json');
-    const fileData = await fs.readFile(filePath, 'utf-8');
+    let fileData = await fs.readFile(filePath, 'utf-8');
+    // Remove BOM if present
+    fileData = fileData.replace(/^\uFEFF/, '').trim();
     const users = JSON.parse(fileData);
 
     const user = users.find(u => u.email === email && u.password === password);
@@ -29,6 +35,10 @@ export async function POST(request) {
       }
     }, { status: 200 });
   } catch (error) {
-    return NextResponse.json({ success: false, message: 'Terjadi kesalahan server.' }, { status: 500 });
+    console.error('Login error:', error);
+    return NextResponse.json({ 
+      success: false, 
+      message: 'Terjadi kesalahan server: ' + error.message 
+    }, { status: 500 });
   }
 }

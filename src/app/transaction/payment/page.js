@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import SharedNavbar from '../components/SharedNavbar';
+import SharedNavbar from '../../components/SharedNavbar';
 
 function PaymentContent() {
   const router = useRouter();
@@ -36,6 +36,8 @@ function PaymentContent() {
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [discountAmount, setDiscountAmount] = useState(0);
   const [paymentType, setPaymentType] = useState('full'); // 'full' or 'pay_after'
+  const [availabilityCheck, setAvailabilityCheck] = useState(null); // null, 'checking', 'available', 'unavailable'
+  const [availabilityMessage, setAvailabilityMessage] = useState('');
 
   const generateRandomQR = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -63,11 +65,6 @@ function PaymentContent() {
     }
 
     const verificationRaw = localStorage.getItem('verificationData');
-    if (!verificationRaw && dealId) {
-      alert('Silakan lengkapi verifikasi identitas terlebih dahulu');
-      router.push(`/transaction/identity-check?dealId=${dealId}`);
-      return;
-    }
 
     if (verificationRaw) {
       try {
@@ -88,9 +85,7 @@ function PaymentContent() {
           throw new Error(`API error: ${response.status}`);
         }
         const deals = await response.json();
-        console.log('All deals:', deals);
         const currentDeal = deals.find(d => d.id === dealId);
-        console.log(`Looking for deal: ${dealId}`, currentDeal);
         setDeal(currentDeal);
       } catch (error) {
         console.error('Error fetching deal:', error);
@@ -146,6 +141,12 @@ function PaymentContent() {
   const handlePayment = async (e) => {
     e.preventDefault();
 
+    // AVAILABILITY CHECK - Validasi ketersediaan sebelum payment
+    if (availabilityCheck !== 'available') {
+      alert('❌ Barang tidak tersedia untuk periode ini. Silakan ubah tanggal atau jumlah barang.');
+      return;
+    }
+
     if (paymentMethod === 'card' && !validateCardDetails()) {
       return;
     }
@@ -172,6 +173,7 @@ function PaymentContent() {
         id: `TRX-${Date.now()}`,
         dealId: dealId,
         userId: user.id,
+        serviceId: deal?.serviceId || deal?.id,
         paymentMethod: paymentMethod,
         basePrice: basePrice,
         quantity: quantity,
@@ -179,6 +181,12 @@ function PaymentContent() {
         durationDays: durationDays,
         notes: notes,
         startDate: startDate,
+        endDate: (() => {
+          const start = new Date(startDate);
+          const end = new Date(start);
+          end.setDate(end.getDate() + durationDays);
+          return end.toISOString().split('T')[0];
+        })(),
         paymentType: paymentType,
         amount: paymentType === 'pay_after' ? downPayment : discountedSubtotal,
         downPayment: paymentType === 'pay_after' ? downPayment : null,
@@ -189,6 +197,16 @@ function PaymentContent() {
         totalAmount: totalAmount,
         status: 'success',
         timestamp: new Date().toISOString(),
+        borrowDate: startDate,
+        expectedReturnDate: expectedReturnDate ? expectedReturnDate.toISOString() : null,
+        returnDeadline: expectedReturnDate ? new Date(expectedReturnDate.getTime() - (24 * 60 * 60 * 1000)).toISOString() : null,
+        returnStatus: 'pending',
+        actualReturnDate: null,
+        daysLate: 0,
+        lateCharge: 0,
+        returnCondition: null,
+        returnNotes: '',
+        lastReminderSent: null,
         identityVerification,
         promo: appliedPromo
           ? {
@@ -211,6 +229,13 @@ function PaymentContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(transactionData)
       });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        alert(`❌ ${result.message || result.error || 'Gagal memproses pembayaran'}`);
+        return;
+      }
 
       if (response.ok) {
         localStorage.removeItem('verificationData');
@@ -266,6 +291,50 @@ function PaymentContent() {
     setPromoMessage('Promo dihapus.');
   };
 
+  // AVAILABILITY CHECK - Validasi ketersediaan barang
+  const checkAvailability = async (qty, duration, startDt) => {
+    if (!deal?.id || !qty || !startDt) {
+      setAvailabilityCheck(null);
+      setAvailabilityMessage('');
+      return;
+    }
+
+    try {
+      setAvailabilityCheck('checking');
+      
+      // Calculate end date
+      const startDateTime = new Date(startDt);
+      const endDateTime = new Date(startDateTime);
+      endDateTime.setDate(endDateTime.getDate() + (Number(duration) || 1));
+      const endDateStr = endDateTime.toISOString().split('T')[0];
+
+      const response = await fetch('/api/availability/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serviceId: deal.serviceId || deal.id,
+          quantity: Number(qty),
+          startDate: startDt,
+          endDate: endDateStr
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success && result.available) {
+        setAvailabilityCheck('available');
+        setAvailabilityMessage(`✅ Stok tersedia: ${result.availableQuantity} dari ${result.totalQuantity} unit`);
+      } else {
+        setAvailabilityCheck('unavailable');
+        setAvailabilityMessage(`❌ ${result.message || 'Stok tidak tersedia untuk periode ini'}`);
+      }
+    } catch (error) {
+      console.error('Availability check error:', error);
+      setAvailabilityCheck('unavailable');
+      setAvailabilityMessage('Gagal mengecek ketersediaan');
+    }
+  };
+
   const serviceFee = 25000;
   const basePrice = deal?.totalPrice || 0;
   const totalPrice = basePrice * quantity * durationDays;
@@ -274,7 +343,20 @@ function PaymentContent() {
   const downPayment = Math.round(totalAmount * 0.2); // 20% down payment
   const remainingPayment = totalAmount - downPayment; // 80% remaining
   const isService = deal?.itemName?.toLowerCase().includes('jasa') || false;
-  const quantityLabel = isService ? 'Hari' : 'Unit';
+  const quantityLabel = isService ? 'Hari' : 'Item';
+  const borrowDateLabel = startDate
+    ? new Date(`${startDate}T00:00:00.000Z`).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
+    : '-';
+  const expectedReturnDate = startDate
+    ? (() => {
+        const result = new Date(`${startDate}T00:00:00.000Z`);
+        result.setUTCDate(result.getUTCDate() + durationDays);
+        return result;
+      })()
+    : null;
+  const expectedReturnDateLabel = expectedReturnDate
+    ? expectedReturnDate.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
+    : '-';
 
   useEffect(() => {
     if (appliedPromo) {
@@ -282,7 +364,16 @@ function PaymentContent() {
       setDiscountAmount(0);
       setPromoMessage('Subtotal berubah, silakan terapkan ulang kode promo.');
     }
-  }, [quantity, durationDays, basePrice]);
+  }, [quantity, durationDays, basePrice, appliedPromo]);
+
+  // CHECK AVAILABILITY - Saat quantity, duration, atau startDate berubah
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      checkAvailability(quantity, durationDays, startDate);
+    }, 500); // Debounce 500ms
+
+    return () => clearTimeout(timer);
+  }, [quantity, durationDays, startDate, deal]);
 
   if (isLoading) {
     return <div style={{ padding: '40px', textAlign: 'center', minHeight: '100vh', background: '#f5f3ff' }}>⏳ Loading...</div>;
@@ -304,28 +395,10 @@ function PaymentContent() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f5f3ff' }}>
-      {/* Navbar */}
-      <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', padding: '16px 24px' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Link href="/" style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '24px', lineHeight: '1' }}>🛡️</span>
-            RentGuard
-          </Link>
-          <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', color: '#666' }}>
-            ← Kembali
-          </button>
-        </div>
-      </div>
+      <SharedNavbar />
 
       {/* Main Content */}
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '40px 20px' }}>
-        {/* Debug Info - Remove later */}
-        {deal && (
-          <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '12px', marginBottom: '20px', fontSize: '12px', fontFamily: 'monospace', color: '#b91c1c' }}>
-            <strong>DEBUG DEAL:</strong> ID={deal.id} | Price={deal.totalPrice} | Vendor={deal.vendorName} | Item={deal.itemName}
-          </div>
-        )}
-
         {step === 'detail' ? (
           // STEP 1: Detail Pesanan
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '32px' }}>
@@ -371,7 +444,7 @@ function PaymentContent() {
               {/* Detail Pesanan */}
               <div style={{ background: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                 <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#1f2937', marginBottom: '24px' }}>Detail Pesanan</h2>
-                <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>Tentukan jumlah dan durasi sewa</p>
+                <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>Tentukan jumlah dan durasi peminjaman</p>
 
                 <div style={{ marginBottom: '20px', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', background: '#fafafa' }}>
                   <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Kode Promo</label>
@@ -415,16 +488,32 @@ function PaymentContent() {
                     <button onClick={() => setQuantity(quantity + 1)} style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '18px', fontWeight: '700', color: '#7c3aed' }}>+</button>
                     <span style={{ fontSize: '14px', color: '#6b7280', marginLeft: '12px' }}>item</span>
                   </div>
+
+                  {/* AVAILABILITY STATUS */}
+                  {availabilityMessage && (
+                    <div style={{
+                      marginTop: '12px',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      background: availabilityCheck === 'available' ? '#dcfce7' : '#fee2e2',
+                      color: availabilityCheck === 'available' ? '#15803d' : '#b91c1c',
+                      border: `1px solid ${availabilityCheck === 'available' ? '#86efac' : '#fca5a5'}`
+                    }}>
+                      {availabilityCheck === 'checking' && '⏳ Memeriksa ketersediaan...'}
+                      {availabilityMessage}
+                    </div>
+                  )}
                 </div>
 
-                {/* Durasi Sewa */}
+                {/* Durasi Hari */}
                 <div style={{ marginBottom: '20px' }}>
-                  <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Durasi Sewa ({quantityLabel})</label>
+                  <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Durasi Hari</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <button onClick={() => setDurationDays(Math.max(1, durationDays - 1))} style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '18px', fontWeight: '700', color: '#7c3aed' }}>−</button>
                     <input type="number" value={durationDays} onChange={(e) => setDurationDays(Math.max(1, parseInt(e.target.value) || 1))} style={{ width: '80px', textAlign: 'center', border: '1px solid #ddd', borderRadius: '8px', padding: '8px', fontSize: '14px', fontWeight: '600' }} min="1" />
                     <button onClick={() => setDurationDays(durationDays + 1)} style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '18px', fontWeight: '700', color: '#7c3aed' }}>+</button>
-                    <span style={{ fontSize: '14px', color: '#6b7280', marginLeft: '12px' }}>{quantityLabel}</span>
                   </div>
                 </div>
 
@@ -438,6 +527,16 @@ function PaymentContent() {
                 <div>
                   <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Tanggal Mulai Sewa</label>
                   <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ width: '100%', border: '1px solid #ddd', borderRadius: '8px', padding: '12px', fontSize: '14px' }} />
+                  <div style={{ marginTop: '10px', padding: '12px', background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', color: '#374151' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '6px' }}>
+                      <span style={{ color: '#6b7280' }}>Tanggal pinjam</span>
+                      <strong>{borrowDateLabel}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                      <span style={{ color: '#6b7280' }}>Estimasi kembali</span>
+                      <strong>{expectedReturnDateLabel}</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -457,7 +556,7 @@ function PaymentContent() {
                     <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>{quantity}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '13px', color: '#6b7280' }}>Durasi sewa</span>
+                    <span style={{ fontSize: '13px', color: '#6b7280' }}>Durasi hari</span>
                     <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>{durationDays} {quantityLabel}</span>
                   </div>
                 </div>

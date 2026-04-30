@@ -2,6 +2,9 @@ import fs from 'fs/promises';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
+// Helper: Normalize ID for consistent comparison
+const normalizeId = (id) => String(id || '').trim();
+
 // Helper function to create notification
 async function createNotification(userId, type, message, relatedId, relatedData = {}) {
   try {
@@ -42,6 +45,7 @@ export async function POST(request) {
     const chatsPath = path.join(process.cwd(), 'chats.json');
     const dealsPath = path.join(process.cwd(), 'deals.json');
     const servicesPath = path.join(process.cwd(), 'services.json');
+    const invoicesPath = path.join(process.cwd(), 'invoices.json');
 
     const chatsData = await fs.readFile(chatsPath, 'utf-8');
     const chats = JSON.parse(chatsData);
@@ -65,7 +69,7 @@ export async function POST(request) {
         return NextResponse.json({ success: false, message: 'Deal belum dibuat' }, { status: 404 });
       }
 
-      if (String(deal.vendorId) !== String(vendorId)) {
+      if (normalizeId(deal.vendorId) !== normalizeId(vendorId)) {
         return NextResponse.json({ success: false, message: 'Hanya vendor pemilik deal yang bisa memberi diskon' }, { status: 403 });
       }
 
@@ -76,7 +80,7 @@ export async function POST(request) {
       if (typeof deal.originalPrice === 'undefined' || deal.originalPrice === null) {
         const servicesData = await fs.readFile(servicesPath, 'utf-8');
         const services = JSON.parse(servicesData);
-        const svc = services.find(s => String(s.id) === String(deal.serviceId));
+        const svc = services.find(s => normalizeId(s.id) === normalizeId(deal.serviceId));
         deal.originalPrice = Number(svc?.price ?? svc?.harga ?? 0);
       }
 
@@ -113,6 +117,58 @@ export async function POST(request) {
       deal.discountUpdatedAt = new Date().toISOString();
 
       await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+
+      // Ensure invoice pending exists right after deal + discount so vendor can track waiting payment.
+      try {
+        let invoices = [];
+        try {
+          const invoicesData = await fs.readFile(invoicesPath, 'utf-8');
+          invoices = JSON.parse(invoicesData);
+        } catch {
+          invoices = [];
+        }
+
+        const now = new Date();
+        const deadline = new Date(now);
+        deadline.setDate(deadline.getDate() + 2);
+
+        const existingPendingInvoice = invoices.find(
+          (item) => normalizeId(item.dealId) === normalizeId(deal.id) && item.status !== 'paid'
+        );
+
+        if (existingPendingInvoice) {
+          existingPendingInvoice.customerId = existingPendingInvoice.customerId || deal.customerId;
+          existingPendingInvoice.vendorId = existingPendingInvoice.vendorId || deal.vendorId;
+          existingPendingInvoice.serviceId = existingPendingInvoice.serviceId || deal.serviceId;
+          existingPendingInvoice.remainingPayment = Number(finalPrice || 0);
+          existingPendingInvoice.paymentDeadline = existingPendingInvoice.paymentDeadline || deadline.toISOString();
+          existingPendingInvoice.paymentType = existingPendingInvoice.paymentType || 'deal_pending';
+          existingPendingInvoice.status = 'pending';
+          existingPendingInvoice.notes = existingPendingInvoice.notes || 'Menunggu pembayaran setelah deal disepakati dan diskon diterapkan.';
+        } else {
+          invoices.push({
+            id: `INV-${Date.now()}`,
+            dealId: deal.id,
+            customerId: deal.customerId,
+            vendorId: deal.vendorId,
+            serviceId: deal.serviceId,
+            transactionId: null,
+            remainingPayment: Number(finalPrice || 0),
+            paymentDeadline: deadline.toISOString(),
+            paymentMethod: null,
+            paymentType: 'deal_pending',
+            status: 'pending',
+            createdAt: now.toISOString(),
+            paidAt: null,
+            paymentTransactionId: null,
+            notes: 'Menunggu pembayaran setelah deal disepakati dan diskon diterapkan.'
+          });
+        }
+
+        await fs.writeFile(invoicesPath, JSON.stringify(invoices, null, 2));
+      } catch (invoiceError) {
+        console.warn('Could not create pending invoice after discount:', invoiceError);
+      }
 
       await createNotification(
         deal.customerId,
@@ -198,7 +254,17 @@ export async function POST(request) {
           discountGiven: false,
           discount: { type: null, value: 0, amount: 0 },
           originalPrice: originalPrice,
-          finalPrice: originalPrice
+          finalPrice: originalPrice,
+          borrowDate: null,
+          expectedReturnDate: null,
+          actualReturnDate: null,
+          returnDeadline: null,
+          returnStatus: 'pending',
+          daysLate: 0,
+          lateCharge: 0,
+          returnCondition: null,
+          returnNotes: '',
+          lastReminderSent: null
         };
 
         deals.push(newDeal);
@@ -219,6 +285,16 @@ export async function POST(request) {
         // ensure discount fields exist
         if (typeof existingDeal.discountGiven === 'undefined') existingDeal.discountGiven = false;
         if (!existingDeal.discount) existingDeal.discount = { type: null, value: 0, amount: 0 };
+        if (typeof existingDeal.borrowDate === 'undefined') existingDeal.borrowDate = null;
+        if (typeof existingDeal.expectedReturnDate === 'undefined') existingDeal.expectedReturnDate = null;
+        if (typeof existingDeal.actualReturnDate === 'undefined') existingDeal.actualReturnDate = null;
+        if (typeof existingDeal.returnDeadline === 'undefined') existingDeal.returnDeadline = null;
+        if (typeof existingDeal.returnStatus === 'undefined') existingDeal.returnStatus = 'pending';
+        if (typeof existingDeal.daysLate === 'undefined') existingDeal.daysLate = 0;
+        if (typeof existingDeal.lateCharge === 'undefined') existingDeal.lateCharge = 0;
+        if (typeof existingDeal.returnCondition === 'undefined') existingDeal.returnCondition = null;
+        if (typeof existingDeal.returnNotes === 'undefined') existingDeal.returnNotes = '';
+        if (typeof existingDeal.lastReminderSent === 'undefined') existingDeal.lastReminderSent = null;
         // load original price if missing
         if (typeof existingDeal.originalPrice === 'undefined' || existingDeal.originalPrice === null) {
           try {

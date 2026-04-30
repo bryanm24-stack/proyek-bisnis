@@ -9,7 +9,8 @@ export async function GET(request) {
     const vendorId = searchParams.get('vendorId');
 
     const filePath = path.join(process.cwd(), 'services.json');
-    const fileData = await fs.readFile(filePath, 'utf-8');
+    let fileData = await fs.readFile(filePath, 'utf-8');
+    fileData = fileData.replace(/^\uFEFF/, '').trim();
     let services = JSON.parse(fileData);
 
     // Filter berdasarkan vendorId jika diberikan
@@ -49,6 +50,8 @@ export async function POST(request) {
       specifications,
       descriptionTable,
       checklist,
+      items,
+      variations,
       // Fields untuk barang
       namaBarang,
       jenisBarang,
@@ -84,10 +87,11 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const hasModernPayload = Boolean(title || mainCategory || shortDescription || location);
+    const hasModernPayload = Boolean(title || mainCategory || location);
 
     const filePath = path.join(process.cwd(), 'services.json');
-    const fileData = await fs.readFile(filePath, 'utf-8');
+    let fileData = await fs.readFile(filePath, 'utf-8');
+    fileData = fileData.replace(/^\uFEFF/, '').trim();
     const services = JSON.parse(fileData);
 
     // Support payload baru dari halaman /vendor/tambah-produk dan /vendor
@@ -96,7 +100,6 @@ export async function POST(request) {
       if (!mainCategory) missingFields.push('mainCategory');
       if (!subCategory) missingFields.push('subCategory');
       if (!title) missingFields.push('title');
-      if (!shortDescription) missingFields.push('shortDescription');
       if (price === undefined || price === null || price === '') missingFields.push('price');
       if (quantity === undefined || quantity === null || quantity === '') missingFields.push('quantity');
       if (!location) missingFields.push('location');
@@ -112,6 +115,11 @@ export async function POST(request) {
       const parsedPrice = Number.parseInt(price, 10);
       const parsedMinimumDays = Number.parseInt(minimumDays, 10);
       const parsedQuantity = Number.parseInt(quantity, 10);
+
+      // ✅ Validasi: Maximum 5 images
+      const validatedImages = images && Array.isArray(images)
+        ? images.slice(0, 5)
+        : [];
 
       const newService = {
         id: Date.now().toString(),
@@ -134,11 +142,12 @@ export async function POST(request) {
         descriptionTable: descriptionTable && typeof descriptionTable === 'object' ? descriptionTable : {},
         checklist: checklist && typeof checklist === 'object' ? checklist : {},
         items: items && Array.isArray(items) ? items : [],
+        variations: variations && typeof variations === 'object' ? variations : {},
         type: resolvedType,
         rating: 0,
         rentCount: 0,
-        images: images && images.length > 0
-          ? images
+        images: validatedImages && validatedImages.length > 0
+          ? validatedImages
           : ['https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=150&q=80']
       };
 
@@ -279,7 +288,8 @@ export async function PUT(request) {
     }
 
     const filePath = path.join(process.cwd(), 'services.json');
-    const fileData = await fs.readFile(filePath, 'utf-8');
+    let fileData = await fs.readFile(filePath, 'utf-8');
+    fileData = fileData.replace(/^\uFEFF/, '').trim();
     let services = JSON.parse(fileData);
 
     // Cari dan update service
@@ -355,7 +365,8 @@ export async function DELETE(request) {
     }
 
     const filePath = path.join(process.cwd(), 'services.json');
-    const fileData = await fs.readFile(filePath, 'utf-8');
+    let fileData = await fs.readFile(filePath, 'utf-8');
+    fileData = fileData.replace(/^\uFEFF/, '').trim();
     let services = JSON.parse(fileData);
 
     // Cari service

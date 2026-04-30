@@ -1,1 +1,36 @@
-[]
+[
+  {
+    "id": "INV-1777477482432-125",
+    "dealId": "1775934693221",
+    "customerId": "4",
+    "vendorId": "1",
+    "serviceId": "s1",
+    "transactionId": "TRX-1775936698530",
+    "remainingPayment": 175000,
+    "paymentDeadline": "2026-04-11T19:44:58.530Z",
+    "paymentMethod": "cod",
+    "paymentType": "full",
+    "status": "paid",
+    "createdAt": "2026-04-11T19:44:58.649Z",
+    "paidAt": "2026-04-11T19:44:58.530Z",
+    "paymentTransactionId": "TRX-1775936698530",
+    "notes": ""
+  },
+  {
+    "id": "INV-1777493820663",
+    "dealId": "1777493759494",
+    "customerId": "4",
+    "vendorId": "3",
+    "serviceId": "1704067202000",
+    "transactionId": null,
+    "remainingPayment": 40000,
+    "paymentDeadline": "2026-05-01T20:17:00.663Z",
+    "paymentMethod": "qris",
+    "paymentType": "deal_pending",
+    "status": "paid",
+    "createdAt": "2026-04-29T20:17:00.663Z",
+    "paidAt": "2026-04-29T20:25:46.275Z",
+    "paymentTransactionId": "TRX-1777494346157",
+    "notes": "Menunggu pembayaran setelah deal disepakati dan diskon diterapkan."
+  }
+]

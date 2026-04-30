@@ -232,7 +232,7 @@ function IdentityCheckContent() {
             
             <div className="form-row">
               <div className="form-group">
-                <label htmlFor="fullName">Nama Lengkap *</label>
+                <label htmlFor="fullName">Nama Lengkap</label>
                 <input
                   type="text"
                   id="fullName"
@@ -246,7 +246,7 @@ function IdentityCheckContent() {
               </div>
 
               <div className="form-group">
-                <label htmlFor="phoneNumber">Nomor Telepon *</label>
+                <label htmlFor="phoneNumber">Nomor Telepon</label>
                 <input
                   type="tel"
                   id="phoneNumber"
@@ -261,7 +261,7 @@ function IdentityCheckContent() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="email">Email *</label>
+              <label htmlFor="email">Email</label>
               <input
                 type="email"
                 id="email"
@@ -279,7 +279,7 @@ function IdentityCheckContent() {
             <h3>🪪 Identitas</h3>
             
             <div className="form-group">
-              <label htmlFor="idType">Jenis Identitas *</label>
+              <label htmlFor="idType">Jenis Identitas</label>
               <select
                 id="idType"
                 name="idType"
@@ -293,7 +293,7 @@ function IdentityCheckContent() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="idNumber">Nomor Identitas *</label>
+              <label htmlFor="idNumber">Nomor Identitas</label>
               <input
                 type="text"
                 id="idNumber"
@@ -307,7 +307,7 @@ function IdentityCheckContent() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="idPhoto">Foto {formData.idType === 'ktp' ? 'KTP' : formData.idType === 'sim' ? 'SIM' : 'Paspor'} *</label>
+              <label htmlFor="idPhoto">Foto {formData.idType === 'ktp' ? 'KTP' : formData.idType === 'sim' ? 'SIM' : 'Paspor'}</label>
               <div className="file-upload-wrapper">
                 <input
                   type="file"
@@ -335,7 +335,7 @@ function IdentityCheckContent() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="selfiePhoto">Foto Selfie (Wajah) *</label>
+              <label htmlFor="selfiePhoto">Foto Selfie (Wajah)</label>
               <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#666' }}>
                 📸 Ambil foto selfie untuk verifikasi wajah sesuai dengan foto KTP/identitas Anda
               </p>

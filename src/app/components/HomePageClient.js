@@ -1,18 +1,22 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import SearchBar from './SearchBar';
 import SharedNavbar from './SharedNavbar';
 
 export default function HomePageClient() {
   const [services, setServices] = useState([]);
+  const [promos, setPromos] = useState([]);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedService, setSelectedService] = useState(null);
   const [selectedItemDetail, setSelectedItemDetail] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [detailTab, setDetailTab] = useState('packages');
+  const [modalImageIndex, setModalImageIndex] = useState(0);
+  // ✅ NEW: Track image carousel for product cards
+  const [currentImageIndex, setCurrentImageIndex] = useState({});
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [chatData, setChatData] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -29,8 +33,63 @@ export default function HomePageClient() {
   const [reviewPage, setReviewPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [userFavorites, setUserFavorites] = useState([]);
+  const [favoriteLoading, setFavoriteLoading] = useState({});
 
-  const fetchNotifications = async (currentUser) => {
+  const fetchFavorites = useCallback(async (currentUser) => {
+    if (!currentUser) return;
+    try {
+      const response = await fetch(`/api/favorites?userId=${currentUser.id}`);
+      const data = await response.json();
+      setUserFavorites(Array.isArray(data.data) ? data.data : []);
+    } catch (error) {
+      console.error('Error fetching favorites:', error);
+    }
+  }, []);
+
+  const toggleFavorite = async (service, isFavorite) => {
+    if (!user) {
+      alert('Silakan login terlebih dahulu');
+      return;
+    }
+
+    setFavoriteLoading(prev => ({ ...prev, [service.id]: true }));
+
+    try {
+      const response = await fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          serviceId: service.id,
+          type: 'service'
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        // Update local favorites state
+        if (data.isFavorite) {
+          setUserFavorites(prev => [...prev, { id: data.data.id, serviceId: service.id, userId: user.id, type: 'service' }]);
+        } else {
+          setUserFavorites(prev => prev.filter(fav => fav.serviceId !== service.id));
+        }
+      } else {
+        alert('Gagal: ' + (data.message || 'Error'));
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      alert('Error: ' + error.message);
+    } finally {
+      setFavoriteLoading(prev => ({ ...prev, [service.id]: false }));
+    }
+  };
+
+  const isFavorited = (serviceId) => {
+    return userFavorites.some(fav => fav.serviceId === serviceId);
+  };
+
+  const fetchNotifications = useCallback(async (currentUser) => {
     if (!currentUser) return;
     try {
       const response = await fetch(`/api/notifications?userId=${currentUser.id}`);
@@ -39,7 +98,7 @@ export default function HomePageClient() {
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -49,10 +108,10 @@ export default function HomePageClient() {
 
     const fetchServices = async () => {
       try {
-        const response = await fetch('/api/vendor/services');
+        const response = await fetch('/api/vendor/services', { cache: 'no-store' });
         const data = await response.json();
         if (data.success) {
-          setServices(data.data);
+          setServices(Array.isArray(data.data) ? data.data : []);
         }
       } catch (error) {
         console.error('Error fetching services:', error);
@@ -61,11 +120,28 @@ export default function HomePageClient() {
       }
     };
 
+    const fetchPromos = async () => {
+      try {
+        const response = await fetch('/api/promos?active=true', { cache: 'no-store' });
+        const data = await response.json();
+        if (data.success) {
+          setPromos(Array.isArray(data.data) ? data.data : []);
+        }
+      } catch (error) {
+        console.error('Error fetching promos:', error);
+      }
+    };
+
     fetchServices();
+    fetchPromos();
 
     // Refresh services setiap 10 detik untuk deteksi service baru dari vendor
     const serviceInterval = setInterval(fetchServices, 10000);
-    return () => clearInterval(serviceInterval);
+    const promoInterval = setInterval(fetchPromos, 15000);
+    return () => {
+      clearInterval(serviceInterval);
+      clearInterval(promoInterval);
+    };
   }, []);
 
   // Fetch notifications for current user
@@ -77,12 +153,40 @@ export default function HomePageClient() {
     // Polling every 5 seconds untuk check notifikasi baru
     const interval = setInterval(() => fetchNotifications(user), 5000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, fetchNotifications]);
+
+  // Fetch favorites for current user
+  useEffect(() => {
+    if (!user) {
+      setUserFavorites([]);
+      return;
+    }
+    fetchFavorites(user);
+  }, [user, fetchFavorites]);
 
   const handleLogout = () => {
     localStorage.removeItem('user');
     setUser(null);
     window.location.reload();
+  };
+
+  // ✅ NEW: Handle image navigation in carousel
+  const handleNextImage = (e, serviceId, totalImages) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentImageIndex(prev => ({
+      ...prev,
+      [serviceId]: ((prev[serviceId] || 0) + 1) % totalImages
+    }));
+  };
+
+  const handlePrevImage = (e, serviceId, totalImages) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentImageIndex(prev => ({
+      ...prev,
+      [serviceId]: ((prev[serviceId] || 0) - 1 + totalImages) % totalImages
+    }));
   };
 
   // Helper function to safely format price
@@ -93,10 +197,98 @@ export default function HomePageClient() {
     return '0';
   };
 
+  const getNonEmptyObjectEntries = (value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+    return Object.entries(value).filter(([, entryValue]) => {
+      if (entryValue === null || entryValue === undefined) return false;
+      if (typeof entryValue === 'string') return entryValue.trim() !== '';
+      return true;
+    });
+  };
+
+  const formatFieldLabel = (key) =>
+    key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/[_-]+/g, ' ')
+      .replace(/^./, (char) => char.toUpperCase())
+      .trim();
+
+  const getServiceThumbnail = (service) => {
+    if (!service) {
+      return 'https://via.placeholder.com/400x300?text=' + encodeURIComponent('Service');
+    }
+
+    return (
+      service.thumbnail ||
+      service.coverImage ||
+      service.image ||
+      (Array.isArray(service.images) && service.images.length > 0 ? service.images[0] : null) ||
+      'https://via.placeholder.com/400x300?text=' + encodeURIComponent(service.title || 'Service')
+    );
+  };
+
+  const getServiceGalleryImages = (service) => {
+    if (!service) return [];
+
+    const uploadedImages = Array.isArray(service.images)
+      ? service.images.filter((img) => typeof img === 'string' && img.trim() !== '')
+      : [];
+
+    if (uploadedImages.length > 0) {
+      return uploadedImages.slice(0, 5);
+    }
+
+    return [getServiceThumbnail(service)];
+  };
+
+  const getItemPreviewImage = (item) =>
+    item?.thumbnail ||
+    item?.image ||
+    (Array.isArray(item?.images) && item.images.length > 0 ? item.images[0] : null) ||
+    'https://via.placeholder.com/120x120?text=Paket';
+
+  const getPromoOffers = (service) => {
+    if (!service) return [];
+
+    const promoMatches = promos.filter((promo) =>
+      promo.active !== false &&
+      (promo.productId === service.id || promo.vendorId === service.vendorId)
+    );
+
+    const fallbackMatches = services.filter((item) =>
+      item.id !== service.id &&
+      (item.vendorId === service.vendorId || item.mainCategory === service.mainCategory || item.category === service.category)
+    );
+
+    const mappedPromos = promoMatches.map((promo) => ({
+      id: promo.id,
+      title: promo.productName,
+      image: promo.productImage || service.image || service.images?.[0],
+      originalPrice: promo.originalPrice || service.price || 0,
+      promoPrice: promo.promoPrice ?? null,
+      description: promo.description || 'Promo spesial dari vendor',
+      code: promo.code
+    }));
+
+    const mappedFallbacks = fallbackMatches.map((item) => ({
+      id: item.id,
+      title: item.title || item.namaBarang || item.namaJasa,
+      image: item.images?.[0],
+      originalPrice: item.price || 0,
+      promoPrice: item.price ? Math.max(0, Math.round(item.price * 0.85)) : null,
+      description: 'Rekomendasi produk serupa dengan penawaran menarik',
+      code: null
+    }));
+
+    const pool = mappedPromos.length > 0 ? mappedPromos : mappedFallbacks;
+    return pool.sort(() => Math.random() - 0.5).slice(0, 3);
+  };
+
   const openModal = (service) => {
     setSelectedService(service);
     setDetailTab('packages');
     setSelectedItemDetail(null);
+    setModalImageIndex(0);
     setServiceReviews([]);
     setReviewsLoading(true);
     setReviewFilter('all');
@@ -123,6 +315,7 @@ export default function HomePageClient() {
     setModalOpen(false);
     setSelectedService(null);
     setSelectedItemDetail(null);
+    setModalImageIndex(0);
     setServiceReviews([]);
     setReviewsLoading(false);
     setReviewFilter('all');
@@ -209,6 +402,10 @@ export default function HomePageClient() {
     if (!newMessage.trim()) return;
     if (!selectedService) return;
     if (!user) return;
+    if (chatData?.dealStatus === 'closed') {
+      alert('Chat sudah ditutup setelah pembayaran selesai.');
+      return;
+    }
 
     try {
       console.log('[sendMessage] Sending:', newMessage);
@@ -246,7 +443,7 @@ export default function HomePageClient() {
   };
 
   const handleDealAction = async (action) => {
-    if (!selectedService || !user) return;
+    if (!selectedService || !user || !chatData?.id) return;
 
     try {
       const response = await fetch('/api/deals', {
@@ -254,7 +451,7 @@ export default function HomePageClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action,
-          chatId: chatData?.id,
+          chatId: chatData.id,
           customerId: user.id,
           vendorId: selectedService.vendorId,
           serviceId: selectedService.id
@@ -262,31 +459,81 @@ export default function HomePageClient() {
       });
 
       const data = await response.json();
-      if (data.success) {
-        // Handle consistent response format
-        if (data.data.deal) {
-          setDealData(data.data.deal);
-        }
-        if (data.data.chat) {
-          setChatData(data.data.chat);
-        }
-        
-        if (action === 'accept' && data.data.readyForRating) {
-          setShowRatingForm(true);
-        }
+      if (!response.ok || !data.success) {
+        alert('Error: ' + (data.message || 'Gagal memproses deal'));
+        return;
+      }
 
-        if (action === 'cancel') {
+      if (data.data?.deal) {
+        setDealData(data.data.deal);
+        if (data.data.deal.status === 'cancelled') {
           setShowRatingForm(false);
         }
-
-        alert(data.message);
-      } else {
-        alert('Error: ' + (data.message || 'Gagal memproses deal'));
       }
+
+      if (data.data?.chat) {
+        setChatData(data.data.chat);
+      }
+
+      alert(data.message);
     } catch (error) {
       console.error('Error processing deal:', error);
       alert('Gagal memproses deal: ' + error.message);
     }
+  };
+
+  const getDealStatusConfig = () => {
+    if (!dealData) {
+      return {
+        label: 'Belum ada status deal',
+        description: 'Transaksi diproses vendor. Kamu cukup lanjut negosiasi di chat.',
+        background: '#f3f4f6',
+        color: '#374151'
+      };
+    }
+
+    if (dealData.status === 'pending') {
+      return {
+        label: 'Menunggu konfirmasi vendor',
+        description: 'Vendor belum mengonfirmasi. Tunggu update dari vendor di chat ini.',
+        background: '#fff7ed',
+        color: '#c2410c'
+      };
+    }
+
+    if (dealData.status === 'agreed') {
+      return {
+        label: 'Deal disetujui',
+        description: 'Deal sudah disepakati. Kamu bisa lanjut ke pembayaran.',
+        background: '#dbeafe',
+        color: '#1d4ed8'
+      };
+    }
+
+    if (dealData.status === 'cancelled') {
+      return {
+        label: 'Deal dibatalkan',
+        description: 'Deal dibatalkan. Kamu bisa lanjut negosiasi ulang melalui chat.',
+        background: '#fee2e2',
+        color: '#b91c1c'
+      };
+    }
+
+    if (dealData.status === 'completed') {
+      return {
+        label: 'Transaksi selesai',
+        description: 'Transaksi sudah selesai. Kamu bisa lanjut isi review.',
+        background: '#dcfce7',
+        color: '#166534'
+      };
+    }
+
+    return {
+      label: `Status: ${dealData.status}`,
+      description: 'Status deal diperbarui secara otomatis dari sistem.',
+      background: '#f3f4f6',
+      color: '#374151'
+    };
   };
 
   const submitRating = async () => {
@@ -368,6 +615,15 @@ export default function HomePageClient() {
   };
 
   const filteredServices = getFilteredServices();
+  const specificationEntries = getNonEmptyObjectEntries(selectedService?.specifications);
+  const descriptionTableEntries = getNonEmptyObjectEntries(selectedService?.descriptionTable);
+  const variationEntries = getNonEmptyObjectEntries(selectedService?.variations);
+  const locationLabel = selectedService?.location || selectedService?.lokasi || '-';
+  const categoryPath = [
+    selectedService?.mainCategory,
+    selectedService?.subCategory,
+    selectedService?.superSubCategory
+  ].filter(Boolean).join(' > ');
   const REVIEWS_PER_PAGE = 5;
   const filteredReviews = serviceReviews.filter((review) =>
     reviewFilter === 'all' ? true : Number(review.rating) === Number(reviewFilter)
@@ -437,6 +693,7 @@ export default function HomePageClient() {
         {/* Search Bar with Category Filter */}
         <SearchBar 
           services={filteredServices}
+          categoriesSource={services}
           onSearch={(term, category) => {
             setSearchTerm(term);
             setSelectedCategory(category);
@@ -475,8 +732,171 @@ export default function HomePageClient() {
                 <div key={service.id} className="vendor-card">
                   {isPopular && <div className="popular-badge">🔥 Populer</div>}
                   
-                  <div className="vendor-cover">
-                    <img src={imageUrl} alt={service.title} />
+                  {/* Favorite Button */}
+                  <button
+                    onClick={() => toggleFavorite(service, isFavorited(service.id))}
+                    disabled={favoriteLoading[service.id]}
+                    style={{
+                      background: isFavorited(service.id) ? '#FF6B6B' : 'rgba(255,255,255,0.9)',
+                      border: 'none',
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '20px',
+                      zIndex: 10,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                      transition: 'all 0.3s ease',
+                      opacity: favoriteLoading[service.id] ? 0.6 : 1
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!favoriteLoading[service.id]) {
+                        e.target.style.transform = 'scale(1.1)';
+                        e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!favoriteLoading[service.id]) {
+                        e.target.style.transform = 'scale(1)';
+                        e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+                      }
+                    }}
+                    title={isFavorited(service.id) ? 'Hapus dari favorit' : 'Tambah ke favorit'}
+                  >
+                    {isFavorited(service.id) ? '❤️' : '🤍'}
+                  </button>
+                  
+                  {/* ✅ CAROUSEL */}
+                  <div className="vendor-cover" style={{ position: 'relative', overflow: 'hidden' }}>
+                    <img 
+                      src={service.images && service.images.length > 0 
+                        ? service.images[currentImageIndex[service.id] || 0] 
+                        : imageUrl} 
+                      alt={service.title}
+                      style={{ transition: 'opacity 0.3s ease' }}
+                    />
+                    
+                    {/* Carousel Controls (show if multiple images) */}
+                    {service.images && service.images.length > 1 && (
+                      <>
+                        {/* Prev Button */}
+                        <button
+                          onClick={(e) => handlePrevImage(e, service.id, service.images.length)}
+                          style={{
+                            position: 'absolute',
+                            left: '8px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'rgba(0,0,0,0.5)',
+                            color: 'white',
+                            border: 'none',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '14px',
+                            zIndex: 5,
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.target.style.background = 'rgba(0,0,0,0.8)'}
+                          onMouseLeave={(e) => e.target.style.background = 'rgba(0,0,0,0.5)'}
+                          title="Foto sebelumnya"
+                        >
+                          ◀
+                        </button>
+                        
+                        {/* Next Button */}
+                        <button
+                          onClick={(e) => handleNextImage(e, service.id, service.images.length)}
+                          style={{
+                            position: 'absolute',
+                            right: '8px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'rgba(0,0,0,0.5)',
+                            color: 'white',
+                            border: 'none',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '14px',
+                            zIndex: 5,
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.target.style.background = 'rgba(0,0,0,0.8)'}
+                          onMouseLeave={(e) => e.target.style.background = 'rgba(0,0,0,0.5)'}
+                          title="Foto berikutnya"
+                        >
+                          ▶
+                        </button>
+                        
+                        {/* Image Counter Badge */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            background: 'rgba(0,0,0,0.7)',
+                            color: 'white',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            zIndex: 4
+                          }}
+                        >
+                          {(currentImageIndex[service.id] || 0) + 1}/{service.images.length}
+                        </div>
+                        
+                        {/* Image Dots */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: '8px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            background: 'rgba(0,0,0,0.6)',
+                            padding: '4px 8px',
+                            borderRadius: '12px',
+                            display: 'flex',
+                            gap: '4px',
+                            zIndex: 4
+                          }}
+                        >
+                          {service.images.map((_, idx) => (
+                            <span
+                              key={idx}
+                              style={{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                background: idx === (currentImageIndex[service.id] || 0) ? 'white' : 'rgba(255,255,255,0.5)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCurrentImageIndex(prev => ({
+                                  ...prev,
+                                  [service.id]: idx
+                                }));
+                              }}
+                              title={`Foto ${idx + 1}`}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                   
                   <div className="vendor-content">
@@ -490,7 +910,7 @@ export default function HomePageClient() {
                     
                     <div className="vendor-stats">
                       <div className="stat-rating">
-                        <span className="rating-stars">⭐ {service.rating.toFixed(1)}</span>
+                        <span className="rating-stars">⭐ {Number(service.rating || 0).toFixed(1)}</span>
                         <span className="rating-count">({service.rentCount} disewa)</span>
                       </div>
                     </div>
@@ -527,14 +947,58 @@ export default function HomePageClient() {
             </div>
 
             <div className="modal-body">
-              {/* Gallery dari Paket Items atau Default Image */}
+              {/* Thumbnail utama service, dipisahkan dari gambar katalog/aset paket */}
               <div className="modal-image">
-                {selectedService.items && selectedService.items.length > 0 ? (
-                  <img src={selectedItemDetail?.images?.[0] || selectedService.items[0].images?.[0] || 'https://via.placeholder.com/400x300?text=' + encodeURIComponent('Paket')} alt={selectedItemDetail?.namaBarang || selectedItemDetail?.namaJasa || 'Paket'} />
-                ) : (
-                  <img src={selectedService.image || (selectedService.images && selectedService.images.length > 0 ? selectedService.images[0] : 'https://via.placeholder.com/400x300?text=' + encodeURIComponent(selectedService.title || 'Service'))} alt={selectedService.title} />
+                <img
+                  src={getServiceGalleryImages(selectedService)[modalImageIndex] || getServiceThumbnail(selectedService)}
+                  alt={selectedService.title || 'Thumbnail service'}
+                />
+
+                {getServiceGalleryImages(selectedService).length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      className="modal-image-nav prev"
+                      onClick={() => {
+                        const total = getServiceGalleryImages(selectedService).length;
+                        setModalImageIndex((prev) => (prev - 1 + total) % total);
+                      }}
+                      aria-label="Foto sebelumnya"
+                    >
+                      ◀
+                    </button>
+                    <button
+                      type="button"
+                      className="modal-image-nav next"
+                      onClick={() => {
+                        const total = getServiceGalleryImages(selectedService).length;
+                        setModalImageIndex((prev) => (prev + 1) % total);
+                      }}
+                      aria-label="Foto berikutnya"
+                    >
+                      ▶
+                    </button>
+
+                    <div className="modal-image-counter">
+                      {modalImageIndex + 1}/{getServiceGalleryImages(selectedService).length}
+                    </div>
+                  </>
                 )}
               </div>
+
+              {getServiceGalleryImages(selectedService).length > 1 && (
+                <div className="modal-image-dots">
+                  {getServiceGalleryImages(selectedService).map((img, idx) => (
+                    <button
+                      type="button"
+                      key={`${img.slice(0, 20)}-${idx}`}
+                      className={`modal-image-dot ${modalImageIndex === idx ? 'active' : ''}`}
+                      onClick={() => setModalImageIndex(idx)}
+                      aria-label={`Lihat foto ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+              )}
 
               <div className="modal-price-block">
                 <div className="modal-price-title">Harga Sewa</div>
@@ -568,6 +1032,12 @@ export default function HomePageClient() {
                   >
                     Informasi Penjual
                   </button>
+                  <button
+                    className={`tab ${detailTab === 'reviews' ? 'active' : ''}`}
+                    onClick={() => setDetailTab('reviews')}
+                  >
+                    Rating & Review
+                  </button>
                 </div>
 
                 <div className="tab-panel">
@@ -588,7 +1058,7 @@ export default function HomePageClient() {
                                 onClick={() => setSelectedItemDetail(item)}
                                 style={{
                                   cursor: 'pointer',
-                                  borderRadius: '8px',
+                                  borderRadius: '14px',
                                   overflow: 'hidden',
                                   border: selectedItemDetail?.id === item.id ? '3px solid #5A45D1' : '1px solid #ddd',
                                   transition: 'all 0.3s ease',
@@ -596,7 +1066,7 @@ export default function HomePageClient() {
                                 }}
                               >
                                 <img
-                                  src={item.images && item.images.length > 0 ? item.images[0] : 'https://via.placeholder.com/120x120?text=Paket'}
+                                  src={getItemPreviewImage(item)}
                                   alt={item.namaBarang || item.namaJasa}
                                   style={{
                                     width: '100%',
@@ -613,18 +1083,18 @@ export default function HomePageClient() {
                             <div style={{
                               backgroundColor: '#f8f9fa',
                               padding: '16px',
-                              borderRadius: '8px',
+                              borderRadius: '14px',
                               marginTop: '16px'
                             }}>
                               <div style={{ marginBottom: '16px' }}>
                                 <img
-                                  src={selectedItemDetail.images && selectedItemDetail.images.length > 0 ? selectedItemDetail.images[0] : 'https://via.placeholder.com/300x200?text=Paket'}
+                                  src={getItemPreviewImage(selectedItemDetail)}
                                   alt={selectedItemDetail.namaBarang || selectedItemDetail.namaJasa}
                                   style={{
                                     width: '100%',
                                     height: '200px',
                                     objectFit: 'cover',
-                                    borderRadius: '8px'
+                                    borderRadius: '14px'
                                   }}
                                 />
                               </div>
@@ -683,6 +1153,166 @@ export default function HomePageClient() {
                         <p>{selectedService.vendorName}</p>
                       </div>
 
+                      <div className="info-section">
+                        <h4>🏷️ Kategori</h4>
+                        <p>{categoryPath || selectedService.category || '-'}</p>
+                      </div>
+
+                      <div className="info-section">
+                        <h4>📈 Terjual</h4>
+                        <p>{selectedService.rentCount ?? '0'}</p>
+                      </div>
+
+                      {(selectedService.location || selectedService.lokasi) && (
+                        <div className="info-section">
+                          <h4>📍 Lokasi Penjemputan</h4>
+                          <p>{locationLabel}</p>
+                        </div>
+                      )}
+
+                      {selectedService.minimumDays && (
+                        <div className="info-section">
+                          <h4>📅 Minimum Sewa</h4>
+                          <p>{selectedService.minimumDays} hari</p>
+                        </div>
+                      )}
+
+                      {selectedService.rentalPolicy && (
+                        <div className="info-section">
+                          <h4>📜 Kebijakan Sewa</h4>
+                          <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.rentalPolicy}</p>
+                        </div>
+                      )}
+
+                      <div className="info-section">
+                        <h4>🕒 Status</h4>
+                        <p>Terakhir online baru-baru ini</p>
+                      </div>
+                    </>
+                  )}
+
+                  {detailTab === 'description' && (
+                    <>
+                      <div className="info-section">
+                        <h4>📝 Deskripsi Lengkap</h4>
+                        <p style={{ lineHeight: '1.6', color: '#555' }}>
+                          {selectedService.detailDescription || selectedService.description}
+                        </p>
+                      </div>
+
+                      {descriptionTableEntries.length > 0 && (
+                        <div className="info-section">
+                          <h4>📋 Detail Produk/Jasa</h4>
+                          <div style={{ display: 'grid', gap: '10px' }}>
+                            {descriptionTableEntries.map(([key, value]) => (
+                              <div key={key}>
+                                <strong>{formatFieldLabel(key)}:</strong> {String(value)}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {variationEntries.length > 0 && (
+                        <div className="info-section">
+                          <h4>🎚️ Variasi</h4>
+                          <div style={{ display: 'grid', gap: '10px' }}>
+                            {variationEntries.map(([key, variation]) => {
+                              const variationName = variation?.name || formatFieldLabel(key);
+                              const optionLabels = Array.isArray(variation?.options)
+                                ? variation.options.map((option) => option.label).filter(Boolean)
+                                : [];
+
+                              return (
+                                <div key={key}>
+                                  <strong>{variationName}:</strong>{' '}
+                                  {optionLabels.length > 0 ? optionLabels.join(', ') : 'Belum ada opsi'}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {specificationEntries.length > 0 && (
+                        <div className="info-section">
+                          <h4>🔧 Spesifikasi</h4>
+                          <div style={{ display: 'grid', gap: '10px' }}>
+                            {specificationEntries.map(([key, value]) => (
+                              <div key={key}>
+                                <strong>{formatFieldLabel(key)}:</strong> {String(value)}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {(selectedService.type === 'barang' || selectedService.category === 'barang') && (
+                        <>
+                          <div className="info-section">
+                            <h4>📦 Keterangan Barang</h4>
+                            <p>{selectedService.jenisBarang || selectedService.shortDescription || '-'}</p>
+                          </div>
+
+                          {selectedService.spesifikBarang && (
+                            <div className="info-section">
+                              <h4>🔎 Spesifik Barang</h4>
+                              <p>{selectedService.spesifikBarang}</p>
+                            </div>
+                          )}
+
+                          {selectedService.kebijakanKerusakan && (
+                            <div className="info-section">
+                              <h4>🛡️ Kebijakan Kerusakan</h4>
+                              <p>{selectedService.kebijakanKerusakan}</p>
+                            </div>
+                          )}
+
+                          {selectedService.dendaKeterlambatan && (
+                            <div className="info-section">
+                              <h4>⚠️ Denda Keterlambatan</h4>
+                              <p>{selectedService.dendaKeterlambatan}</p>
+                            </div>
+                          )}
+
+                          {selectedService.syaratKetentuan && (
+                            <div className="info-section">
+                              <h4>📋 Syarat & Ketentuan</h4>
+                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {(selectedService.type === 'jasa' || selectedService.category === 'jasa') && (
+                        <>
+                          {selectedService.spesifikBarang && (
+                            <div className="info-section">
+                              <h4>✨ Detail Layanan</h4>
+                              <p>{selectedService.spesifikBarang}</p>
+                            </div>
+                          )}
+
+                          {selectedService.dendaKeterlambatan && (
+                            <div className="info-section">
+                              <h4>⚠️ Denda Keterlambatan</h4>
+                              <p>{selectedService.dendaKeterlambatan}</p>
+                            </div>
+                          )}
+
+                          {selectedService.syaratKetentuan && (
+                            <div className="info-section">
+                              <h4>📋 Syarat & Ketentuan</h4>
+                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  {detailTab === 'reviews' && (
+                    <>
                       <div className="info-section">
                         <h4>⭐ Rating & Review</h4>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -756,107 +1386,37 @@ export default function HomePageClient() {
                           </div>
                         )}
                       </div>
-                    
-
-                      {(selectedService.category === 'barang' || selectedService.type === 'barang') && (
-                        <div className="info-section">
-                          <h4>📦 Stok</h4>
-                          <p>{selectedService.jumlahBarang ?? 'N/A'}</p>
-                        </div>
-                      )}
-
-                      <div className="info-section">
-                        <h4>📈 Terjual</h4>
-                        <p>{selectedService.rentCount ?? '0'}</p>
-                      </div>
-
-                      {selectedService.lokasi && (
-                        <div className="info-section">
-                          <h4>📍 Lokasi Penjemputan</h4>
-                          <p>{selectedService.lokasi}</p>
-                        </div>
-                      )}
-
-                      <div className="info-section">
-                        <h4>🕒 Status</h4>
-                        <p>Terakhir online baru-baru ini</p>
-                      </div>
                     </>
                   )}
 
-                  {detailTab === 'description' && (
-                    <>
-                      <div className="info-section">
-                        <h4>📝 Deskripsi Lengkap</h4>
-                        <p style={{ lineHeight: '1.6', color: '#555' }}>
-                          {selectedService.detailDescription || selectedService.description}
-                        </p>
-                      </div>
+                </div>
 
-                      {(selectedService.type === 'barang' || selectedService.category === 'barang') && (
-                        <>
-                          <div className="info-section">
-                            <h4>📦 Keterangan Barang</h4>
-                            <p>{selectedService.jenisBarang || selectedService.shortDescription || '-'}</p>
+                <div className="info-section" style={{ marginTop: '24px', background: 'linear-gradient(135deg, #f8f7ff, #eef6ff)', border: '1px solid #dbeafe' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <div>
+                      <h4 style={{ margin: 0 }}>🎁 Offer Promo Random</h4>
+                      <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#6b7280' }}>Rekomendasi menarik dari produk lain yang sedang tampil di katalog.</p>
+                    </div>
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#5A45D1', background: '#ede9fe', padding: '6px 10px', borderRadius: '999px' }}>Limited deal</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
+                    {getPromoOffers(selectedService).map((offer) => (
+                      <div key={offer.id} style={{ background: 'white', borderRadius: '14px', overflow: 'hidden', border: '1px solid #e5e7eb', boxShadow: '0 8px 20px rgba(91, 69, 209, 0.08)' }}>
+                        <div style={{ height: '120px', background: '#f3f4f6' }}>
+                          <img src={offer.image || 'https://via.placeholder.com/400x240?text=Promo'} alt={offer.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                        <div style={{ padding: '14px' }}>
+                          <div style={{ fontSize: '12px', color: '#7c3aed', fontWeight: '700', marginBottom: '6px' }}>Promo {offer.code ? `• ${offer.code}` : 'spesial'}</div>
+                          <div style={{ fontSize: '15px', fontWeight: '800', color: '#111827', marginBottom: '8px' }}>{offer.title}</div>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '18px', fontWeight: '900', color: '#dc2626' }}>Rp {Number(offer.promoPrice ?? offer.originalPrice).toLocaleString('id-ID')}</span>
+                            <span style={{ fontSize: '12px', color: '#6b7280', textDecoration: 'line-through' }}>Rp {Number(offer.originalPrice || 0).toLocaleString('id-ID')}</span>
                           </div>
-
-                          {selectedService.spesifikBarang && (
-                            <div className="info-section">
-                              <h4>🔎 Spesifik Barang</h4>
-                              <p>{selectedService.spesifikBarang}</p>
-                            </div>
-                          )}
-
-                          {selectedService.kebijakanKerusakan && (
-                            <div className="info-section">
-                              <h4>🛡️ Kebijakan Kerusakan</h4>
-                              <p>{selectedService.kebijakanKerusakan}</p>
-                            </div>
-                          )}
-
-                          {selectedService.dendaKeterlambatan && (
-                            <div className="info-section">
-                              <h4>⚠️ Denda Keterlambatan</h4>
-                              <p>{selectedService.dendaKeterlambatan}</p>
-                            </div>
-                          )}
-
-                          {selectedService.syaratKetentuan && (
-                            <div className="info-section">
-                              <h4>📋 Syarat & Ketentuan</h4>
-                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {(selectedService.type === 'jasa' || selectedService.category === 'jasa') && (
-                        <>
-                          {selectedService.spesifikBarang && (
-                            <div className="info-section">
-                              <h4>✨ Detail Layanan</h4>
-                              <p>{selectedService.spesifikBarang}</p>
-                            </div>
-                          )}
-
-                          {selectedService.dendaKeterlambatan && (
-                            <div className="info-section">
-                              <h4>⚠️ Denda Keterlambatan</h4>
-                              <p>{selectedService.dendaKeterlambatan}</p>
-                            </div>
-                          )}
-
-                          {selectedService.syaratKetentuan && (
-                            <div className="info-section">
-                              <h4>📋 Syarat & Ketentuan</h4>
-                              <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </>
-                  )}
-
+                          <div style={{ fontSize: '12px', color: '#4b5563', minHeight: '36px' }}>{offer.description}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="modal-actions">
@@ -889,56 +1449,6 @@ export default function HomePageClient() {
                 </p>
               </div>
               <button className="modal-close" onClick={closeChatModal}>✕</button>
-            </div>
-
-            {/* Deal Buttons - Transparent Bar at Top of Chat */}
-            <div className="chat-deal-actions" style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: '12px',
-              padding: '12px',
-              backgroundColor: 'rgba(255, 255, 255, 0.7)',
-              borderBottom: '1px solid rgba(200, 200, 200, 0.3)',
-              backdropFilter: 'blur(4px)'
-            }}>
-              <button
-                className="btn-deal"
-                onClick={() => handleDealAction('accept')}
-                disabled={dealData?.status === 'agreed' || dealData?.status === 'cancelled'}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  backgroundColor: dealData?.status === 'agreed' ? '#d4edda' : '#28a745',
-                  color: dealData?.status === 'agreed' ? '#155724' : 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: 'bold',
-                  cursor: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
-                  opacity: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? 0.6 : 1,
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                ✅ {dealData?.status === 'agreed' ? 'Deal Diterima' : 'Deal'}
-              </button>
-              <button
-                className="btn-cancel"
-                onClick={() => handleDealAction('cancel')}
-                disabled={dealData?.status === 'cancelled'}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  backgroundColor: dealData?.status === 'cancelled' ? '#f8d7da' : '#dc3545',
-                  color: dealData?.status === 'cancelled' ? '#721c24' : 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: 'bold',
-                  cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
-                  opacity: dealData?.status === 'cancelled' ? 0.6 : 1,
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                ❌ {dealData?.status === 'cancelled' ? 'Dibatalkan' : 'Cancel'}
-              </button>
             </div>
 
             {/* Chat Messages */}
@@ -1001,22 +1511,125 @@ export default function HomePageClient() {
 
             {/* Chat Input */}
             {!showRatingForm && (
-              <div className="chat-input-section">
-                <input
-                  type="text"
-                  className="chat-input"
-                  placeholder="Ketik pesan..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      sendMessage();
-                    }
-                  }}
-                />
-                <button className="btn-send" onClick={sendMessage}>
-                  Kirim
-                </button>
+              <div className="chat-input-section" style={{ flexDirection: 'column', gap: '10px' }}>
+                {(() => {
+                  const statusConfig = getDealStatusConfig();
+                  const finalPrice = dealData?.finalPrice || dealData?.originalPrice || 0;
+                  const dealDisabled = dealData?.status === 'agreed' || dealData?.status === 'cancelled' || chatData?.dealStatus === 'closed';
+
+                  return (
+                    <div
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid #e5e7eb',
+                        background: statusConfig.background
+                      }}
+                    >
+                      <div style={{ fontSize: '12px', fontWeight: '700', color: statusConfig.color }}>
+                        {statusConfig.label}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#4b5563', marginTop: '3px' }}>
+                        {statusConfig.description}
+                      </div>
+                      {chatData?.dealStatus === 'closed' && (
+                        <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: '700', color: '#92400e' }}>
+                          Chat sudah ditutup setelah pembayaran selesai.
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleDealAction('accept')}
+                          disabled={dealDisabled}
+                          style={{
+                            flex: 1,
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #10b981',
+                            background: 'rgba(16, 185, 129, 0.08)',
+                            color: '#047857',
+                            fontWeight: '700',
+                            cursor: dealDisabled ? 'not-allowed' : 'pointer',
+                            opacity: dealDisabled ? 0.55 : 1
+                          }}
+                        >
+                          {dealData?.status === 'agreed' ? 'Deal Diterima' : 'Terima Deal'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDealAction('cancel')}
+                          disabled={dealData?.status === 'cancelled'}
+                          style={{
+                            flex: 1,
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid #ef4444',
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            color: '#b91c1c',
+                            fontWeight: '700',
+                            cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
+                            opacity: dealData?.status === 'cancelled' ? 0.55 : 1
+                          }}
+                        >
+                          {dealData?.status === 'cancelled' ? 'Dibatalkan' : 'Cancel'}
+                        </button>
+                      </div>
+
+                      {dealData?.status === 'agreed' && (
+                        <div style={{ marginTop: '8px', fontSize: '12px', color: '#1e40af' }}>
+                          <div style={{ fontWeight: '700' }}>
+                            Harga akhir: Rp {Number(finalPrice).toLocaleString('id-ID')}
+                          </div>
+                          {dealData.discountGiven && dealData.discount && (
+                            <div style={{ marginTop: '2px' }}>
+                              Potongan: Rp {Number(dealData.discount.amount || 0).toLocaleString('id-ID')}
+                            </div>
+                          )}
+                          {dealData.id && (
+                            <button
+                              type="button"
+                              onClick={() => router.push(`/transaction/payment?dealId=${dealData.id}`)}
+                              style={{
+                                marginTop: '7px',
+                                padding: '7px 10px',
+                                border: '1px solid #1d4ed8',
+                                borderRadius: '8px',
+                                background: 'rgba(29, 78, 216, 0.09)',
+                                color: '#1d4ed8',
+                                fontWeight: '700',
+                                fontSize: '12px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Lanjut ke Pembayaran
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input
+                    type="text"
+                    className="chat-input"
+                    placeholder="Ketik pesan..."
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    disabled={chatData?.dealStatus === 'closed'}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        sendMessage();
+                      }
+                    }}
+                  />
+                  <button className="btn-send" onClick={sendMessage}>
+                    Kirim
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -1761,11 +2374,13 @@ export default function HomePageClient() {
         .modal-content {
           background: white;
           border-radius: 16px;
-          max-width: 600px;
+          max-width: 900px;
           width: 100%;
           max-height: 90vh;
-          overflow-y: auto;
+          overflow: hidden;
           box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+          display: flex;
+          flex-direction: column;
         }
 
         .modal-header {
@@ -1778,6 +2393,7 @@ export default function HomePageClient() {
           top: 0;
           background: white;
           z-index: 10;
+          border-radius: 16px 16px 0 0;
         }
 
         .modal-header h2 {
@@ -1809,20 +2425,91 @@ export default function HomePageClient() {
 
         .modal-body {
           padding: 24px;
+          overflow-y: auto;
+          max-height: calc(90vh - 92px);
         }
 
         .modal-image {
           width: 100%;
           height: 300px;
           margin-bottom: 24px;
-          border-radius: 12px;
+          border-radius: 14px;
           overflow: hidden;
+          position: relative;
+          background: #f3f4f6;
         }
 
         .modal-image img {
           width: 100%;
           height: 100%;
           object-fit: cover;
+        }
+
+        .modal-image-nav {
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          border: none;
+          width: 34px;
+          height: 34px;
+          border-radius: 50%;
+          background: rgba(17, 24, 39, 0.65);
+          color: #fff;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 3;
+          transition: background 0.2s ease;
+        }
+
+        .modal-image-nav:hover {
+          background: rgba(17, 24, 39, 0.85);
+        }
+
+        .modal-image-nav.prev {
+          left: 10px;
+        }
+
+        .modal-image-nav.next {
+          right: 10px;
+        }
+
+        .modal-image-counter {
+          position: absolute;
+          right: 12px;
+          bottom: 12px;
+          background: rgba(17, 24, 39, 0.72);
+          color: #fff;
+          font-size: 12px;
+          font-weight: 600;
+          padding: 4px 8px;
+          border-radius: 999px;
+          z-index: 3;
+        }
+
+        .modal-image-dots {
+          display: flex;
+          gap: 8px;
+          margin-top: -12px;
+          margin-bottom: 20px;
+          justify-content: center;
+        }
+
+        .modal-image-dot {
+          width: 9px;
+          height: 9px;
+          border-radius: 50%;
+          border: none;
+          background: #d1d5db;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .modal-image-dot.active {
+          width: 22px;
+          border-radius: 999px;
+          background: #5A45D1;
         }
 
         .modal-info {

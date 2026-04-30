@@ -51,7 +51,7 @@ export default function TambahProdukPage() {
     }
 
     setUser(parsedUser);
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (!selectedType) return;
@@ -81,9 +81,6 @@ export default function TambahProdukPage() {
     if (!formData.subCategory) missingFields.push('Sub Kategori');
     if (currentSuperSubOptions.length > 0 && !formData.superSubCategory) missingFields.push('Super-Sub Kategori');
     if (!formData.title) missingFields.push('Nama Item');
-    if (!formData.shortDescription) missingFields.push('Deskripsi Singkat');
-    if (!formData.price) missingFields.push('Harga per Hari');
-    if (!formData.quantity) missingFields.push('Jumlah Item');
     if (!formData.location) missingFields.push('Lokasi Pickup');
 
     if (missingFields.length > 0) {
@@ -94,6 +91,13 @@ export default function TambahProdukPage() {
     setIsSubmitting(true);
 
     try {
+      const derivedQuantity = selectedType === 'barang'
+        ? Math.max(
+            1,
+            (formData.items || []).reduce((sum, item) => sum + (parseInt(item.stok, 10) || 0), 0)
+          )
+        : Math.max(1, (formData.items || []).length || 1);
+
       const submitData = {
         vendorId: user.id,
         vendorName: user.name,
@@ -106,16 +110,20 @@ export default function TambahProdukPage() {
         shortDescription: formData.shortDescription,
         detailDescription: formData.description,
         description: formData.description,
-        price: parseInt(formData.price),
+        price: formData.price ? parseInt(formData.price) : undefined,
         minimumDays: parseInt(formData.minimumDays),
-        quantity: parseInt(formData.quantity),
+        quantity: derivedQuantity,
         rentalPolicy: formData.rentalPolicy,
         location: formData.location,
         specifications: formData.specifications || {},
         descriptionTable: formData.descriptionTable || {},
         checklist: formData.checklist || {},
         items: formData.items || [],
-        images: formData.images.filter(img => typeof img === 'string' && (img.startsWith('data:') || img.startsWith('http'))),
+        variations: formData.variations || {},
+        // ✅ FIXED: Accept all valid image formats (base64, http, https, blob)
+        images: (formData.images || [])
+          .filter(img => typeof img === 'string' && (img.startsWith('data:') || img.startsWith('http') || img.startsWith('blob:')))
+          .slice(0, 5),
         rating: 0,
         rentCount: 0
       };

@@ -57,13 +57,15 @@ export async function GET(request) {
 
       // Jika tidak ada vendorReg, gunakan service title
       if (!itemName || itemName === 'N/A') {
-        itemName = service?.title || 'Layanan';
+        itemName = service?.title || vendorReg?.namaBarang || vendorReg?.spesialisasi || 'Layanan';
       }
+
+      const vendorName = vendor?.name || vendor?.vendorName || chat?.vendorName || vendorReg?.vendorName || vendorReg?.namaToko || 'Unknown';
 
       return {
         ...deal,
         itemName: itemName,
-        vendorName: vendor?.name || vendor?.vendorName || 'Unknown',
+        vendorName,
         totalPrice: service?.price || 0,
         customerName: chat?.customerName || 'Unknown',
         // Add service details untuk payment page
