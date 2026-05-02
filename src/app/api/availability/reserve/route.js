@@ -54,8 +54,18 @@ export async function POST(request) {
     // Add booking to service
     service.bookings.push(newBooking);
 
-    // Update availableQuantity (recalculate)
-    const totalQuantity = Number(service.quantity) || Number(service.jumlahBarang) || 0;
+    // Update availableQuantity (recalculate) based on service type
+    let totalQuantity = 0;
+    const serviceType = service.type || 'barang';
+    
+    if (serviceType === 'jasa') {
+      // JASA: Use service-level quantity
+      totalQuantity = Number(service.quantity) || 0;
+    } else {
+      // BARANG: Sum of all items stok
+      totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
+    }
+    
     let bookedQuantity = 0;
     for (const booking of service.bookings) {
       if (booking.status !== 'cancelled' && booking.status !== 'completed') {
@@ -67,6 +77,14 @@ export async function POST(request) {
     // Save updated services
     await fs.writeFile(servicesPath, JSON.stringify(services, null, 2));
 
+    // Calculate bookedQuantity for response
+    let responseBookedQty = 0;
+    for (const booking of service.bookings) {
+      if (booking.status !== 'cancelled' && booking.status !== 'completed') {
+        responseBookedQty += booking.quantity || 0;
+      }
+    }
+    
     return NextResponse.json({
       success: true,
       message: 'Booking berhasil dibuat dan diresevasi',
@@ -75,7 +93,7 @@ export async function POST(request) {
         id: service.id,
         title: service.title,
         totalQuantity: totalQuantity,
-        bookedQuantity: bookedQuantity,
+        bookedQuantity: responseBookedQty,
         availableQuantity: service.availableQuantity
       }
     }, { status: 201 });
@@ -125,12 +143,24 @@ export async function GET(request) {
       filteredBookings = bookings.filter(b => b.status === statusFilter);
     }
 
+    // Calculate total quantity based on service type
+    let totalQty = 0;
+    const svcType = service.type || 'barang';
+    
+    if (svcType === 'jasa') {
+      // JASA: Use service-level quantity
+      totalQty = Number(service.quantity) || 0;
+    } else {
+      // BARANG: Sum of all items stok
+      totalQty = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
+    }
+    
     return NextResponse.json({
       success: true,
       service: {
         id: service.id,
         title: service.title,
-        quantity: Number(service.quantity) || Number(service.jumlahBarang) || 0,
+        quantity: totalQty,
         availableQuantity: service.availableQuantity
       },
       bookings: filteredBookings,
@@ -190,8 +220,18 @@ export async function PUT(request) {
     service.bookings[bookingIndex].status = newStatus;
     service.bookings[bookingIndex].updatedAt = new Date().toISOString();
 
-    // Recalculate availableQuantity
-    const totalQuantity = Number(service.quantity) || Number(service.jumlahBarang) || 0;
+    // Recalculate availableQuantity based on service type
+    let totalQuantity = 0;
+    const putServiceType = service.type || 'barang';
+    
+    if (putServiceType === 'jasa') {
+      // JASA: Use service-level quantity
+      totalQuantity = Number(service.quantity) || 0;
+    } else {
+      // BARANG: Sum of all items stok
+      totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
+    }
+    
     let bookedQuantity = 0;
     for (const booking of service.bookings) {
       if (booking.status !== 'cancelled' && booking.status !== 'completed') {
