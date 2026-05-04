@@ -132,8 +132,14 @@ export async function POST(request) {
     }
 
     // Calculate late charge: daily_rate × daysLate
-    // daily_rate = totalPrice / 5 (assuming 5-day average rental)
-    const dailyRate = (deal.totalPrice || 0) / 5;
+    // daily_rate = totalPrice / rentalDays (using actual rental duration)
+    // Get rental duration from deal data or calculate from dates
+    let rentalDays = deal.rentalDays || deal.durationDays || 1;
+    if (rentalDays <= 0 && deal.borrowDate && deal.expectedReturnDate) {
+      rentalDays = Math.ceil((new Date(deal.expectedReturnDate) - new Date(deal.borrowDate)) / (1000 * 60 * 60 * 24));
+    }
+    rentalDays = Math.max(rentalDays, 1); // Ensure at least 1 day
+    const dailyRate = (deal.totalPrice || 0) / rentalDays;
     deal.lateCharge = Math.round(daysLate * dailyRate);
 
     // Status for inspection
