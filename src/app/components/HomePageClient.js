@@ -2469,18 +2469,21 @@ export default function HomePageClient() {
 
         .modal-image {
           width: 100%;
-          height: 300px;
+          height: 500px;
           margin-bottom: 24px;
           border-radius: 14px;
           overflow: hidden;
           position: relative;
           background: #f3f4f6;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .modal-image img {
           width: 100%;
           height: 100%;
-          object-fit: cover;
+          object-fit: contain;
         }
 
         .modal-image-nav {
