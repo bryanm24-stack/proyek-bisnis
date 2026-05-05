@@ -1131,7 +1131,6 @@ export default function HomePageClient() {
                                   alt={selectedItemDetail.namaBarang || selectedItemDetail.namaJasa}
                                   style={{
                                     width: '100%',
-                                    height: '200px',
                                     objectFit: 'cover',
                                     borderRadius: '14px'
                                   }}
