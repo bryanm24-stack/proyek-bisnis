@@ -33,8 +33,16 @@ export default function HomePageClient() {
   const [reviewPage, setReviewPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchFilters, setSearchFilters] = useState({
+    locationTerm: '',
+    minRating: 'all',
+    priceRange: 'all',
+    sortBy: 'recommended'
+  });
   const [userFavorites, setUserFavorites] = useState([]);
   const [favoriteLoading, setFavoriteLoading] = useState({});
+  const [vendorReplyDrafts, setVendorReplyDrafts] = useState({});
+  const [vendorReplySubmittingId, setVendorReplySubmittingId] = useState(null);
 
   const fetchFavorites = useCallback(async (currentUser) => {
     if (!currentUser) return;
@@ -233,6 +241,12 @@ export default function HomePageClient() {
       max: maxPrice,
       display: `${formatPrice(minPrice)} - ${formatPrice(maxPrice)}`
     };
+  };
+
+  const getServicePriceNumber = (service) => {
+    const itemPrice = getItemsPrice(service);
+    if (itemPrice?.min) return Number(itemPrice.min) || 0;
+    return Number(service?.price || service?.tarif || 0) || 0;
   };
 
   const getNonEmptyObjectEntries = (value) => {
@@ -610,6 +624,52 @@ export default function HomePageClient() {
     }
   };
 
+  const submitVendorReply = async (review) => {
+    if (!user || user.role !== 'vendor' || user.id !== selectedService?.vendorId) {
+      alert('Hanya vendor pemilik layanan yang dapat membalas review.');
+      return;
+    }
+
+    const reply = (vendorReplyDrafts[review.id] || '').trim();
+    if (!reply) {
+      alert('Balasan tidak boleh kosong');
+      return;
+    }
+
+    setVendorReplySubmittingId(review.id);
+
+    try {
+      const response = await fetch('/api/ratings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ratingId: review.id,
+          vendorId: selectedService.vendorId,
+          serviceId: selectedService.id,
+          reply
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Gagal menyimpan balasan vendor');
+      }
+
+      setServiceReviews((prev) => prev.map((item) => (
+        item.id === review.id
+          ? { ...item, vendorReply: data.data.vendorReply, vendorReplyAt: data.data.vendorReplyAt, vendorReplyBy: data.data.vendorReplyBy }
+          : item
+      )));
+      setVendorReplyDrafts((prev) => ({ ...prev, [review.id]: '' }));
+      alert('Balasan vendor berhasil disimpan');
+    } catch (error) {
+      console.error('Error saving vendor reply:', error);
+      alert(error.message || 'Gagal menyimpan balasan vendor');
+    } finally {
+      setVendorReplySubmittingId(null);
+    }
+  };
+
   const handleChatClick = () => {
     if (!user) {
       alert('Silakan login terlebih dahulu');
@@ -645,9 +705,53 @@ export default function HomePageClient() {
         service.title?.toLowerCase().includes(term) ||
         service.vendorName?.toLowerCase().includes(term) ||
         service.shortDescription?.toLowerCase().includes(term) ||
-        service.description?.toLowerCase().includes(term)
+        service.description?.toLowerCase().includes(term) ||
+        service.location?.toLowerCase().includes(term) ||
+        service.lokasi?.toLowerCase().includes(term)
       );
     }
+
+    const locationTerm = (searchFilters.locationTerm || '').trim().toLowerCase();
+    if (locationTerm) {
+      filtered = filtered.filter(service =>
+        service.location?.toLowerCase().includes(locationTerm) ||
+        service.lokasi?.toLowerCase().includes(locationTerm)
+      );
+    }
+
+    if (searchFilters.minRating !== 'all') {
+      const minimumRating = Number(searchFilters.minRating) || 0;
+      filtered = filtered.filter(service => Number(service.rating || 0) >= minimumRating);
+    }
+
+    if (searchFilters.priceRange !== 'all') {
+      filtered = filtered.filter((service) => {
+        const price = getServicePriceNumber(service);
+        if (searchFilters.priceRange === 'under_100k') return price > 0 && price < 100000;
+        if (searchFilters.priceRange === '100k_250k') return price >= 100000 && price < 250000;
+        if (searchFilters.priceRange === '250k_500k') return price >= 250000 && price < 500000;
+        if (searchFilters.priceRange === 'above_500k') return price >= 500000;
+        return true;
+      });
+    }
+
+    const sortBy = searchFilters.sortBy || 'recommended';
+    filtered = [...filtered].sort((a, b) => {
+      const ratingA = Number(a.rating || 0);
+      const ratingB = Number(b.rating || 0);
+      const rentA = Number.parseInt(String(a.rentCount || '0').replace(/[K,]/g, ''), 10) || 0;
+      const rentB = Number.parseInt(String(b.rentCount || '0').replace(/[K,]/g, ''), 10) || 0;
+      const priceA = getServicePriceNumber(a);
+      const priceB = getServicePriceNumber(b);
+
+      if (sortBy === 'popular') return rentB - rentA;
+      if (sortBy === 'rating') return ratingB - ratingA || rentB - rentA;
+      if (sortBy === 'price_low') return priceA - priceB || ratingB - ratingA;
+      if (sortBy === 'price_high') return priceB - priceA || ratingB - ratingA;
+      if (sortBy === 'newest') return Number(b.id || 0) - Number(a.id || 0);
+
+      return ratingB - ratingA || rentB - rentA || priceA - priceB;
+    });
 
     return filtered;
   };
@@ -736,6 +840,7 @@ export default function HomePageClient() {
             setSearchTerm(term);
             setSelectedCategory(category);
           }}
+          onFiltersChange={(filters) => setSearchFilters((prev) => ({ ...prev, ...filters }))}
           onCategoryChange={(category) => setSelectedCategory(category)}
         />
 
@@ -1398,6 +1503,31 @@ export default function HomePageClient() {
                                 </div>
                                 <p className="review-author">{review.customerName || 'Customer'}</p>
                                 <p className="review-text">{review.review?.trim() || 'Customer tidak menulis komentar.'}</p>
+                                {review.vendorReply && (
+                                  <div className="vendor-reply-box">
+                                    <div className="vendor-reply-label">Balasan vendor</div>
+                                    <p className="vendor-reply-text">{review.vendorReply}</p>
+                                  </div>
+                                )}
+                                {user?.role === 'vendor' && user.id === selectedService?.vendorId && !review.vendorReply && (
+                                  <div className="vendor-reply-form">
+                                    <textarea
+                                      className="vendor-reply-input"
+                                      rows={3}
+                                      placeholder="Tulis balasan vendor untuk review ini..."
+                                      value={vendorReplyDrafts[review.id] || ''}
+                                      onChange={(e) => setVendorReplyDrafts((prev) => ({ ...prev, [review.id]: e.target.value }))}
+                                    />
+                                    <button
+                                      type="button"
+                                      className="vendor-reply-btn"
+                                      onClick={() => submitVendorReply(review)}
+                                      disabled={vendorReplySubmittingId === review.id}
+                                    >
+                                      {vendorReplySubmittingId === review.id ? 'Menyimpan...' : 'Kirim Balasan'}
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             ))
                           )}
@@ -1917,6 +2047,67 @@ export default function HomePageClient() {
           font-size: 13px;
           color: #374151;
           line-height: 1.5;
+        }
+
+        .vendor-reply-box {
+          margin-top: 10px;
+          padding: 10px 12px;
+          border-radius: 8px;
+          background: #eff6ff;
+          border: 1px solid #bfdbfe;
+        }
+
+        .vendor-reply-label {
+          font-size: 12px;
+          font-weight: 700;
+          color: #1d4ed8;
+          margin-bottom: 4px;
+        }
+
+        .vendor-reply-text {
+          margin: 0;
+          font-size: 13px;
+          color: #1e3a8a;
+          line-height: 1.5;
+        }
+
+        .vendor-reply-form {
+          margin-top: 10px;
+          display: grid;
+          gap: 8px;
+        }
+
+        .vendor-reply-input {
+          width: 100%;
+          border: 1px solid #cbd5e1;
+          border-radius: 8px;
+          padding: 10px 12px;
+          font-size: 13px;
+          font-family: inherit;
+          resize: vertical;
+        }
+
+        .vendor-reply-input:focus {
+          outline: none;
+          border-color: #5A45D1;
+          box-shadow: 0 0 0 3px rgba(90, 69, 209, 0.12);
+        }
+
+        .vendor-reply-btn {
+          justify-self: start;
+          border: none;
+          border-radius: 8px;
+          background: #5A45D1;
+          color: #fff;
+          padding: 8px 12px;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .vendor-reply-btn:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
         }
 
         .review-empty {
