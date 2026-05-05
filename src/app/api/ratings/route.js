@@ -22,13 +22,10 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const ratingsPath = path.join(process.cwd(), 'ratings.json');
-    const servicesPath = path.join(process.cwd(), 'services.json');
-
     const ratingsData = await fs.readFile(ratingsPath, 'utf-8');
-    const ratings = JSON.parse(ratingsData);
+    const ratings = JSON.parse(ratingsData.trim());
     const servicesData = await fs.readFile(servicesPath, 'utf-8');
-    const services = JSON.parse(servicesData);
+    const services = JSON.parse(servicesData.trim());
 
     // Cari service
     const service = services.find(s => s.id === serviceId);
@@ -115,9 +112,9 @@ export async function PUT(request) {
     const servicesPath = path.join(process.cwd(), 'services.json');
 
     const ratingsData = await fs.readFile(ratingsPath, 'utf-8');
-    const ratings = JSON.parse(ratingsData);
+    const ratings = JSON.parse(ratingsData.trim());
     const servicesData = await fs.readFile(servicesPath, 'utf-8');
-    const services = JSON.parse(servicesData);
+    const services = JSON.parse(servicesData.trim());
 
     const service = services.find((item) => item.id === serviceId);
     if (!service || service.vendorId !== vendorId) {
@@ -171,9 +168,9 @@ export async function GET(request) {
     const ratingsPath = path.join(process.cwd(), 'ratings.json');
     const usersPath = path.join(process.cwd(), 'users.json');
     const ratingsData = await fs.readFile(ratingsPath, 'utf-8');
-    const ratings = JSON.parse(ratingsData);
+    const ratings = JSON.parse(ratingsData.trim());
     const usersData = await fs.readFile(usersPath, 'utf-8');
-    const users = JSON.parse(usersData);
+    const users = JSON.parse(usersData.trim());
 
     const serviceRatings = ratings
       .filter(r => r.serviceId === serviceId)

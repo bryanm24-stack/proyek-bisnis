@@ -347,11 +347,22 @@ export default function HomePageClient() {
     setReviewPage(1);
     setModalOpen(true);
 
+    // Fetch reviews for this service
+    console.log('Fetching reviews for serviceId:', service.id);
+    
     fetch(`/api/ratings?serviceId=${service.id}`)
-      .then((response) => response.json())
+      .then((response) => {
+        console.log('API Response status:', response.status);
+        return response.json();
+      })
       .then((data) => {
-        if (data.success) {
-          setServiceReviews(data.data || []);
+        console.log('API Response data:', data);
+        if (data.success && data.data && Array.isArray(data.data)) {
+          console.log('Setting reviews:', data.data.length, 'reviews');
+          setServiceReviews(data.data);
+        } else {
+          console.warn('Invalid API response format:', data);
+          setServiceReviews([]);
         }
       })
       .catch((error) => {
