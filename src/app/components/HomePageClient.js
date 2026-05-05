@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import SearchBar from './SearchBar';
 import SharedNavbar from './SharedNavbar';
 
 export default function HomePageClient() {
+  const router = useRouter();
   const [services, setServices] = useState([]);
   const [promos, setPromos] = useState([]);
   const [user, setUser] = useState(null);

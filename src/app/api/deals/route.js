@@ -298,8 +298,70 @@ export async function POST(request) {
         return NextResponse.json({ success: true, message: 'Penawaran dikirim, menunggu vendor menerima', data: { deal: newDeal, chat: chatRoom } }, { status: 201 });
       } else {
         // Vendor menerima deal dari customer
-        // If deal status is 'cancelled' or 'completed', allow it to reset to 'agreed' for new cycle
-        if (existingDeal.status !== 'pending' && existingDeal.status !== 'agreed' && existingDeal.status !== 'cancelled' && existingDeal.status !== 'completed') {
+        // ✅ FIX #3: If deal is 'completed' or 'cancelled', CREATE FRESH DEAL instead of reusing!
+        if (existingDeal.status === 'completed' || existingDeal.status === 'cancelled') {
+          console.log(`✅ FIX #3: Deal ${existingDeal.id} is ${existingDeal.status}. Creating fresh deal for new rental cycle.`);
+          
+          // Create FRESH deal with reset dates
+          let originalPrice = null;
+          try {
+            const servicesData = await fs.readFile(servicesPath, 'utf-8');
+            const services = JSON.parse(servicesData);
+            const svc = services.find(s => s.id === existingDeal.serviceId);
+            originalPrice = svc ? svc.price || null : null;
+          } catch (e) {
+            originalPrice = null;
+          }
+
+          const freshDeal = {
+            id: Date.now().toString(),
+            chatId: chatId,
+            customerId: customerId,
+            vendorId: vendorId,
+            serviceId: existingDeal.serviceId,
+            customerAccepted: true,  // Customer initiates, now vendor accepts
+            vendorAccepted: true,    // Vendor just accepted
+            status: 'agreed',
+            createdAt: new Date().toISOString(),
+            agreedAt: new Date().toISOString(),
+            discountGiven: false,
+            discount: { type: null, value: 0, amount: 0 },
+            originalPrice: originalPrice,
+            finalPrice: originalPrice,
+            
+            // ✅ FRESH/RESET: All date fields are null
+            borrowDate: null,
+            expectedReturnDate: null,
+            actualReturnDate: null,
+            returnDeadline: null,
+            
+            // ✅ FRESH/RESET: All return fields are reset
+            returnStatus: 'pending',
+            returnCondition: null,
+            returnNotes: '',
+            daysLate: 0,
+            lateCharge: 0,
+            
+            // ✅ FRESH: No old data
+            lastReminderSent: null,
+            ratingCompleted: false,
+            totalPrice: null,
+            bookingId: null
+          };
+
+          deals.push(freshDeal);
+          chatRoom.dealStatus = 'agreed';
+          await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+          await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
+
+          // Create notification
+          await createNotification(customerId, 'deal_accepted', 'Vendor menerima penawaran baru Anda!', chatId, { vendorId, serviceId });
+
+          return NextResponse.json({ success: true, message: 'Deal siklus baru berhasil dibuat.', data: { deal: freshDeal, chat: chatRoom, readyForRating: false } }, { status: 200 });
+        }
+
+        // ❌ If deal is in other invalid states, reject
+        if (existingDeal.status !== 'pending' && existingDeal.status !== 'agreed') {
           return NextResponse.json({ success: false, message: `Deal dengan status ${existingDeal.status} tidak bisa diproses` }, { status: 400 });
         }
 
@@ -331,6 +393,41 @@ export async function POST(request) {
           } catch (e) {
             // ignore
           }
+        }
+
+        // ✅ FIX #2: Create booking record when deal is agreed (BEFORE payment)
+        try {
+          const servicesData = await fs.readFile(servicesPath, 'utf-8');
+          let parsedServices = JSON.parse(servicesData);
+          const serviceIndex = parsedServices.findIndex(s => String(s.id) === String(existingDeal.serviceId));
+          
+          if (serviceIndex !== -1) {
+            const service = parsedServices[serviceIndex];
+            if (!service.bookings) service.bookings = [];
+            
+            // Create new booking with status 'confirmed' (after payment)
+            const newBooking = {
+              id: `booking_${Date.now()}`,
+              dealId: existingDeal.id,
+              customerId: existingDeal.customerId,
+              vendorId: existingDeal.vendorId,
+              quantity: 1, // Will be updated during payment
+              status: 'confirmed', // Ready for pickup
+              createdAt: new Date().toISOString(),
+              pickupConfirmedAt: null,
+              returnRequestedAt: null,
+              returnConfirmedAt: null
+            };
+            
+            service.bookings.push(newBooking);
+            await fs.writeFile(servicesPath, JSON.stringify(parsedServices, null, 2));
+            
+            // Store bookingId in deal for reference
+            existingDeal.bookingId = newBooking.id;
+          }
+        } catch (e) {
+          console.warn('Could not create booking record:', e.message);
+          // Continue anyway - booking creation is enhancement, not blocking
         }
 
         chatRoom.dealStatus = 'agreed';

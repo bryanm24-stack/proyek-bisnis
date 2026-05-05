@@ -143,6 +143,44 @@ export async function POST(request) {
         // Don't fail on availability check errors, continue with transaction
       }
     }
+
+    // ✅ NEW: ITEM PRICE VERIFICATION - Validate item price matches service data
+    let verifiedItemPrice = body.basePrice || 0;
+    let verifiedItemId = body.itemId || null;
+    
+    if (body.serviceId && body.itemId) {
+      try {
+        const servicesFile = path.join(process.cwd(), 'services.json');
+        let servicesData = fs.readFileSync(servicesFile, 'utf-8');
+        servicesData = servicesData.replace(/^\uFEFF/, '').trim();
+        const services = JSON.parse(servicesData);
+        
+        const service = services.find(s => String(s.id) === String(body.serviceId));
+        if (service && service.items && Array.isArray(service.items)) {
+          const item = service.items.find(i => String(i.id) === String(body.itemId));
+          
+          if (item) {
+            // Get price based on service type
+            const priceField = service.type === 'barang' ? 'hargaPcs' : 'hargaSesi';
+            const itemPrice = item[priceField] || item.price || body.basePrice;
+            
+            verifiedItemPrice = itemPrice;
+            verifiedItemId = item.id;
+            
+            // Log price mismatch if significant difference (> 1000)
+            if (Math.abs(body.basePrice - itemPrice) > 1000) {
+              console.warn(`Price mismatch for item ${body.itemId}: payment sent ${body.basePrice}, but actual is ${itemPrice}`);
+              // Don't fail, just log - customer might have applied discount
+            }
+          } else {
+            console.warn(`Item ${body.itemId} not found in service ${body.serviceId}`);
+          }
+        }
+      } catch (priceVerifyError) {
+        console.warn('Item price verification warning:', priceVerifyError.message);
+        // Continue with transaction using provided price
+      }
+    }
     
     // Add new transaction
     const identityVerification = body.identityVerification
@@ -158,7 +196,10 @@ export async function POST(request) {
     const newTransaction = {
       ...body,
       identityVerification,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      // ✅ ADD: Verified item price for audit trail
+      verifiedItemPrice: verifiedItemPrice,
+      verifiedItemId: verifiedItemId
     };
 
     const rentalTimeline = buildRentalTimeline(body.startDate, body.durationDays);
