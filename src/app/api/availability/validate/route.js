@@ -34,12 +34,22 @@ export async function POST(request) {
       }, { status: 404 });
     }
 
-    // Get available quantity
-    const totalQuantity = Number(service.quantity) || Number(service.jumlahBarang) || 0;
+    // Get available quantity based on service type
+    let totalQuantity = 0;
+    const serviceType = service.type || 'barang';
+    
+    if (serviceType === 'jasa') {
+      // JASA: Use service-level quantity
+      totalQuantity = Number(service.quantity) || 0;
+    } else {
+      // BARANG: Sum of all items stok
+      totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
+    }
+    
     if (totalQuantity === 0) {
       return NextResponse.json({
         success: false,
-        message: 'Barang tidak memiliki stok',
+        message: `${serviceType === 'jasa' ? 'Provider/Tim' : 'Barang'} tidak memiliki stok`,
         available: false,
         availableQuantity: 0,
         requestedQuantity: quantity

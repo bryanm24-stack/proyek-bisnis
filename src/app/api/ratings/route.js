@@ -22,13 +22,10 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const ratingsPath = path.join(process.cwd(), 'ratings.json');
-    const servicesPath = path.join(process.cwd(), 'services.json');
-
     const ratingsData = await fs.readFile(ratingsPath, 'utf-8');
-    const ratings = JSON.parse(ratingsData);
+    const ratings = JSON.parse(ratingsData.trim());
     const servicesData = await fs.readFile(servicesPath, 'utf-8');
-    const services = JSON.parse(servicesData);
+    const services = JSON.parse(servicesData.trim());
 
     // Cari service
     const service = services.find(s => s.id === serviceId);
@@ -98,6 +95,63 @@ export async function POST(request) {
   }
 }
 
+// PUT - Vendor reply to a rating
+export async function PUT(request) {
+  try {
+    const body = await request.json();
+    const { ratingId, vendorId, serviceId, reply } = body;
+
+    if (!ratingId || !vendorId || !serviceId) {
+      return NextResponse.json({
+        success: false,
+        message: 'ratingId, vendorId, dan serviceId wajib diisi!'
+      }, { status: 400 });
+    }
+
+    const ratingsPath = path.join(process.cwd(), 'ratings.json');
+    const servicesPath = path.join(process.cwd(), 'services.json');
+
+    const ratingsData = await fs.readFile(ratingsPath, 'utf-8');
+    const ratings = JSON.parse(ratingsData.trim());
+    const servicesData = await fs.readFile(servicesPath, 'utf-8');
+    const services = JSON.parse(servicesData.trim());
+
+    const service = services.find((item) => item.id === serviceId);
+    if (!service || service.vendorId !== vendorId) {
+      return NextResponse.json({
+        success: false,
+        message: 'Vendor tidak memiliki akses ke rating ini'
+      }, { status: 403 });
+    }
+
+    const targetRating = ratings.find((item) => item.id === ratingId && item.serviceId === serviceId);
+    if (!targetRating) {
+      return NextResponse.json({
+        success: false,
+        message: 'Rating tidak ditemukan'
+      }, { status: 404 });
+    }
+
+    targetRating.vendorReply = (reply || '').trim();
+    targetRating.vendorReplyAt = targetRating.vendorReply ? new Date().toISOString() : null;
+    targetRating.vendorReplyBy = vendorId;
+
+    await fs.writeFile(ratingsPath, JSON.stringify(ratings, null, 2));
+
+    return NextResponse.json({
+      success: true,
+      message: 'Balasan vendor berhasil disimpan',
+      data: targetRating
+    }, { status: 200 });
+  } catch (error) {
+    console.error('Error saving vendor reply:', error);
+    return NextResponse.json({
+      success: false,
+      message: 'Terjadi kesalahan server.'
+    }, { status: 500 });
+  }
+}
+
 // GET - Get ratings for a service
 export async function GET(request) {
   try {
@@ -114,9 +168,9 @@ export async function GET(request) {
     const ratingsPath = path.join(process.cwd(), 'ratings.json');
     const usersPath = path.join(process.cwd(), 'users.json');
     const ratingsData = await fs.readFile(ratingsPath, 'utf-8');
-    const ratings = JSON.parse(ratingsData);
+    const ratings = JSON.parse(ratingsData.trim());
     const usersData = await fs.readFile(usersPath, 'utf-8');
-    const users = JSON.parse(usersData);
+    const users = JSON.parse(usersData.trim());
 
     const serviceRatings = ratings
       .filter(r => r.serviceId === serviceId)

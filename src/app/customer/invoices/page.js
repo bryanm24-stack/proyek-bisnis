@@ -511,7 +511,8 @@ export default function CustomerInvoicesPage() {
                           ) : (
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setActiveRatingInvoiceId(invoice.id);
                                 setRatingValue(5);
                                 setRatingReview('');
@@ -529,7 +530,10 @@ export default function CustomerInvoicesPage() {
                                   <button
                                     key={star}
                                     type="button"
-                                    onClick={() => setRatingValue(star)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setRatingValue(star);
+                                    }}
                                     style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '24px', lineHeight: 1 }}
                                   >
                                     {star <= ratingValue ? '⭐' : '☆'}
@@ -540,6 +544,7 @@ export default function CustomerInvoicesPage() {
                               <textarea
                                 value={ratingReview}
                                 onChange={(e) => setRatingReview(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
                                 placeholder="Tulis ulasan singkat (opsional)..."
                                 rows={3}
                                 style={{ width: '100%', border: '1px solid #ddd', borderRadius: '8px', padding: '10px', fontSize: '13px', resize: 'vertical', boxSizing: 'border-box' }}
@@ -548,7 +553,10 @@ export default function CustomerInvoicesPage() {
                               <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                                 <button
                                   type="button"
-                                  onClick={() => handleSubmitRating(invoice)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSubmitRating(invoice);
+                                  }}
                                   disabled={isRatingSubmitting}
                                   style={{ padding: '10px 12px', border: 'none', borderRadius: '8px', background: isRatingSubmitting ? '#a78bfa' : '#7c3aed', color: 'white', fontWeight: '700', cursor: isRatingSubmitting ? 'not-allowed' : 'pointer' }}
                                 >
@@ -556,7 +564,10 @@ export default function CustomerInvoicesPage() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => setActiveRatingInvoiceId(null)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveRatingInvoiceId(null);
+                                  }}
                                   style={{ padding: '10px 12px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', color: '#374151', fontWeight: '600', cursor: 'pointer' }}
                                 >
                                   Batal

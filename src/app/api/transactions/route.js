@@ -84,7 +84,17 @@ export async function POST(request) {
 
         const service = services.find(s => String(s.id) === String(body.serviceId));
         if (service) {
-          const totalQuantity = Number(service.quantity) || Number(service.jumlahBarang) || 0;
+          // Determine total quantity based on service type
+          let totalQuantity = 0;
+          const serviceType = service.type || 'barang'; // default to barang
+          
+          if (serviceType === 'jasa') {
+            // JASA: Use service-level quantity (number of providers/teams available)
+            totalQuantity = Number(service.quantity) || 0;
+          } else {
+            // BARANG: Sum of all items stok (total inventory)
+            totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
+          }
           
           // Calculate end date if not provided
           let endDate = body.endDate;
@@ -121,7 +131,7 @@ export async function POST(request) {
             return Response.json({
               success: false,
               error: 'Stok tidak mencukupi',
-              message: `Stok barang tidak cukup untuk periode ini. Tersedia: ${availableQuantity} dari ${body.quantity} yang diminta`,
+              message: `Stok ${serviceType === 'jasa' ? 'provider/tim' : 'barang'} tidak cukup untuk periode ini. Tersedia: ${availableQuantity} dari ${body.quantity} yang diminta`,
               availableQuantity,
               requestedQuantity: body.quantity,
               status: 'availability_check_failed'
@@ -334,8 +344,18 @@ export async function POST(request) {
 
           service.bookings.push(newBooking);
 
-          // Recalculate availableQuantity
-          const totalQuantity = Number(service.quantity) || Number(service.jumlahBarang) || 0;
+          // Recalculate availableQuantity based on service type
+          let totalQuantity = 0;
+          const serviceType = service.type || 'barang';
+          
+          if (serviceType === 'jasa') {
+            // JASA: Use service-level quantity
+            totalQuantity = Number(service.quantity) || 0;
+          } else {
+            // BARANG: Sum of all items stok
+            totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
+          }
+          
           let bookedQuantity = 0;
           for (const booking of service.bookings) {
             if (booking.status !== 'cancelled' && booking.status !== 'completed') {
