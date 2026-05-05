@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import SharedNavbar from '../../components/SharedNavbar';
 
 export default function VendorChatsPage() {
+  const router = useRouter();
   const [user, setUser] = useState(null);
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -793,8 +795,8 @@ export default function VendorChatsPage() {
               </p>
             </div>
 
-            {/* Deal Buttons - HANYA UNTUK VENDOR CHATS */}
-            {user.id === selectedChat.vendorId && (
+              {/* Deal Buttons - VENDOR TAB: HANYA UNTUK VENDOR CHATS, CUSTOMER TAB: UNTUK VENDOR CUSTOMER */}
+              {(user.id === selectedChat.vendorId || (user.id === selectedChat.customerId && chatTab === 'vendor')) && (
               <div style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -806,15 +808,15 @@ export default function VendorChatsPage() {
                     handleDealAction('accept');
                     setShowCustomerModal(false);
                   }}
-                  disabled={dealData?.status === 'agreed' || dealData?.status === 'cancelled'}
+                  disabled={dealData?.status === 'agreed' || dealData?.status === 'cancelled' || dealData?.status === 'completed'}
                   style={{
                     padding: '12px 16px',
                     border: 'none',
                     borderRadius: '8px',
-                    background: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? '#d1d5db' : '#10b981',
+                    background: dealData?.status === 'agreed' || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? '#d1d5db' : '#10b981',
                     color: 'white',
                     fontWeight: '600',
-                    cursor: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
+                    cursor: dealData?.status === 'agreed' || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? 'not-allowed' : 'pointer',
                     fontSize: '14px'
                   }}
                 >
@@ -853,7 +855,7 @@ export default function VendorChatsPage() {
                     }}>
                       ✓ Deal Diterima
                     </div>
-                    {discountMode !== 'yes' && discountMode !== 'prompt' && (
+                    {user.id === selectedChat.vendorId && discountMode !== 'yes' && discountMode !== 'prompt' && (
                       <button
                         onClick={() => setDiscountMode('yes')}
                         style={{
@@ -870,6 +872,29 @@ export default function VendorChatsPage() {
                         onMouseLeave={(e) => e.target.style.background = '#f59e0b'}
                       >
                         💰 Aplikasikan Diskon
+                      </button>
+                    )}
+                    {user.id === selectedChat.customerId && (
+                      <button
+                        onClick={() => {
+                          if (!dealData?.id) {
+                            alert('Deal belum siap untuk pembayaran.');
+                            return;
+                          }
+                          router.push(`/transaction/payment?dealId=${dealData.id}`);
+                        }}
+                        style={{
+                          padding: '12px 16px',
+                          border: 'none',
+                          borderRadius: '8px',
+                          background: '#7c3aed',
+                          color: 'white',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          fontSize: '14px'
+                        }}
+                      >
+                        💳 Lanjut ke Pembayaran
                       </button>
                     )}
                   </>

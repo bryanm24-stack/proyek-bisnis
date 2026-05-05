@@ -436,8 +436,11 @@ export default function HomePageClient() {
         const dealDataResp = await dealResponse.json();
         if (dealDataResp.success && dealDataResp.data) {
           setDealData(dealDataResp.data);
-          if (dealDataResp.data.status === 'completed') {
+          // Show rating form only if status completed and not yet rated
+          if (dealDataResp.data.status === 'completed' && !dealDataResp.data.ratingCompleted) {
             setShowRatingForm(true);
+          } else {
+            setShowRatingForm(false);
           }
         }
       } else {
@@ -583,9 +586,19 @@ export default function HomePageClient() {
     }
 
     if (dealData.status === 'completed') {
+      // Jika sudah rating, allow new cycle
+      if (dealData.ratingCompleted) {
+        return {
+          label: 'Rating selesai',
+          description: 'Anda dapat melanjutkan dengan penawaran baru untuk produk ini atau lanjut negosiasi.',
+          background: '#fef3c7',
+          color: '#92400e'
+        };
+      }
+      // Jika belum rating, tunggu rating form
       return {
         label: 'Transaksi selesai',
-        description: 'Transaksi sudah selesai. Kamu bisa lanjut isi review.',
+        description: 'Transaksi sudah selesai. Silakan berikan rating di bawah.',
         background: '#dcfce7',
         color: '#166534'
       };
@@ -613,6 +626,7 @@ export default function HomePageClient() {
           serviceId: selectedService.id,
           customerId: user.id,
           vendorId: selectedService.vendorId,
+          dealId: dealData?.id || null,
           rating: ratingValue,
           review: ratingReview
         })
@@ -621,7 +635,19 @@ export default function HomePageClient() {
       const data = await response.json();
       if (data.success) {
         alert('Rating berhasil disimpan!');
-        closeChatModal();
+        
+        // Reset rating form dan deal status untuk allow new cycle
+        setShowRatingForm(false);
+        setRatingValue(5);
+        setRatingReview('');
+        
+        // Mark deal as rating completed
+        if (dealData) {
+          setDealData({
+            ...dealData,
+            ratingCompleted: true
+          });
+        }
         
         setServices(services.map(s =>
           s.id === selectedService.id
@@ -1203,7 +1229,7 @@ export default function HomePageClient() {
                           {/* Package Gallery */}
                           <div style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
                             gap: '16px',
                             marginBottom: '24px'
                           }}>
@@ -1217,18 +1243,75 @@ export default function HomePageClient() {
                                   overflow: 'hidden',
                                   border: selectedItemDetail?.id === item.id ? '3px solid #5A45D1' : '1px solid #ddd',
                                   transition: 'all 0.3s ease',
-                                  transform: selectedItemDetail?.id === item.id ? 'scale(1.05)' : 'scale(1)'
+                                  transform: selectedItemDetail?.id === item.id ? 'scale(1.05)' : 'scale(1)',
+                                  backgroundColor: '#fff'
                                 }}
                               >
-                                <img
-                                  src={getItemPreviewImage(item)}
-                                  alt={item.namaBarang || item.namaJasa}
-                                  style={{
-                                    width: '100%',
-                                    height: '120px',
-                                    objectFit: 'cover'
-                                  }}
-                                />
+                                <div style={{ position: 'relative' }}>
+                                  <img
+                                    src={getItemPreviewImage(item)}
+                                    alt={item.namaBarang || item.namaJasa}
+                                    style={{
+                                      width: '100%',
+                                      height: '120px',
+                                      objectFit: 'cover'
+                                    }}
+                                  />
+                                </div>
+                                <div style={{ 
+                                  padding: '10px', 
+                                  backgroundColor: selectedItemDetail?.id === item.id ? '#f5f3ff' : '#fafafa',
+                                  borderTop: '1px solid #eee'
+                                }}>
+                                  <h4 style={{ 
+                                    margin: '0 0 6px 0', 
+                                    fontSize: '12px', 
+                                    fontWeight: '600',
+                                    color: '#333',
+                                    lineHeight: '1.3'
+                                  }}>
+                                    {item.namaBarang || item.namaJasa}
+                                  </h4>
+                                  {item.deskripsi && (
+                                    <p style={{ 
+                                      margin: '0 0 6px 0', 
+                                      fontSize: '11px', 
+                                      color: '#666',
+                                      lineHeight: '1.3',
+                                      display: '-webkit-box',
+                                      WebkitLineClamp: 2,
+                                      WebkitBoxOrient: 'vertical',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis'
+                                    }}>
+                                      {item.deskripsi}
+                                    </p>
+                                  )}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                                    <p style={{ 
+                                      margin: '0', 
+                                      fontSize: '11px', 
+                                      fontWeight: '600',
+                                      color: '#5A45D1'
+                                    }}>
+                                      Rp {item.hargaPcs ? Number(item.hargaPcs).toLocaleString('id-ID') : Number(item.hargaSesi).toLocaleString('id-ID')}
+                                    </p>
+                                    {item.stok !== undefined && (
+                                      <p style={{ 
+                                        margin: '0', 
+                                        fontSize: '10px', 
+                                        fontWeight: '600',
+                                        color: item.stok > 0 ? '#10b981' : '#dc2626',
+                                        backgroundColor: item.stok > 0 ? '#d1fae5' : '#fee2e2',
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        whiteSpace: 'nowrap'
+                                      }}>
+                                        {item.stok > 0 ? `Stok: ${item.stok}` : 'Habis'}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -1255,6 +1338,16 @@ export default function HomePageClient() {
                               <h4 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: 'bold' }}>
                                 {selectedItemDetail.namaBarang || selectedItemDetail.namaJasa}
                               </h4>
+                              {selectedItemDetail.deskripsi && (
+                                <p style={{ 
+                                  margin: '0 0 12px 0', 
+                                  fontSize: '14px', 
+                                  color: '#555',
+                                  lineHeight: '1.5'
+                                }}>
+                                  {selectedItemDetail.deskripsi}
+                                </p>
+                              )}
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                                 <div>
                                   <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Harga</p>
@@ -1263,29 +1356,36 @@ export default function HomePageClient() {
                                     {selectedItemDetail.hargaSesi ? ' / Hari' : ' / Pcs'}
                                   </p>
                                 </div>
-                                {selectedItemDetail.stok && (
+                                {selectedItemDetail.stok !== undefined && (
                                   <div>
-                                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Stok</p>
-                                    <p style={{ margin: '0', fontSize: '16px', fontWeight: 'bold' }}>{selectedItemDetail.stok}</p>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Ketersediaan</p>
+                                    <p style={{ 
+                                      margin: '0', 
+                                      fontSize: '16px', 
+                                      fontWeight: 'bold',
+                                      color: selectedItemDetail.stok > 0 ? '#10b981' : '#dc2626'
+                                    }}>
+                                      {selectedItemDetail.stok > 0 ? `${selectedItemDetail.stok} Tersedia` : 'Habis'}
+                                    </p>
                                   </div>
                                 )}
                               </div>
                               <button
                                 className="btn-primary-modal"
                                 onClick={() => openChatModal(selectedService)}
-                                disabled={user && user.id === selectedService.vendorId}
+                                disabled={user && user.id === selectedService.vendorId || selectedItemDetail.stok === 0}
                                 style={{
                                   width: '100%',
                                   padding: '10px',
-                                  backgroundColor: '#5A45D1',
+                                  backgroundColor: selectedItemDetail.stok === 0 ? '#d1d5db' : '#5A45D1',
                                   color: 'white',
                                   border: 'none',
                                   borderRadius: '6px',
-                                  cursor: user && user.id === selectedService.vendorId ? 'not-allowed' : 'pointer',
-                                  opacity: user && user.id === selectedService.vendorId ? 0.5 : 1
+                                  cursor: (user && user.id === selectedService.vendorId) || selectedItemDetail.stok === 0 ? 'not-allowed' : 'pointer',
+                                  opacity: (user && user.id === selectedService.vendorId) || selectedItemDetail.stok === 0 ? 0.5 : 1
                                 }}
                               >
-                                💬 Chat untuk Paket Ini
+                                {selectedItemDetail.stok === 0 ? '⛔ Stok Habis' : '💬 Chat untuk Paket Ini'}
                               </button>
                             </div>
                           )}
@@ -1661,7 +1761,7 @@ export default function HomePageClient() {
             </div>
 
             {/* Rating Form */}
-            {showRatingForm && dealData?.status === 'completed' && (
+            {showRatingForm && dealData?.status === 'completed' && !dealData?.ratingCompleted && (
               <div className="rating-form">
                 <h3>Berikan Rating &amp; Review</h3>
                 <div className="rating-stars">
@@ -1688,12 +1788,13 @@ export default function HomePageClient() {
               </div>
             )}
 
-            {/* Chat Input */}
+            {/* Chat Input / Deal Status - Show when not rating or after rating completed */}
             {!showRatingForm && (
               <div className="chat-input-section" style={{ flexDirection: 'column', gap: '10px' }}>
                 {(() => {
                   const statusConfig = getDealStatusConfig();
                   const finalPrice = dealData?.finalPrice || dealData?.originalPrice || 0;
+                  // Buttons disabled jika: agreed, cancelled, closed, atau completed tapi belum rating
                   const dealDisabled = dealData?.status === 'agreed' || dealData?.status === 'cancelled' || chatData?.dealStatus === 'closed';
 
                   return (
@@ -1726,12 +1827,13 @@ export default function HomePageClient() {
                             flex: 1,
                             padding: '8px 10px',
                             borderRadius: '8px',
-                            border: '1px solid #10b981',
-                            background: 'rgba(16, 185, 129, 0.08)',
-                            color: '#047857',
+                            border: messages.length === 0 ? '1px solid #7c3aed' : '1px solid #10b981',
+                            background: messages.length === 0 ? 'rgba(124, 58, 237, 0.15)' : 'rgba(16, 185, 129, 0.08)',
+                            color: messages.length === 0 ? '#5b21b6' : '#047857',
                             fontWeight: '700',
                             cursor: dealDisabled ? 'not-allowed' : 'pointer',
-                            opacity: dealDisabled ? 0.55 : 1
+                            opacity: dealDisabled ? 0.55 : 1,
+                            transition: 'all 0.3s ease'
                           }}
                         >
                           {dealData?.status === 'agreed' ? 'Deal Diterima' : 'Terima Deal'}
