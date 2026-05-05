@@ -185,9 +185,9 @@ export async function POST(request) {
       }, { status: 200 });
     }
 
-    // Handle cancel
+    // Handle cancel/reset
     if (action === 'cancel') {
-      const { chatId, customerId, vendorId, serviceId } = body;
+      const { chatId, customerId, vendorId, serviceId, resetDeadline } = body;
       if (!chatId || !customerId || !vendorId || !serviceId) {
         return NextResponse.json({ success: false, message: 'Semua field wajib diisi!' }, { status: 400 });
       }
@@ -197,11 +197,30 @@ export async function POST(request) {
         return NextResponse.json({ success: false, message: 'Chat room tidak ditemukan' }, { status: 404 });
       }
 
+      // Find existing deal
+      const existingDeal = deals.find(d => d.chatId === chatId);
+      
+      // If resetDeadline is true and deal is completed, reset it to pending for new cycle
+      if (resetDeadline && existingDeal && (existingDeal.status === 'completed' || existingDeal.status === 'cancelled')) {
+        // Reset deal to pending for new cycle
+        existingDeal.status = 'pending';
+        existingDeal.customerAccepted = true;
+        existingDeal.vendorAccepted = false;
+        existingDeal.ratingCompleted = false;
+        chatRoom.dealStatus = 'pending';
+        await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+        await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
+
+        await createNotification(vendorId, 'deal_pending', 'Ada penawaran baru dari customer', chatId, { customerId, serviceId });
+
+        return NextResponse.json({ success: true, message: 'Deal direset untuk siklus baru', data: { deal: existingDeal, chat: chatRoom } }, { status: 200 });
+      }
+
+      // Otherwise, cancel the deal normally
       chatRoom.dealStatus = 'cancelled';
       await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
 
       // Find and update deal status if exists
-      const existingDeal = deals.find(d => d.chatId === chatId);
       if (existingDeal) {
         existingDeal.status = 'cancelled';
       }
@@ -264,7 +283,8 @@ export async function POST(request) {
           lateCharge: 0,
           returnCondition: null,
           returnNotes: '',
-          lastReminderSent: null
+          lastReminderSent: null,
+          ratingCompleted: false
         };
 
         deals.push(newDeal);
@@ -278,6 +298,11 @@ export async function POST(request) {
         return NextResponse.json({ success: true, message: 'Penawaran dikirim, menunggu vendor menerima', data: { deal: newDeal, chat: chatRoom } }, { status: 201 });
       } else {
         // Vendor menerima deal dari customer
+        // If deal status is 'cancelled' or 'completed', allow it to reset to 'agreed' for new cycle
+        if (existingDeal.status !== 'pending' && existingDeal.status !== 'agreed' && existingDeal.status !== 'cancelled' && existingDeal.status !== 'completed') {
+          return NextResponse.json({ success: false, message: `Deal dengan status ${existingDeal.status} tidak bisa diproses` }, { status: 400 });
+        }
+
         existingDeal.vendorAccepted = true;
         existingDeal.status = 'agreed';
         existingDeal.agreedAt = new Date().toISOString();

@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server';
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { serviceId, customerId, vendorId, rating, review } = body;
+    const { serviceId, customerId, vendorId, rating, review, dealId } = body;
 
     if (!serviceId || !customerId || !vendorId || !rating) {
       return NextResponse.json({
@@ -21,6 +21,10 @@ export async function POST(request) {
         message: 'Rating harus antara 1-5'
       }, { status: 400 });
     }
+
+    const ratingsPath = path.join(process.cwd(), 'ratings.json');
+    const servicesPath = path.join(process.cwd(), 'services.json');
+    const dealsPath = path.join(process.cwd(), 'deals.json');
 
     const ratingsData = await fs.readFile(ratingsPath, 'utf-8');
     const ratings = JSON.parse(ratingsData.trim());
@@ -54,6 +58,7 @@ export async function POST(request) {
       serviceId,
       customerId,
       vendorId,
+      dealId: dealId || null,
       rating: parseInt(rating),
       review: review || '',
       createdAt: new Date().toISOString()
@@ -74,6 +79,23 @@ export async function POST(request) {
     service.rentCount = (currentRentCount + 1).toString();
     service.rating = parseFloat(newAverageRating);
 
+    // Update deal ratingCompleted if dealId provided
+    let updatedDeal = null;
+    if (dealId) {
+      try {
+        const dealsData = await fs.readFile(dealsPath, 'utf-8');
+        const deals = JSON.parse(dealsData.trim());
+        const deal = deals.find(d => d.id === dealId);
+        if (deal) {
+          deal.ratingCompleted = true;
+          await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+          updatedDeal = deal;
+        }
+      } catch (e) {
+        console.warn('Could not update deal ratingCompleted:', e);
+      }
+    }
+
     // Simpan perubahan
     await fs.writeFile(ratingsPath, JSON.stringify(ratings, null, 2));
     await fs.writeFile(servicesPath, JSON.stringify(services, null, 2));
@@ -83,7 +105,8 @@ export async function POST(request) {
       message: 'Rating berhasil disimpan',
       data: {
         rating: newRating,
-        updatedService: service
+        updatedService: service,
+        updatedDeal
       }
     }, { status: 201 });
   } catch (error) {
