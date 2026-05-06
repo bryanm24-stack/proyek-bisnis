@@ -40,15 +40,21 @@ export async function POST(request) {
       }, { status: 404 });
     }
 
-    // Check apakah user sudah rating service yang sama
-    const existingRating = ratings.find(
-      r => r.serviceId === serviceId && r.customerId === customerId
-    );
+    // Check duplikasi rating per siklus deal; fallback ke service untuk data lama tanpa dealId.
+    const existingRating = dealId
+      ? ratings.find(
+          (r) => String(r.customerId) === String(customerId) && String(r.dealId || '') === String(dealId)
+        )
+      : ratings.find(
+          (r) => String(r.serviceId) === String(serviceId) && String(r.customerId) === String(customerId) && !r.dealId
+        );
 
     if (existingRating) {
       return NextResponse.json({
         success: false,
-        message: 'Anda sudah memberikan rating untuk layanan ini'
+        message: dealId
+          ? 'Anda sudah memberikan rating untuk transaksi ini'
+          : 'Anda sudah memberikan rating untuk layanan ini'
       }, { status: 400 });
     }
 

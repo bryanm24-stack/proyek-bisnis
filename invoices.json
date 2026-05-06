@@ -32,5 +32,22 @@
     "paidAt": "2026-04-29T20:25:46.275Z",
     "paymentTransactionId": "TRX-1777494346157",
     "notes": "Menunggu pembayaran setelah deal disepakati dan diskon diterapkan."
+  },
+  {
+    "id": "INV-1778046562801",
+    "dealId": "1778044223791",
+    "customerId": "4",
+    "vendorId": "3",
+    "serviceId": "1704067202000",
+    "transactionId": "TRX-1778046562756",
+    "remainingPayment": 4625000,
+    "paymentDeadline": "2026-05-06T05:49:22.756Z",
+    "paymentMethod": "qris",
+    "paymentType": "full",
+    "status": "paid",
+    "createdAt": "2026-05-06T05:49:22.801Z",
+    "paidAt": "2026-05-06T05:49:22.756Z",
+    "paymentTransactionId": "TRX-1778046562756",
+    "notes": ""
   }
 ]

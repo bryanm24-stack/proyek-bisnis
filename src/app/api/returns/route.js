@@ -100,11 +100,28 @@ export async function POST(request) {
       }, { status: 403 });
     }
 
+    // ✅ FIX #5: Validate rental dates are set
+    if (!deal.borrowDate || !deal.expectedReturnDate) {
+      return NextResponse.json({
+        success: false,
+        message: 'Data peminjaman tidak lengkap. borrowDate atau expectedReturnDate belum diatur. Hubungi vendor atau support.'
+      }, { status: 400 });
+    }
+
+    // ✅ FIX #5: Validate deal is in correct status for return
+    // Allow return only on: agreed (payment made but not started), active (ongoing rental), or returning (already initiated)
+    if (!['agreed', 'active', 'returning'].includes(deal.status)) {
+      return NextResponse.json({
+        success: false,
+        message: `Peminjaman tidak bisa di-return. Status saat ini: '${deal.status}'. Hanya status 'agreed', 'active', atau 'returning' yang bisa di-return.`
+      }, { status: 400 });
+    }
+
     // Set return date to now
     const actualReturnDate = new Date().toISOString().split('T')[0];
     deal.actualReturnDate = actualReturnDate;
 
-    // Calculate days late
+    // Calculate days late using CURRENT deal's expectedReturnDate (not old deal from previous cycle - ✅ FIX #5)
     const expectedReturn = new Date(deal.expectedReturnDate);
     const actualReturn = new Date(actualReturnDate);
     const daysLate = Math.max(0, Math.ceil((actualReturn - expectedReturn) / (1000 * 60 * 60 * 24)));
@@ -214,6 +231,30 @@ export async function PUT(request) {
       }, { status: 403 });
     }
 
+    // ✅ FIX #5: Validate return has been initiated by customer
+    if (deal.returnStatus !== 'pending_inspection' && deal.returnStatus !== 'inspected') {
+      return NextResponse.json({
+        success: false,
+        message: `Peminjaman belum siap untuk inspeksi. Return status: '${deal.returnStatus}'. Tunggu customer mengajukan return terlebih dahulu.`
+      }, { status: 400 });
+    }
+
+    // ✅ FIX #5: Validate rental dates are set (should be set when customer submits return)
+    if (!deal.borrowDate || !deal.expectedReturnDate || !deal.actualReturnDate) {
+      return NextResponse.json({
+        success: false,
+        message: 'Data peminjaman tidak lengkap. Hubungi support jika masalah berlanjut.'
+      }, { status: 400 });
+    }
+
+    // ✅ FIX #5: Validate daysLate is already calculated
+    if (deal.daysLate === undefined || deal.daysLate === null) {
+      return NextResponse.json({
+        success: false,
+        message: 'Hari keterlambatan belum dihitung. Hubungi support jika masalah berlanjut.'
+      }, { status: 400 });
+    }
+
     // Update damage assessment
     deal.damageStatus = damageStatus;
     deal.damageCharge = damageCharge || 0;
@@ -228,6 +269,29 @@ export async function PUT(request) {
 
     // Set return status to inspected
     deal.returnStatus = 'inspected';
+
+    // ✅ FIX #2: Update booking status to 'pending_return' (awaiting return confirmation)
+    if (deal.bookingId) {
+      try {
+        const servicesPath = path.join(process.cwd(), 'services.json');
+        let servicesData = await fs.readFile(servicesPath, 'utf-8');
+        servicesData = servicesData.replace(/^\uFEFF/, '').trim();
+        const services = JSON.parse(servicesData);
+        
+        const serviceIndex = services.findIndex(s => s.bookings && s.bookings.find(b => b.id === deal.bookingId));
+        if (serviceIndex !== -1) {
+          const booking = services[serviceIndex].bookings.find(b => b.id === deal.bookingId);
+          if (booking && booking.status === 'active') {
+            booking.status = 'pending_return'; // Item is returned, awaiting vendor inspection
+            booking.returnRequestedAt = new Date().toISOString();
+            await fs.writeFile(servicesPath, JSON.stringify(services, null, 2));
+          }
+        }
+      } catch (e) {
+        console.warn('Could not update booking status:', e.message);
+        // Continue anyway - booking update is enhancement
+      }
+    }
 
     // If no issues and on-time, auto-complete
     if (damageStatus === 'none' && deal.daysLate === 0 && deal.customerConfirmed) {

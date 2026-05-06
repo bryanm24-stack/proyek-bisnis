@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import SearchBar from './SearchBar';
 import SharedNavbar from './SharedNavbar';
 
 export default function HomePageClient() {
+  const router = useRouter();
   const [services, setServices] = useState([]);
   const [promos, setPromos] = useState([]);
   const [user, setUser] = useState(null);
@@ -416,6 +418,7 @@ export default function HomePageClient() {
     setShowRatingForm(false);
     setRatingValue(5);
     setRatingReview('');
+    setDealData(null);
     setChatModalOpen(true);
     setModalOpen(false);
 
@@ -436,23 +439,23 @@ export default function HomePageClient() {
         const dealDataResp = await dealResponse.json();
         if (dealDataResp.success && dealDataResp.data) {
           setDealData(dealDataResp.data);
-          // Show rating form only if status completed and not yet rated
-          if (dealDataResp.data.status === 'completed' && !dealDataResp.data.ratingCompleted) {
-            setShowRatingForm(true);
-          } else {
-            setShowRatingForm(false);
-          }
+          // Rating form moved to dedicated page - not shown in chat
+          setShowRatingForm(false);
+        } else {
+          setDealData(null);
         }
       } else {
         console.log('[openChatModal] No existing chat found, starting new');
         setChatData(null);
         setMessages([]);
+        setDealData(null);
       }
     } catch (error) {
       console.error('[openChatModal] Error:', error);
       // Still open chat, just without history
       setChatData(null);
       setMessages([]);
+      setDealData(null);
     }
   };
 
@@ -461,6 +464,7 @@ export default function HomePageClient() {
     setSelectedService(null);
     setChatData(null);
     setMessages([]);
+    setDealData(null);
     setShowRatingForm(false);
   };
 
@@ -1760,36 +1764,8 @@ export default function HomePageClient() {
               )}
             </div>
 
-            {/* Rating Form */}
-            {showRatingForm && dealData?.status === 'completed' && !dealData?.ratingCompleted && (
-              <div className="rating-form">
-                <h3>Berikan Rating &amp; Review</h3>
-                <div className="rating-stars">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      className={`star ${star <= ratingValue ? 'active' : ''}`}
-                      onClick={() => setRatingValue(star)}
-                    >
-                      ⭐
-                    </button>
-                  ))}
-                </div>
-                <textarea
-                  className="rating-textarea"
-                  placeholder="Tulis review Anda (opsional)"
-                  value={ratingReview}
-                  onChange={(e) => setRatingReview(e.target.value)}
-                  maxLength={500}
-                />
-                <button className="btn-submit-rating" onClick={submitRating}>
-                  Kirim Rating
-                </button>
-              </div>
-            )}
-
-            {/* Chat Input / Deal Status - Show when not rating or after rating completed */}
-            {!showRatingForm && (
+            {/* Chat Input / Deal Status */}
+            {(
               <div className="chat-input-section" style={{ flexDirection: 'column', gap: '10px' }}>
                 {(() => {
                   const statusConfig = getDealStatusConfig();
@@ -1840,21 +1816,28 @@ export default function HomePageClient() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDealAction('cancel')}
-                          disabled={dealData?.status === 'cancelled'}
+                          onClick={() => {
+                            if (dealData?.status === 'cancelled') {
+                              // Reset deal untuk mulai negosiasi ulang
+                              setDealData(null);
+                            } else {
+                              handleDealAction('cancel');
+                            }
+                          }}
                           style={{
                             flex: 1,
                             padding: '8px 10px',
                             borderRadius: '8px',
-                            border: '1px solid #ef4444',
-                            background: 'rgba(239, 68, 68, 0.08)',
-                            color: '#b91c1c',
+                            border: dealData?.status === 'cancelled' ? '1px solid #7c3aed' : '1px solid #ef4444',
+                            background: dealData?.status === 'cancelled' ? 'rgba(124, 58, 237, 0.15)' : 'rgba(239, 68, 68, 0.08)',
+                            color: dealData?.status === 'cancelled' ? '#5b21b6' : '#b91c1c',
                             fontWeight: '700',
-                            cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
-                            opacity: dealData?.status === 'cancelled' ? 0.55 : 1
+                            cursor: 'pointer',
+                            opacity: 1,
+                            transition: 'all 0.3s ease'
                           }}
                         >
-                          {dealData?.status === 'cancelled' ? 'Dibatalkan' : 'Cancel'}
+                          {dealData?.status === 'cancelled' ? 'Mulai Ulang Negosiasi' : 'Cancel'}
                         </button>
                       </div>
 

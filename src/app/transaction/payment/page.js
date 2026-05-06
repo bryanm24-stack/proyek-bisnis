@@ -38,6 +38,8 @@ function PaymentContent() {
   const [paymentType, setPaymentType] = useState('full'); // 'full' or 'pay_after'
   const [availabilityCheck, setAvailabilityCheck] = useState(null); // null, 'checking', 'available', 'unavailable'
   const [availabilityMessage, setAvailabilityMessage] = useState('');
+  const [selectedItem, setSelectedItem] = useState(null); // ✅ ADD: Track selected item & price
+  const [service, setService] = useState(null); // ✅ ADD: Store service data with items
 
   const generateRandomQR = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -87,6 +89,40 @@ function PaymentContent() {
         const deals = await response.json();
         const currentDeal = deals.find(d => d.id === dealId);
         setDeal(currentDeal);
+
+        // ✅ NEW: Fetch service data to get item prices
+        if (currentDeal && currentDeal.serviceId) {
+          try {
+            const servicesResponse = await fetch('/api/services');
+            if (servicesResponse.ok) {
+              const servicesData = await servicesResponse.json();
+              const currentService = Array.isArray(servicesData) 
+                ? servicesData.find(s => String(s.id) === String(currentDeal.serviceId))
+                : null;
+              
+              if (currentService) {
+                setService(currentService);
+                
+                // ✅ NEW: Set first item as default
+                if (currentService.items && currentService.items.length > 0) {
+                  const firstItem = currentService.items[0];
+                  const itemPrice = currentService.type === 'barang' 
+                    ? firstItem.hargaPcs 
+                    : firstItem.hargaSesi;
+                  
+                  setSelectedItem({
+                    id: firstItem.id,
+                    name: firstItem.namaBarang || firstItem.namaJasa,
+                    price: itemPrice
+                  });
+                }
+              }
+            }
+          } catch (serviceError) {
+            console.warn('Error fetching service:', serviceError);
+            // Continue anyway, use deal.totalPrice as fallback
+          }
+        }
       } catch (error) {
         console.error('Error fetching deal:', error);
         setDeal(null);
@@ -174,6 +210,10 @@ function PaymentContent() {
         dealId: dealId,
         userId: user.id,
         serviceId: deal?.serviceId || deal?.id,
+        // ✅ NEW: Track selected item
+        itemId: selectedItem?.id || null,
+        itemName: selectedItem?.name || null,
+        itemPrice: selectedItem?.price || basePrice,
         paymentMethod: paymentMethod,
         basePrice: basePrice,
         quantity: quantity,
@@ -336,7 +376,8 @@ function PaymentContent() {
   };
 
   const serviceFee = 25000;
-  const basePrice = deal?.totalPrice || 0;
+  // ✅ FIXED: Use selectedItem price instead of deal?.totalPrice
+  const basePrice = selectedItem?.price || 0;
   const totalPrice = basePrice * quantity * durationDays;
   const discountedSubtotal = Math.max(0, totalPrice - discountAmount);
   const totalAmount = discountedSubtotal + serviceFee;
@@ -445,6 +486,22 @@ function PaymentContent() {
               <div style={{ background: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                 <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#1f2937', marginBottom: '24px' }}>Detail Pesanan</h2>
                 <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>Tentukan jumlah dan durasi peminjaman</p>
+
+                {/* ✅ NEW: Display selected item */}
+                {selectedItem && (
+                  <div style={{ marginBottom: '20px', padding: '12px', background: '#f0f9ff', border: '1px solid #bfdbfe', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px 0' }}>Item yang dipilih</p>
+                        <p style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', margin: '0' }}>{selectedItem.name}</p>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px 0' }}>Harga/unit</p>
+                        <p style={{ fontSize: '16px', fontWeight: '700', color: '#2563eb', margin: '0' }}>Rp {selectedItem.price?.toLocaleString('id-ID')}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div style={{ marginBottom: '20px', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', background: '#fafafa' }}>
                   <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Kode Promo</label>
