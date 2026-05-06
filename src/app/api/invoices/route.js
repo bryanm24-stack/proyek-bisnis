@@ -157,8 +157,11 @@ export async function GET(request) {
 
       const customerIdForInvoice = String(invoice.customerId || relatedDeal?.customerId || relatedTransaction?.userId || '');
       const serviceIdForInvoice = String(relatedDeal?.serviceId || invoice.serviceId || '');
+      const dealIdForInvoice = String(invoice.dealId || '');
       const hasCustomerRating = Boolean(
-        ratings.find((item) => String(item.customerId) === customerIdForInvoice && String(item.serviceId) === serviceIdForInvoice)
+        dealIdForInvoice
+          ? ratings.find((item) => String(item.customerId) === customerIdForInvoice && String(item.dealId || '') === dealIdForInvoice)
+          : ratings.find((item) => String(item.customerId) === customerIdForInvoice && String(item.serviceId) === serviceIdForInvoice)
       );
 
       return {

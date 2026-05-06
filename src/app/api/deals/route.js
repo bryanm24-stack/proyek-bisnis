@@ -5,6 +5,16 @@ import { NextResponse } from 'next/server';
 // Helper: Normalize ID for consistent comparison
 const normalizeId = (id) => String(id || '').trim();
 
+const findLatestDealByChatId = (deals, chatId) => {
+  const normalizedChatId = normalizeId(chatId);
+  for (let index = deals.length - 1; index >= 0; index -= 1) {
+    if (normalizeId(deals[index]?.chatId) === normalizedChatId) {
+      return deals[index];
+    }
+  }
+  return null;
+};
+
 // Helper function to create notification
 async function createNotification(userId, type, message, relatedId, relatedData = {}) {
   try {
@@ -64,7 +74,7 @@ export async function POST(request) {
         return NextResponse.json({ success: false, message: 'Chat room tidak ditemukan' }, { status: 404 });
       }
 
-      const deal = deals.find(d => d.chatId === chatId);
+      const deal = findLatestDealByChatId(deals, chatId);
       if (!deal) {
         return NextResponse.json({ success: false, message: 'Deal belum dibuat' }, { status: 404 });
       }
@@ -198,7 +208,7 @@ export async function POST(request) {
       }
 
       // Find existing deal
-      const existingDeal = deals.find(d => d.chatId === chatId);
+      const existingDeal = findLatestDealByChatId(deals, chatId);
       
       // If resetDeadline is true and deal is completed, reset it to pending for new cycle
       if (resetDeadline && existingDeal && (existingDeal.status === 'completed' || existingDeal.status === 'cancelled')) {
@@ -244,7 +254,7 @@ export async function POST(request) {
       }
 
       // Check if deal sudah ada dari pihak lain
-      const existingDeal = deals.find(d => d.chatId === chatId);
+      const existingDeal = findLatestDealByChatId(deals, chatId);
 
       if (!existingDeal) {
         // Buat deal baru (dari pihak customer)
@@ -466,7 +476,7 @@ export async function GET(request) {
     const dealsData = await fs.readFile(dealsPath, 'utf-8');
     const deals = JSON.parse(dealsData);
 
-    const deal = deals.find(d => d.chatId === chatId);
+    const deal = findLatestDealByChatId(deals, chatId);
 
     return NextResponse.json({
       success: true,

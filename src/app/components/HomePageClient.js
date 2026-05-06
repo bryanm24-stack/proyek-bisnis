@@ -418,6 +418,7 @@ export default function HomePageClient() {
     setShowRatingForm(false);
     setRatingValue(5);
     setRatingReview('');
+    setDealData(null);
     setChatModalOpen(true);
     setModalOpen(false);
 
@@ -440,17 +441,21 @@ export default function HomePageClient() {
           setDealData(dealDataResp.data);
           // Rating form moved to dedicated page - not shown in chat
           setShowRatingForm(false);
+        } else {
+          setDealData(null);
         }
       } else {
         console.log('[openChatModal] No existing chat found, starting new');
         setChatData(null);
         setMessages([]);
+        setDealData(null);
       }
     } catch (error) {
       console.error('[openChatModal] Error:', error);
       // Still open chat, just without history
       setChatData(null);
       setMessages([]);
+      setDealData(null);
     }
   };
 
@@ -459,6 +464,7 @@ export default function HomePageClient() {
     setSelectedService(null);
     setChatData(null);
     setMessages([]);
+    setDealData(null);
     setShowRatingForm(false);
   };
 

@@ -194,6 +194,7 @@ export default function CustomerInvoicesPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          dealId: invoice.dealId,
           serviceId: invoice.serviceId,
           customerId: user.id,
           vendorId: invoice.vendorId,
