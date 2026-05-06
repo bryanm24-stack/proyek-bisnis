@@ -416,6 +416,7 @@ export default function VendorProductForm({
 
   const serviceMainCategorySet = new Set(Object.keys(normalizeCategoryTree(SERVICE_CATEGORY_TREE)));
   const isJasaSelected = isJasaFormType || serviceMainCategorySet.has(formData.mainCategory);
+  const isBarangSelected = !isJasaSelected;
   const entityLabel = isJasaSelected ? 'Jasa' : 'Barang';
   const activeCategoryPath = getCategoryPath(formData.mainCategory, formData.subCategory, formData.superSubCategory);
   const selectedMainCategory = formData.mainCategory || '';
@@ -676,7 +677,7 @@ export default function VendorProductForm({
   const handleAddItemRow = () => {
     const newItemId = `item-${Date.now()}`;
     const baseSpecOptionValues = Object.fromEntries(activeSpecOptionFields.map((field) => [field.key, '']));
-    const newItem = isBarangCategory(formData.mainCategory)
+    const newItem = isBarangSelected
       ? { id: newItemId, namaBarang: '', hargaPcs: '', stok: '', images: [], variationValues: {}, specOptionValues: baseSpecOptionValues }
       : { id: newItemId, namaJasa: '', hargaSesi: '', images: [], variationValues: {}, specOptionValues: baseSpecOptionValues };
 
@@ -1084,7 +1085,7 @@ export default function VendorProductForm({
         </div>
 
         {/* Conditional Items Table - BARANG or JASA */}
-        {isBarangCategory(formData.mainCategory) ? (
+        {isBarangSelected ? (
           // BARANG: Katalog Barang/Aset dengan detail per pcs
           <div style={{ 
             border: '1px solid #e5e7eb', 
@@ -1130,7 +1131,7 @@ export default function VendorProductForm({
                 border: '1px dashed #d1d5db'
               }}>
                 <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
-                  {isBarangCategory(formData.mainCategory) 
+                  {isBarangSelected 
                     ? 'Belum ada barang ditambahkan. Klik tombol "Tambah Baris" untuk memulai.' 
                     : 'Belum ada paket layanan ditambahkan. Klik tombol "Tambah Paket" untuk memulai.'}
                 </p>
@@ -1505,7 +1506,7 @@ export default function VendorProductForm({
             )}
 
             <p style={{ margin: '12px 0 0', fontSize: '12px', color: '#6b7280' }}>
-              💡 Tips: Daftarkan setiap tipe barang dengan jumlah stok dan harga satuan. Contoh: Laptop ROG 16" (5 unit @2,500,000), Gaming Chair (8 unit @1,200,000)
+              💡 Tips: Daftarkan setiap tipe barang dengan jumlah stok dan harga satuan. Contoh: Laptop ROG 16 inci (5 unit @2,500,000), Gaming Chair (8 unit @1,200,000)
             </p>
           </div>
         ) : (
@@ -1519,7 +1520,7 @@ export default function VendorProductForm({
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <label style={{ fontSize: '15px', fontWeight: '700', color: '#111827', margin: 0 }}>
-                � Daftar Paket Layanan
+                💼 Daftar Paket Layanan
               </label>
               <button
                 type="button"
@@ -1899,7 +1900,7 @@ export default function VendorProductForm({
             )}
 
             <p style={{ margin: '12px 0 0', fontSize: '12px', color: '#6b7280' }}>
-              💡 Tips: Buat berbagai pilihan paket dengan durasi/scope berbeda untuk fleksibilitas klien. Contoh: "Half Day (8 jam)", "Full Day (12 jam)", "Full Day + Prewedding (20 jam)"
+              💡 Tips: Buat berbagai pilihan paket dengan durasi/scope berbeda untuk fleksibilitas klien. Contoh: &quot;Half Day (8 jam)&quot;, &quot;Full Day (12 jam)&quot;, &quot;Full Day + Prewedding (20 jam)&quot;
             </p>
           </div>
         )}
@@ -1952,6 +1953,34 @@ export default function VendorProductForm({
             />
           </div>
         </div>
+
+        {isJasaSelected && (
+          <div>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
+              👥 Availability Tim/Provider
+            </label>
+            <input
+              type="number"
+              name="availability"
+              placeholder="Contoh: 3"
+              value={formData.availability || ''}
+              onChange={handleInputChange}
+              min="1"
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                fontSize: '14px',
+                boxSizing: 'border-box'
+              }}
+              required
+            />
+            <p style={{ marginTop: '8px', marginBottom: 0, fontSize: '12px', color: '#6b7280' }}>
+              Untuk jasa tidak menggunakan stok unit. Isi jumlah tim/provider yang bisa melayani pada periode yang sama.
+            </p>
+          </div>
+        )}
 
         {/* Kebijakan Sewa */}
         <div>
@@ -2362,6 +2391,37 @@ export default function VendorProductForm({
             </div>
 
             <div style={{ overflowY: 'auto', padding: '12px 20px' }}>
+              {deletedSpecFields.size > 0 && (
+                <div style={{ marginBottom: '14px', border: '1px solid #fde68a', background: '#fffbeb', borderRadius: '10px', padding: '12px' }}>
+                  <div style={{ fontSize: '12px', color: '#92400e', fontWeight: '700', marginBottom: '8px' }}>
+                    Field disembunyikan
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {activeSpecTemplate
+                      .filter((field) => deletedSpecFields.has(field.key))
+                      .map((field) => (
+                        <button
+                          key={field.key}
+                          type="button"
+                          onClick={() => handleRestoreSpec(field.key)}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '9999px',
+                            border: '1px solid #f59e0b',
+                            background: '#fff',
+                            color: '#92400e',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            fontWeight: '600'
+                          }}
+                        >
+                          ↺ Tampilkan {field.label}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {activeSpecTemplate
                   .filter(field => !deletedSpecFields.has(field.key))

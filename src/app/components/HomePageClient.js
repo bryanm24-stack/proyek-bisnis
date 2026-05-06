@@ -909,6 +909,9 @@ export default function HomePageClient() {
               }
               
               const isPopular = rentCountNum >= 100;
+              const mainCategoryText = String(service.mainCategory || service.category || '').toLowerCase();
+              const isJasaService = service.type === 'jasa' || mainCategoryText.includes('jasa');
+              const serviceAvailability = Number(service.availability ?? service.quantity ?? 0);
               const shortDesc = service.detailDescription || service.shortDescription || (service.description ? service.description.substring(0, 80) + '...' : '');
               const imageUrl = service.image || (service.images && service.images.length > 0 ? service.images[0] : 'https://via.placeholder.com/300x200?text=' + encodeURIComponent(service.title || 'Service'));
               
@@ -1097,6 +1100,24 @@ export default function HomePageClient() {
                         <span className="rating-stars">⭐ {Number(service.rating || 0).toFixed(1)}</span>
                         <span className="rating-count">({service.rentCount} disewa)</span>
                       </div>
+                      {isJasaService && (
+                        <div style={{ marginTop: '8px' }}>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              color: serviceAvailability > 0 ? '#15803d' : '#b91c1c',
+                              background: serviceAvailability > 0 ? '#dcfce7' : '#fee2e2',
+                              border: `1px solid ${serviceAvailability > 0 ? '#86efac' : '#fca5a5'}`,
+                              borderRadius: '9999px',
+                              padding: '4px 10px',
+                              display: 'inline-block'
+                            }}
+                          >
+                            {serviceAvailability > 0 ? `Availability: ${serviceAvailability} Tim/Provider` : 'Availability Penuh'}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="vendor-footer">
@@ -1314,6 +1335,22 @@ export default function HomePageClient() {
                                         {item.stok > 0 ? `Stok: ${item.stok}` : 'Habis'}
                                       </p>
                                     )}
+                                    {item.stok === undefined && selectedService?.type === 'jasa' && (
+                                      <p style={{
+                                        margin: '0',
+                                        fontSize: '10px',
+                                        fontWeight: '600',
+                                        color: (Number(selectedService.availability || selectedService.quantity || 0) > 0) ? '#10b981' : '#dc2626',
+                                        backgroundColor: (Number(selectedService.availability || selectedService.quantity || 0) > 0) ? '#d1fae5' : '#fee2e2',
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        whiteSpace: 'nowrap'
+                                      }}>
+                                        {Number(selectedService.availability || selectedService.quantity || 0) > 0
+                                          ? `Availability: ${Number(selectedService.availability || selectedService.quantity || 0)}`
+                                          : 'Penuh'}
+                                      </p>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -1328,6 +1365,13 @@ export default function HomePageClient() {
                               borderRadius: '14px',
                               marginTop: '16px'
                             }}>
+                              {(() => {
+                                const jasaAvailability = Number(selectedService?.availability || selectedService?.quantity || 0);
+                                const isJasaItem = selectedService?.type === 'jasa' && selectedItemDetail.stok === undefined;
+                                const isUnavailable = isJasaItem ? jasaAvailability <= 0 : selectedItemDetail.stok === 0;
+
+                                return (
+                                  <>
                               <div style={{ marginBottom: '16px' }}>
                                 <img
                                   src={getItemPreviewImage(selectedItemDetail)}
@@ -1373,24 +1417,42 @@ export default function HomePageClient() {
                                     </p>
                                   </div>
                                 )}
+                                {isJasaItem && (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Availability</p>
+                                    <p style={{
+                                      margin: '0',
+                                      fontSize: '16px',
+                                      fontWeight: 'bold',
+                                      color: jasaAvailability > 0 ? '#10b981' : '#dc2626'
+                                    }}>
+                                      {jasaAvailability > 0 ? `${jasaAvailability} Tim/Provider` : 'Penuh'}
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                               <button
                                 className="btn-primary-modal"
                                 onClick={() => openChatModal(selectedService)}
-                                disabled={user && user.id === selectedService.vendorId || selectedItemDetail.stok === 0}
+                                disabled={user && user.id === selectedService.vendorId || isUnavailable}
                                 style={{
                                   width: '100%',
                                   padding: '10px',
-                                  backgroundColor: selectedItemDetail.stok === 0 ? '#d1d5db' : '#5A45D1',
+                                  backgroundColor: isUnavailable ? '#d1d5db' : '#5A45D1',
                                   color: 'white',
                                   border: 'none',
                                   borderRadius: '6px',
-                                  cursor: (user && user.id === selectedService.vendorId) || selectedItemDetail.stok === 0 ? 'not-allowed' : 'pointer',
-                                  opacity: (user && user.id === selectedService.vendorId) || selectedItemDetail.stok === 0 ? 0.5 : 1
+                                  cursor: (user && user.id === selectedService.vendorId) || isUnavailable ? 'not-allowed' : 'pointer',
+                                  opacity: (user && user.id === selectedService.vendorId) || isUnavailable ? 0.5 : 1
                                 }}
                               >
-                                {selectedItemDetail.stok === 0 ? '⛔ Stok Habis' : '💬 Chat untuk Paket Ini'}
+                                {isUnavailable
+                                  ? (isJasaItem ? '⛔ Availability Penuh' : '⛔ Stok Habis')
+                                  : '💬 Chat untuk Paket Ini'}
                               </button>
+                                  </>
+                                );
+                              })()}
                             </div>
                           )}
                         </>

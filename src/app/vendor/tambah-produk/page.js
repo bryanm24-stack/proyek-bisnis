@@ -19,6 +19,7 @@ export default function TambahProdukPage() {
   const [errorMsg, setErrorMsg] = useState('');
 
   const [formData, setFormData] = useState({
+    type: '',
     mainCategory: '',
     subCategory: '',
     superSubCategory: '',
@@ -27,6 +28,7 @@ export default function TambahProdukPage() {
     description: '',
     price: '',
     minimumDays: 1,
+    availability: '',
     quantity: '',
     rentalPolicy: '',
     location: '',
@@ -58,10 +60,12 @@ export default function TambahProdukPage() {
 
     setFormData(prev => ({
       ...prev,
+      type: selectedType,
       mainCategory: '',
       subCategory: '',
       superSubCategory: '',
       category: '',
+      availability: '',
       specifications: {},
       descriptionTable: {},
       checklist: {}
@@ -82,6 +86,9 @@ export default function TambahProdukPage() {
     if (currentSuperSubOptions.length > 0 && !formData.superSubCategory) missingFields.push('Super-Sub Kategori');
     if (!formData.title) missingFields.push('Nama Item');
     if (!formData.location) missingFields.push('Lokasi Pickup');
+    if (selectedType === 'jasa' && (!formData.availability || Number(formData.availability) < 1)) {
+      missingFields.push('Availability Tim/Provider');
+    }
 
     if (missingFields.length > 0) {
       setErrorMsg('Bidang yang belum diisi:\n• ' + missingFields.join('\n• '));
@@ -96,7 +103,7 @@ export default function TambahProdukPage() {
             1,
             (formData.items || []).reduce((sum, item) => sum + (parseInt(item.stok, 10) || 0), 0)
           )
-        : Math.max(1, (formData.items || []).length || 1);
+        : Math.max(1, parseInt(formData.availability, 10) || 0);
 
       const submitData = {
         vendorId: user.id,
@@ -112,6 +119,7 @@ export default function TambahProdukPage() {
         description: formData.description,
         price: formData.price ? parseInt(formData.price) : undefined,
         minimumDays: parseInt(formData.minimumDays),
+        availability: selectedType === 'jasa' ? (parseInt(formData.availability, 10) || 0) : undefined,
         quantity: derivedQuantity,
         rentalPolicy: formData.rentalPolicy,
         location: formData.location,
