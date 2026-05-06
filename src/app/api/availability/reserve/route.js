@@ -59,8 +59,8 @@ export async function POST(request) {
     const serviceType = service.type || 'barang';
     
     if (serviceType === 'jasa') {
-      // JASA: Use service-level quantity
-      totalQuantity = Number(service.quantity) || 0;
+      // JASA: prefer availability, fallback to quantity for backward compatibility
+      totalQuantity = Number(service.availability ?? service.quantity) || 0;
     } else {
       // BARANG: Sum of all items stok
       totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
@@ -148,8 +148,8 @@ export async function GET(request) {
     const svcType = service.type || 'barang';
     
     if (svcType === 'jasa') {
-      // JASA: Use service-level quantity
-      totalQty = Number(service.quantity) || 0;
+      // JASA: prefer availability, fallback to quantity for backward compatibility
+      totalQty = Number(service.availability ?? service.quantity) || 0;
     } else {
       // BARANG: Sum of all items stok
       totalQty = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
@@ -225,8 +225,8 @@ export async function PUT(request) {
     const putServiceType = service.type || 'barang';
     
     if (putServiceType === 'jasa') {
-      // JASA: Use service-level quantity
-      totalQuantity = Number(service.quantity) || 0;
+      // JASA: prefer availability, fallback to quantity for backward compatibility
+      totalQuantity = Number(service.availability ?? service.quantity) || 0;
     } else {
       // BARANG: Sum of all items stok
       totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);

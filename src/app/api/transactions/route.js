@@ -89,8 +89,8 @@ export async function POST(request) {
           const serviceType = service.type || 'barang'; // default to barang
           
           if (serviceType === 'jasa') {
-            // JASA: Use service-level quantity (number of providers/teams available)
-            totalQuantity = Number(service.quantity) || 0;
+            // JASA: prefer availability, fallback to quantity for backward compatibility
+            totalQuantity = Number(service.availability ?? service.quantity) || 0;
           } else {
             // BARANG: Sum of all items stok (total inventory)
             totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
@@ -130,8 +130,8 @@ export async function POST(request) {
             console.warn(`AVAILABILITY CHECK FAILED: Service ${body.serviceId} - Available: ${availableQuantity}, Requested: ${body.quantity}`);
             return Response.json({
               success: false,
-              error: 'Stok tidak mencukupi',
-              message: `Stok ${serviceType === 'jasa' ? 'provider/tim' : 'barang'} tidak cukup untuk periode ini. Tersedia: ${availableQuantity} dari ${body.quantity} yang diminta`,
+              error: serviceType === 'jasa' ? 'Availability tidak mencukupi' : 'Stok tidak mencukupi',
+              message: `${serviceType === 'jasa' ? 'Availability provider/tim' : 'Stok barang'} tidak cukup untuk periode ini. Tersedia: ${availableQuantity} dari ${body.quantity} yang diminta`,
               availableQuantity,
               requestedQuantity: body.quantity,
               status: 'availability_check_failed'
@@ -390,8 +390,8 @@ export async function POST(request) {
           const serviceType = service.type || 'barang';
           
           if (serviceType === 'jasa') {
-            // JASA: Use service-level quantity
-            totalQuantity = Number(service.quantity) || 0;
+            // JASA: prefer availability, fallback to quantity for backward compatibility
+            totalQuantity = Number(service.availability ?? service.quantity) || 0;
           } else {
             // BARANG: Sum of all items stok
             totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);

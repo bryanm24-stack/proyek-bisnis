@@ -42,11 +42,12 @@ export async function POST(request) {
       detailDescription,
       price,
       minimumDays,
+      type,
+      availability,
       quantity,
       rentalPolicy,
       location,
       category,
-      type, // 'barang' atau 'jasa'
       specifications,
       descriptionTable,
       checklist,
@@ -59,7 +60,7 @@ export async function POST(request) {
       jumlahBarang,
       hargaBarang,
       deskripsiProduk,
-      availability,
+      availability: legacyAvailability,
       lokasi,
       latitude,
       longitude,
@@ -96,12 +97,18 @@ export async function POST(request) {
 
     // Support payload baru dari halaman /vendor/tambah-produk dan /vendor
     if (hasModernPayload) {
+      const resolvedType = type || (mainCategory && mainCategory.toLowerCase().includes('jasa') ? 'jasa' : 'barang');
       const missingFields = [];
       if (!mainCategory) missingFields.push('mainCategory');
       if (!subCategory) missingFields.push('subCategory');
       if (!title) missingFields.push('title');
       if (price === undefined || price === null || price === '') missingFields.push('price');
-      if (quantity === undefined || quantity === null || quantity === '') missingFields.push('quantity');
+      if (resolvedType === 'barang' && (quantity === undefined || quantity === null || quantity === '')) {
+        missingFields.push('quantity');
+      }
+      if (resolvedType === 'jasa' && (availability === undefined || availability === null || availability === '')) {
+        missingFields.push('availability');
+      }
       if (!location) missingFields.push('location');
 
       if (missingFields.length > 0) {
@@ -111,10 +118,16 @@ export async function POST(request) {
         }, { status: 400 });
       }
 
-      const resolvedType = type || (mainCategory && mainCategory.toLowerCase().includes('jasa') ? 'jasa' : 'barang');
       const parsedPrice = Number.parseInt(price, 10);
       const parsedMinimumDays = Number.parseInt(minimumDays, 10);
+      const parsedAvailability = Number.parseInt(availability, 10);
       const parsedQuantity = Number.parseInt(quantity, 10);
+      const normalizedQuantity = resolvedType === 'jasa'
+        ? (Number.isNaN(parsedAvailability) ? 0 : parsedAvailability)
+        : (Number.isNaN(parsedQuantity) ? 0 : parsedQuantity);
+      const normalizedAvailability = resolvedType === 'jasa'
+        ? (Number.isNaN(parsedAvailability) ? 0 : parsedAvailability)
+        : 0;
 
       // ✅ Validasi: Maximum 5 images
       const validatedImages = images && Array.isArray(images)
@@ -135,7 +148,8 @@ export async function POST(request) {
         detailDescription: detailDescription || description || '',
         price: Number.isNaN(parsedPrice) ? 0 : parsedPrice,
         minimumDays: Number.isNaN(parsedMinimumDays) ? 1 : parsedMinimumDays,
-        quantity: Number.isNaN(parsedQuantity) ? 0 : parsedQuantity,
+        availability: normalizedAvailability,
+        quantity: normalizedQuantity,
         rentalPolicy: rentalPolicy || '',
         location,
         specifications: specifications && typeof specifications === 'object' ? specifications : {},
@@ -204,7 +218,7 @@ export async function POST(request) {
         type: 'barang',
         jenisBarang,
         jumlahBarang: parseInt(jumlahBarang),
-        availability,
+        availability: legacyAvailability,
         lokasi,
         latitude,
         longitude,
@@ -269,6 +283,7 @@ export async function PUT(request) {
       description,
       price,
       minimumDays,
+      availability,
       quantity,
       rentalPolicy,
       location,
@@ -313,9 +328,19 @@ export async function PUT(request) {
       description: description || services[serviceIndex].description,
       price: price !== undefined ? price : services[serviceIndex].price,
       minimumDays: minimumDays || services[serviceIndex].minimumDays,
-      quantity: quantity !== undefined ? quantity : services[serviceIndex].quantity,
+      availability: availability !== undefined
+        ? availability
+        : (services[serviceIndex].availability ?? 0),
+      quantity: quantity !== undefined
+        ? quantity
+        : (
+            availability !== undefined
+              ? availability
+              : services[serviceIndex].quantity
+          ),
       rentalPolicy: rentalPolicy || services[serviceIndex].rentalPolicy,
       location: location || services[serviceIndex].location,
+      type: type || services[serviceIndex].type,
       images: images && images.length > 0 ? images : services[serviceIndex].images,
       category: category || services[serviceIndex].category,
       specifications: specifications && typeof specifications === 'object'
