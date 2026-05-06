@@ -1,10 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-export default function SearchBar({ services, onSearch, onCategoryChange, categoriesSource }) {
+export default function SearchBar({ services, onSearch, onCategoryChange, categoriesSource, onFiltersChange }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [locationTerm, setLocationTerm] = useState('');
+  const [minRating, setMinRating] = useState('all');
+  const [priceRange, setPriceRange] = useState('all');
+  const [sortBy, setSortBy] = useState('recommended');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const categorySource = categoriesSource || services;
 
@@ -57,11 +61,17 @@ export default function SearchBar({ services, onSearch, onCategoryChange, catego
     return categoryList;
   }, [categorySource]);
 
-  useEffect(() => {
+  const syncSearch = (nextSearchTerm = searchTerm, nextCategory = selectedCategory) => {
     if (onSearch) {
-      onSearch(searchTerm, selectedCategory);
+      onSearch(nextSearchTerm, nextCategory);
     }
-  }, [searchTerm, selectedCategory, onSearch]);
+  };
+
+  const syncFilters = (nextFilters) => {
+    if (onFiltersChange) {
+      onFiltersChange(nextFilters);
+    }
+  };
 
   const handleCategorySelect = (categoryId) => {
     setSelectedCategory(categoryId);
@@ -84,7 +94,11 @@ export default function SearchBar({ services, onSearch, onCategoryChange, catego
             type="text"
             placeholder="Cari vendor, layanan sewa..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              setSearchTerm(nextValue);
+              syncSearch(nextValue, selectedCategory);
+            }}
             className="search-input"
           />
         </div>
@@ -116,6 +130,93 @@ export default function SearchBar({ services, onSearch, onCategoryChange, catego
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="search-filter-row">
+        <div className="filter-field">
+          <label>Lokasi</label>
+          <input
+            type="text"
+            placeholder="Kota, area, atau alamat"
+            value={locationTerm}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              setLocationTerm(nextValue);
+              syncFilters({
+                locationTerm: nextValue,
+                minRating,
+                priceRange,
+                sortBy
+              });
+            }}
+          />
+        </div>
+        <div className="filter-field">
+          <label>Rating minimum</label>
+          <select
+            value={minRating}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              setMinRating(nextValue);
+              syncFilters({
+                locationTerm,
+                minRating: nextValue,
+                priceRange,
+                sortBy
+              });
+            }}
+          >
+            <option value="all">Semua</option>
+            <option value="4.5">4.5+</option>
+            <option value="4">4+</option>
+            <option value="3">3+</option>
+          </select>
+        </div>
+        <div className="filter-field">
+          <label>Rentang harga</label>
+          <select
+            value={priceRange}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              setPriceRange(nextValue);
+              syncFilters({
+                locationTerm,
+                minRating,
+                priceRange: nextValue,
+                sortBy
+              });
+            }}
+          >
+            <option value="all">Semua</option>
+            <option value="under_100k">Di bawah Rp100 ribu</option>
+            <option value="100k_250k">Rp100 ribu - Rp250 ribu</option>
+            <option value="250k_500k">Rp250 ribu - Rp500 ribu</option>
+            <option value="above_500k">Di atas Rp500 ribu</option>
+          </select>
+        </div>
+        <div className="filter-field">
+          <label>Urutkan</label>
+          <select
+            value={sortBy}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              setSortBy(nextValue);
+              syncFilters({
+                locationTerm,
+                minRating,
+                priceRange,
+                sortBy: nextValue
+              });
+            }}
+          >
+            <option value="recommended">Rekomendasi</option>
+            <option value="popular">Paling populer</option>
+            <option value="rating">Rating tertinggi</option>
+            <option value="price_low">Harga termurah</option>
+            <option value="price_high">Harga termahal</option>
+            <option value="newest">Terbaru</option>
+          </select>
         </div>
       </div>
 
@@ -296,9 +397,50 @@ export default function SearchBar({ services, onSearch, onCategoryChange, catego
           color: #666;
         }
 
+        .search-filter-row {
+          margin-top: 14px;
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 12px;
+        }
+
+        .filter-field {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .filter-field label {
+          font-size: 12px;
+          font-weight: 700;
+          color: #475569;
+        }
+
+        .filter-field input,
+        .filter-field select {
+          border: 2px solid #ddd;
+          border-radius: 12px;
+          padding: 10px 12px;
+          font-size: 14px;
+          background: #fff;
+          color: #111827;
+          outline: none;
+          font-family: inherit;
+        }
+
+        .filter-field input:focus,
+        .filter-field select:focus {
+          border-color: #5a45d1;
+          box-shadow: 0 0 0 3px rgba(90, 69, 209, 0.12);
+        }
+
         @media (max-width: 768px) {
           .search-wrapper {
             gap: 10px;
+          }
+
+          .search-filter-row {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
 
           .search-input-wrapper {
@@ -324,6 +466,10 @@ export default function SearchBar({ services, onSearch, onCategoryChange, catego
         @media (max-width: 480px) {
           .search-wrapper {
             flex-direction: column;
+          }
+
+          .search-filter-row {
+            grid-template-columns: 1fr;
           }
 
           .search-input-wrapper,

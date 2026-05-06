@@ -248,6 +248,9 @@ export default function VendorProductForm({
   const CATEGORIES = categories || ALL_VENDOR_CATEGORY_TREE;
   const normalizedCategoryTree = normalizeCategoryTree(CATEGORIES);
 
+  // Determine if this is a Jasa (service) form based on passed categories or mainCategory
+  const isJasaFormType = categories === SERVICE_CATEGORY_TREE;
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -412,7 +415,8 @@ export default function VendorProductForm({
   );
 
   const serviceMainCategorySet = new Set(Object.keys(normalizeCategoryTree(SERVICE_CATEGORY_TREE)));
-  const isJasaSelected = serviceMainCategorySet.has(formData.mainCategory);
+  const isJasaSelected = isJasaFormType || serviceMainCategorySet.has(formData.mainCategory);
+  const isBarangSelected = !isJasaSelected;
   const entityLabel = isJasaSelected ? 'Jasa' : 'Barang';
   const activeCategoryPath = getCategoryPath(formData.mainCategory, formData.subCategory, formData.superSubCategory);
   const selectedMainCategory = formData.mainCategory || '';
@@ -673,7 +677,7 @@ export default function VendorProductForm({
   const handleAddItemRow = () => {
     const newItemId = `item-${Date.now()}`;
     const baseSpecOptionValues = Object.fromEntries(activeSpecOptionFields.map((field) => [field.key, '']));
-    const newItem = isBarangCategory(formData.mainCategory)
+    const newItem = isBarangSelected
       ? { id: newItemId, namaBarang: '', hargaPcs: '', stok: '', images: [], variationValues: {}, specOptionValues: baseSpecOptionValues }
       : { id: newItemId, namaJasa: '', hargaSesi: '', images: [], variationValues: {}, specOptionValues: baseSpecOptionValues };
 
@@ -916,7 +920,9 @@ export default function VendorProductForm({
   return (
     <div style={{ background: 'white', padding: '40px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
       <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '32px', color: '#1f2937' }}>
-        {isEditing ? `✏️ Edit ${entityLabel}` : `➕ Tambah ${entityLabel} Baru`}
+        {isEditing 
+          ? (isJasaSelected ? `✏️ Edit Layanan Jasa` : `✏️ Edit Barang`) 
+          : (isJasaSelected ? `➕ Tambah Layanan Jasa Baru` : `➕ Tambah Barang Baru`)}
       </h2>
 
       {errorMsg && (
@@ -951,7 +957,9 @@ export default function VendorProductForm({
         {/* Jasa atau Barang */}
         <div>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            🧭 Jasa atau Barang
+            {isJasaSelected 
+              ? '🧭 Kategori Layanan Jasa' 
+              : '🧭 Kategori Barang/Aset'}
           </label>
           <button
             type="button"
@@ -976,14 +984,18 @@ export default function VendorProductForm({
             <span style={{ color: '#6b7280', marginLeft: '8px' }}>▼</span>
           </button>
           <p style={{ marginTop: '8px', marginBottom: 0, fontSize: '12px', color: hasValidSelectedMainCategory ? '#6b7280' : '#dc2626' }}>
-            Pilih kategori jasa/barang, sub kategori, dan super-sub kategori (jika tersedia).
+            {isJasaSelected 
+              ? 'Pilih kategori layanan, sub kategori, dan super-sub kategori untuk memilih keahlian yang tepat.' 
+              : 'Pilih kategori barang, sub kategori, dan super-sub kategori untuk klasifikasi aset yang tepat.'}
           </p>
         </div>
 
         {/* Nama Barang/Jasa */}
         <div>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            📝 Nama {entityLabel}
+            {isJasaSelected 
+              ? '📝 Nama Layanan' 
+              : '📝 Nama Barang'}
           </label>
           <input
             type="text"
@@ -1006,11 +1018,15 @@ export default function VendorProductForm({
         {/* Deskripsi Lengkap */}
         <div>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            📄 Deskripsi Lengkap {entityLabel}
+            {isJasaSelected 
+              ? '📄 Deskripsi Lengkap Layanan' 
+              : '📄 Deskripsi Lengkap Barang'}
           </label>
           <textarea
             name="description"
-            placeholder="Spesifikasi, kondisi, fitur, dll..."
+            placeholder={isJasaSelected 
+              ? 'Jelaskan proses layanan, deliverables, timeline, expertise tim, portfolio, dan hal penting lainnya...' 
+              : 'Spesifikasi teknis, kondisi barang, fitur lengkap, cara perawatan, aksesori yang disertakan, dll...'}
             value={formData.description || ''}
             onChange={handleInputChange}
             rows="5"
@@ -1041,10 +1057,18 @@ export default function VendorProductForm({
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <strong style={{ color: '#111827' }}>🧩 Tabel Spesifikasi {entityLabel}</strong>
+            <strong style={{ color: '#111827' }}>
+              {isJasaSelected 
+                ? '🧩 Detail Keahlian & Pengalaman' 
+                : '🧩 Spesifikasi Teknis Barang'}
+            </strong>
             <span style={{ fontSize: '12px', color: '#6b7280' }}>{completedRequiredSpecCount}/{requiredSpecCount}</span>
           </div>
-          <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#6b7280' }}>Klik untuk isi spesifikasi {entityLabel.toLowerCase()} via popup.</p>
+          <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#6b7280' }}>
+            {isJasaSelected 
+              ? 'Klik untuk detail keahlian, pengalaman, dan kemampuan layanan via popup.' 
+              : 'Klik untuk detail spesifikasi teknis barang via popup.'}
+          </p>
         </button>
 
         <div style={{
@@ -1061,7 +1085,7 @@ export default function VendorProductForm({
         </div>
 
         {/* Conditional Items Table - BARANG or JASA */}
-        {isBarangCategory(formData.mainCategory) ? (
+        {isBarangSelected ? (
           // BARANG: Katalog Barang/Aset dengan detail per pcs
           <div style={{ 
             border: '1px solid #e5e7eb', 
@@ -1107,7 +1131,9 @@ export default function VendorProductForm({
                 border: '1px dashed #d1d5db'
               }}>
                 <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
-                  Belum ada detail {entityLabel.toLowerCase()} ditambahkan. Klik tombol &quot;Tambah Baris&quot; untuk memulai.
+                  {isBarangSelected 
+                    ? 'Belum ada barang ditambahkan. Klik tombol "Tambah Baris" untuk memulai.' 
+                    : 'Belum ada paket layanan ditambahkan. Klik tombol "Tambah Paket" untuk memulai.'}
                 </p>
               </div>
             ) : (
@@ -1135,7 +1161,7 @@ export default function VendorProductForm({
                         color: '#374151',
                         width: '35%'
                       }}>
-                        Nama {entityLabel}
+                        Nama Barang
                       </th>
                       <th style={{ 
                         padding: '12px 14px', 
@@ -1144,7 +1170,7 @@ export default function VendorProductForm({
                         color: '#374151',
                         width: '22%'
                       }}>
-                        Harga/Pcs (Rp)
+                        Harga per Pcs (Rp)
                       </th>
                       <th style={{ 
                         padding: '12px 14px', 
@@ -1153,7 +1179,7 @@ export default function VendorProductForm({
                         color: '#374151',
                         width: '16%'
                       }}>
-                        Stok
+                        Jumlah Stok (Unit)
                       </th>
                       <th style={{ 
                         padding: '12px 14px', 
@@ -1312,7 +1338,7 @@ export default function VendorProductForm({
                         <td style={{ padding: '12px 14px' }}>
                           <input
                             type="text"
-                            placeholder="Nama barang (misal: Laptop Gaming ROG)"
+                            placeholder="Contoh: Laptop ROG 16 Inch, Gaming Chair RGB, Monitor 4K 27 Inci"
                             value={item.namaBarang || ''}
                             onChange={(e) => handleItemFieldChange(item.id, 'namaBarang', e.target.value)}
                             style={{
@@ -1331,7 +1357,7 @@ export default function VendorProductForm({
                         <td style={{ padding: '12px 14px' }}>
                           <input
                             type="number"
-                            placeholder="0"
+                            placeholder="Harga satuan"
                             value={item.hargaPcs || ''}
                             onChange={(e) => handleItemFieldChange(item.id, 'hargaPcs', e.target.value)}
                             style={{
@@ -1350,7 +1376,7 @@ export default function VendorProductForm({
                         <td style={{ padding: '12px 14px' }}>
                           <input
                             type="number"
-                            placeholder="0"
+                            placeholder="Jumlah unit"
                             value={item.stok || ''}
                             onChange={(e) => handleItemFieldChange(item.id, 'stok', e.target.value)}
                             style={{
@@ -1480,7 +1506,7 @@ export default function VendorProductForm({
             )}
 
             <p style={{ margin: '12px 0 0', fontSize: '12px', color: '#6b7280' }}>
-              💡 Tip: Masukkan setiap varian/tipe barang/aset dengan harga per pcs. Contoh: Laptop A (3 unit @2jt), Laptop B (2 unit @1.5jt)
+              💡 Tips: Daftarkan setiap tipe barang dengan jumlah stok dan harga satuan. Contoh: Laptop ROG 16 inci (5 unit @2,500,000), Gaming Chair (8 unit @1,200,000)
             </p>
           </div>
         ) : (
@@ -1494,7 +1520,7 @@ export default function VendorProductForm({
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <label style={{ fontSize: '15px', fontWeight: '700', color: '#111827', margin: 0 }}>
-                🗂️ Katalog Product & Harga
+                💼 Daftar Paket Layanan
               </label>
               <button
                 type="button"
@@ -1516,7 +1542,7 @@ export default function VendorProductForm({
                 onMouseEnter={(e) => e.target.style.background = '#2563eb'}
                 onMouseLeave={(e) => e.target.style.background = '#3b82f6'}
               >
-                ➕ Tambah Paket
+                ➕ Tambah Paket Baru
               </button>
             </div>
 
@@ -1529,7 +1555,7 @@ export default function VendorProductForm({
                 border: '1px dashed #d1d5db'
               }}>
                 <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
-                  Belum ada paket {entityLabel.toLowerCase()} ditambahkan. Klik tombol &quot;Tambah Paket&quot; untuk memulai.
+                  Belum ada paket layanan ditambahkan. Klik tombol &quot;Tambah Paket Baru&quot; untuk memulai.
                 </p>
               </div>
             ) : (
@@ -1557,7 +1583,7 @@ export default function VendorProductForm({
                         color: '#374151',
                         width: '48%'
                       }}>
-                        Nama {entityLabel}/Paket
+                        Nama Paket Layanan
                       </th>
                       <th style={{ 
                         padding: '12px 14px', 
@@ -1566,7 +1592,7 @@ export default function VendorProductForm({
                         color: '#374151',
                         width: '25%'
                       }}>
-                        Harga Per Hari/Sesi (Rp)
+                        Harga Paket (Rp)
                       </th>
                       <th style={{ 
                         padding: '12px 14px', 
@@ -1725,7 +1751,7 @@ export default function VendorProductForm({
                         <td style={{ padding: '12px 14px' }}>
                           <input
                             type="text"
-                            placeholder="Nama paket/layanan (misal: Full Day Photography)"
+                            placeholder="Contoh: Full Day Photography, Half Day Session, Event Coverage"
                             value={item.namaJasa || ''}
                             onChange={(e) => handleItemFieldChange(item.id, 'namaJasa', e.target.value)}
                             style={{
@@ -1744,7 +1770,7 @@ export default function VendorProductForm({
                         <td style={{ padding: '12px 14px' }}>
                           <input
                             type="number"
-                            placeholder="0"
+                            placeholder="Masukkan harga paket"
                             value={item.hargaSesi || ''}
                             onChange={(e) => handleItemFieldChange(item.id, 'hargaSesi', e.target.value)}
                             style={{
@@ -1874,7 +1900,7 @@ export default function VendorProductForm({
             )}
 
             <p style={{ margin: '12px 0 0', fontSize: '12px', color: '#6b7280' }}>
-              💡 Tip: Bisa tambahkan paket berbeda dengan harga berbeda. Contoh: &quot;Half Day (8 jam)&quot;, &quot;Full Day (12 jam)&quot;, &quot;Custom Duration&quot;
+              💡 Tips: Buat berbagai pilihan paket dengan durasi/scope berbeda untuk fleksibilitas klien. Contoh: &quot;Half Day (8 jam)&quot;, &quot;Full Day (12 jam)&quot;, &quot;Full Day + Prewedding (20 jam)&quot;
             </p>
           </div>
         )}
@@ -1883,12 +1909,12 @@ export default function VendorProductForm({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div>
             <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-              💰 Harga per Hari (Rp)
+              {isJasaSelected ? '💰 Harga Standar Paket (Rp)' : '💰 Harga Base per Hari (Rp)'}
             </label>
             <input
               type="number"
               name="price"
-              placeholder="Contoh: 50000"
+              placeholder={isJasaSelected ? 'Contoh: 3500000' : 'Contoh: 500000'}
               value={formData.price || ''}
               onChange={handleInputChange}
               style={{
@@ -1906,12 +1932,12 @@ export default function VendorProductForm({
 
           <div>
             <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-              📅 Durasi Minimum Sewa (hari)
+              {isJasaSelected ? '📋 Durasi Standar (hari)' : '📅 Durasi Minimum Sewa (hari)'}
             </label>
             <input
               type="number"
               name="minimumDays"
-              placeholder="Contoh: 1"
+              placeholder={isJasaSelected ? 'Contoh: 1' : 'Contoh: 1'}
               value={formData.minimumDays || 1}
               onChange={handleInputChange}
               style={{
@@ -1928,14 +1954,46 @@ export default function VendorProductForm({
           </div>
         </div>
 
+        {isJasaSelected && (
+          <div>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
+              👥 Availability Tim/Provider
+            </label>
+            <input
+              type="number"
+              name="availability"
+              placeholder="Contoh: 3"
+              value={formData.availability || ''}
+              onChange={handleInputChange}
+              min="1"
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                fontSize: '14px',
+                boxSizing: 'border-box'
+              }}
+              required
+            />
+            <p style={{ marginTop: '8px', marginBottom: 0, fontSize: '12px', color: '#6b7280' }}>
+              Untuk jasa tidak menggunakan stok unit. Isi jumlah tim/provider yang bisa melayani pada periode yang sama.
+            </p>
+          </div>
+        )}
+
         {/* Kebijakan Sewa */}
         <div>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            ⚖️ Kebijakan Sewa (Kerusakan, Denda, Syarat, dll)
+            {isJasaSelected 
+              ? '⚖️ Syarat & Ketentuan Layanan (Pembayaran, Pembatalan, Revisi, dll)' 
+              : '⚖️ Kebijakan Sewa (Kerusakan, Denda, Syarat, dll)'}
           </label>
           <textarea
             name="rentalPolicy"
-            placeholder="Contoh: Jaminan Rp500.000 | Biaya Kerusakan 20% dari harga sewa | Denda keterlambatan Rp50.000/hari"
+            placeholder={isJasaSelected 
+              ? 'Contoh: DP 50% untuk konfirmasi | Pembatalan gratis 7 hari sebelumnya | Termasuk konsultasi awal | Tidak termasuk pengeluaran transport' 
+              : 'Contoh: Jaminan Rp500.000 | Biaya Kerusakan 20% dari harga sewa | Denda keterlambatan Rp50.000/hari'}
             value={formData.rentalPolicy || ''}
             onChange={handleInputChange}
             rows="4"
@@ -1954,12 +2012,16 @@ export default function VendorProductForm({
         {/* Lokasi Pickup */}
         <div>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            📍 Lokasi Pickup/Pengiriman
+            {isJasaSelected 
+              ? '📍 Lokasi Layanan / Bertemu Klien' 
+              : '📍 Lokasi Pickup/Pengambilan Barang'}
           </label>
           <input
             type="text"
             name="location"
-            placeholder="Alamat lengkap tempat pengambilan"
+            placeholder={isJasaSelected 
+              ? 'Contoh: Studio Citra Jl. Gajah Mada No.123, Jakarta Pusat' 
+              : 'Contoh: Gudang Jl. Panjang Utama No.456, Medan'}
             value={formData.location || ''}
             onChange={handleInputChange}
             style={{
@@ -1977,7 +2039,9 @@ export default function VendorProductForm({
         {/* Upload Foto */}
         <div>
           <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            📸 Foto {entityLabel} (Upload hingga 5 foto)
+            {isJasaSelected 
+              ? '📸 Foto Portofolio Layanan' 
+              : '📸 Foto Barang/Aset'}
           </label>
           <input
             type="file"
@@ -2327,6 +2391,37 @@ export default function VendorProductForm({
             </div>
 
             <div style={{ overflowY: 'auto', padding: '12px 20px' }}>
+              {deletedSpecFields.size > 0 && (
+                <div style={{ marginBottom: '14px', border: '1px solid #fde68a', background: '#fffbeb', borderRadius: '10px', padding: '12px' }}>
+                  <div style={{ fontSize: '12px', color: '#92400e', fontWeight: '700', marginBottom: '8px' }}>
+                    Field disembunyikan
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {activeSpecTemplate
+                      .filter((field) => deletedSpecFields.has(field.key))
+                      .map((field) => (
+                        <button
+                          key={field.key}
+                          type="button"
+                          onClick={() => handleRestoreSpec(field.key)}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '9999px',
+                            border: '1px solid #f59e0b',
+                            background: '#fff',
+                            color: '#92400e',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            fontWeight: '600'
+                          }}
+                        >
+                          ↺ Tampilkan {field.label}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {activeSpecTemplate
                   .filter(field => !deletedSpecFields.has(field.key))

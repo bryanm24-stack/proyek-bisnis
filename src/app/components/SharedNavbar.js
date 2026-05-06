@@ -1,32 +1,46 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 
+function readUserFromStorage() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const userData = localStorage.getItem('user');
+  if (!userData) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(userData);
+  } catch {
+    return null;
+  }
+}
+
+function subscribeAuth(listener) {
+  if (typeof window === 'undefined') {
+    return () => {};
+  }
+
+  window.addEventListener('storage', listener);
+  window.addEventListener('auth-change', listener);
+
+  return () => {
+    window.removeEventListener('storage', listener);
+    window.removeEventListener('auth-change', listener);
+  };
+}
+
 export default function SharedNavbar() {
-  const [user, setUser] = useState(null);
-  const [isHydrated, setIsHydrated] = useState(false);
+  const user = useSyncExternalStore(subscribeAuth, readUserFromStorage, () => null);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-
-  useEffect(() => {
-    setIsHydrated(true);
-    const userData = localStorage.getItem('user');
-
-    if (!userData) {
-      setUser(null);
-      return;
-    }
-
-    try {
-      setUser(JSON.parse(userData));
-    } catch {
-      setUser(null);
-    }
-  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -48,7 +62,7 @@ export default function SharedNavbar() {
 
   const handleLogout = () => {
     localStorage.removeItem('user');
-    setUser(null);
+    window.dispatchEvent(new Event('auth-change'));
     router.push('/login');
   };
 
@@ -66,7 +80,7 @@ export default function SharedNavbar() {
     return pathname === href || pathname.startsWith(href + '/');
   };
 
-  if (!isHydrated || !user) {
+  if (!user) {
     return null;
   }
 

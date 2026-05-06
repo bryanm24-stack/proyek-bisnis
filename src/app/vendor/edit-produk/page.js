@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import VendorProductForm from '../VendorProductForm';
 import {
   ALL_VENDOR_CATEGORY_TREE,
+  SERVICE_CATEGORY_TREE,
+  normalizeCategoryTree,
   getSubCategoryMap,
   getSuperSubOptions
 } from '../category-tree';
@@ -14,6 +16,7 @@ function EditProdukPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const itemId = searchParams.get('id');
+  const serviceMainCategorySet = new Set(Object.keys(normalizeCategoryTree(SERVICE_CATEGORY_TREE)));
   
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -22,6 +25,7 @@ function EditProdukPageContent() {
   const [errorMsg, setErrorMsg] = useState('');
   
   const [formData, setFormData] = useState({
+    type: '',
     mainCategory: '',
     subCategory: '',
     superSubCategory: '',
@@ -30,6 +34,7 @@ function EditProdukPageContent() {
     description: '',
     price: '',
     minimumDays: 1,
+    availability: '',
     quantity: '',
     rentalPolicy: '',
     location: '',
@@ -70,8 +75,12 @@ function EditProdukPageContent() {
       if (data.success && Array.isArray(data.data)) {
         const item = data.data.find(i => i.id === id);
         if (item) {
+          const resolvedMainCategory = item.mainCategory || item.category || '';
+          const resolvedType = item.type || (serviceMainCategorySet.has(resolvedMainCategory) ? 'jasa' : 'barang');
+
           setFormData({
-            mainCategory: item.mainCategory || item.category || '',
+            type: resolvedType,
+            mainCategory: resolvedMainCategory,
             subCategory: item.subCategory || '',
             superSubCategory: item.superSubCategory || '',
             title: item.title || '',
@@ -79,6 +88,7 @@ function EditProdukPageContent() {
             description: item.description || item.detailDescription || '',
             price: item.price?.toString() || '',
             minimumDays: item.minimumDays || 1,
+            availability: resolvedType === 'jasa' ? (item.availability?.toString() || item.quantity?.toString() || '') : '',
             quantity: item.quantity?.toString() || '',
             rentalPolicy: item.rentalPolicy || '',
             location: item.location || '',
@@ -99,6 +109,8 @@ function EditProdukPageContent() {
   };
 
   const handleSubmit = async (e) => {
+      const isJasaEntry = formData.type === 'jasa' || serviceMainCategorySet.has(formData.mainCategory);
+
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
@@ -114,6 +126,9 @@ function EditProdukPageContent() {
     }
     if (!formData.title) missingFields.push('Nama Item');
     if (!formData.location) missingFields.push('Lokasi Pickup');
+    if (isJasaEntry && (!formData.availability || Number(formData.availability) < 1)) {
+      missingFields.push('Availability Tim/Provider');
+    }
 
     if (missingFields.length > 0) {
       setErrorMsg('Bidang yang belum diisi:\n• ' + missingFields.join('\n• '));
@@ -123,10 +138,12 @@ function EditProdukPageContent() {
     setIsSubmitting(true);
 
     try {
-      const derivedQuantity = Math.max(
-        1,
-        (formData.items || []).reduce((sum, item) => sum + (parseInt(item.stok, 10) || 0), 0)
-      );
+      const derivedQuantity = isJasaEntry
+        ? Math.max(1, parseInt(formData.availability, 10) || 0)
+        : Math.max(
+            1,
+            (formData.items || []).reduce((sum, item) => sum + (parseInt(item.stok, 10) || 0), 0)
+          );
 
       const submitData = {
         id: itemId,
@@ -142,6 +159,8 @@ function EditProdukPageContent() {
         description: formData.description,
         price: formData.price ? parseInt(formData.price) : undefined,
         minimumDays: parseInt(formData.minimumDays),
+        type: isJasaEntry ? 'jasa' : 'barang',
+        availability: isJasaEntry ? (parseInt(formData.availability, 10) || 0) : undefined,
         quantity: derivedQuantity,
         rentalPolicy: formData.rentalPolicy,
         location: formData.location,

@@ -87,6 +87,52 @@ export default function FavoritesPage() {
     }
   };
 
+  // Helper function to safely format price
+  const formatPrice = (price) => {
+    if (typeof price === 'number' && isFinite(price) && price > 0 && price < 1e20) {
+      return price.toLocaleString('id-ID');
+    }
+    return '0';
+  };
+
+  // Helper function to get display price from items
+  const getItemsPrice = (service) => {
+    if (!service.items || service.items.length === 0) {
+      return null;
+    }
+
+    // Get prices from items based on type
+    const prices = service.items
+      .map(item => item.hargaSesi || item.hargaPcs || 0)
+      .filter(price => price > 0)
+      .sort((a, b) => a - b);
+
+    if (prices.length === 0) {
+      return null;
+    }
+
+    // Single item - show price only
+    if (prices.length === 1) {
+      return {
+        single: true,
+        min: prices[0],
+        max: prices[0],
+        display: formatPrice(prices[0])
+      };
+    }
+
+    // Multiple items - show range
+    const minPrice = prices[0];
+    const maxPrice = prices[prices.length - 1];
+    
+    return {
+      single: false,
+      min: minPrice,
+      max: maxPrice,
+      display: `${formatPrice(minPrice)} - ${formatPrice(maxPrice)}`
+    };
+  };
+
   const openModal = (service) => {
     setSelectedService(service);
     setDetailTab('packages');
@@ -95,11 +141,22 @@ export default function FavoritesPage() {
     setReviewsLoading(true);
     setModalOpen(true);
 
+    // Fetch reviews for this service
+    console.log('Fetching reviews for serviceId:', service.id);
+    
     fetch(`/api/ratings?serviceId=${service.id}`)
-      .then((response) => response.json())
+      .then((response) => {
+        console.log('API Response status:', response.status);
+        return response.json();
+      })
       .then((data) => {
-        if (data.success) {
-          setServiceReviews(data.data || []);
+        console.log('API Response data:', data);
+        if (data.success && data.data && Array.isArray(data.data)) {
+          console.log('Setting reviews:', data.data.length, 'reviews');
+          setServiceReviews(data.data);
+        } else {
+          console.warn('Invalid API response format:', data);
+          setServiceReviews([]);
         }
       })
       .catch((error) => {
@@ -528,8 +585,9 @@ export default function FavoritesPage() {
                     <div className="vendor-footer">
                       <div className="vendor-price">
                         <span className="price-label">Rp</span>
-                        <span className="price-amount">{(service.price || 0).toLocaleString('id-ID')}</span>
-                        <span className="price-period">/ hari</span>
+                        <span className="price-amount">
+                          {getItemsPrice(service)?.display || formatPrice(service.price)}
+                        </span>
                       </div>
 
                       <button 

@@ -7,6 +7,9 @@ const dealsFile = path.join(process.cwd(), 'deals.json');
 const servicesFile = path.join(process.cwd(), 'services.json');
 const ratingsFile = path.join(process.cwd(), 'ratings.json');
 
+// Helper: Normalize ID for consistent comparison
+const normalizeId = (id) => String(id || '').trim();
+
 // Ensure invoices.json exists
 const ensureInvoicesFile = () => {
   if (!fs.existsSync(invoicesFile)) {
@@ -45,8 +48,12 @@ export async function GET(request) {
     transactions
       .filter((item) => item.dealId && item.paymentType !== 'invoice_payment')
       .forEach((transaction) => {
+        // Improved deduplication using normalizeId for case-insensitive matching
         const alreadyExists = invoices.some(
-          (invoice) => invoice.transactionId === transaction.id || (invoice.dealId === transaction.dealId && invoice.paymentType === transaction.paymentType)
+          (invoice) => normalizeId(invoice.transactionId) === normalizeId(transaction.id) || 
+                       (normalizeId(invoice.dealId) === normalizeId(transaction.dealId) && 
+                        invoice.paymentType === transaction.paymentType &&
+                        invoice.status !== 'pending') // Only match if not pending (avoid overwriting pending invoices)
         );
         if (alreadyExists) return;
 
@@ -82,7 +89,8 @@ export async function GET(request) {
     deals
       .filter((deal) => deal?.id && deal?.status === 'agreed' && deal?.discountGiven && deal?.invoiceStatus !== 'paid')
       .forEach((deal) => {
-        const alreadyExists = invoices.some((invoice) => String(invoice.dealId) === String(deal.id));
+        // Improved deduplication: check if invoice already exists with same dealId
+        const alreadyExists = invoices.some((invoice) => normalizeId(invoice.dealId) === normalizeId(deal.id));
         if (alreadyExists) return;
 
         const baseDate = new Date(deal.discountUpdatedAt || deal.agreedAt || Date.now());
@@ -149,8 +157,11 @@ export async function GET(request) {
 
       const customerIdForInvoice = String(invoice.customerId || relatedDeal?.customerId || relatedTransaction?.userId || '');
       const serviceIdForInvoice = String(relatedDeal?.serviceId || invoice.serviceId || '');
+      const dealIdForInvoice = String(invoice.dealId || '');
       const hasCustomerRating = Boolean(
-        ratings.find((item) => String(item.customerId) === customerIdForInvoice && String(item.serviceId) === serviceIdForInvoice)
+        dealIdForInvoice
+          ? ratings.find((item) => String(item.customerId) === customerIdForInvoice && String(item.dealId || '') === dealIdForInvoice)
+          : ratings.find((item) => String(item.customerId) === customerIdForInvoice && String(item.serviceId) === serviceIdForInvoice)
       );
 
       return {

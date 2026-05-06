@@ -38,6 +38,9 @@ function PaymentContent() {
   const [paymentType, setPaymentType] = useState('full'); // 'full' or 'pay_after'
   const [availabilityCheck, setAvailabilityCheck] = useState(null); // null, 'checking', 'available', 'unavailable'
   const [availabilityMessage, setAvailabilityMessage] = useState('');
+  const [maxAvailableQuantity, setMaxAvailableQuantity] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(null); // ✅ ADD: Track selected item & price
+  const [service, setService] = useState(null); // ✅ ADD: Store service data with items
 
   const generateRandomQR = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -87,6 +90,40 @@ function PaymentContent() {
         const deals = await response.json();
         const currentDeal = deals.find(d => d.id === dealId);
         setDeal(currentDeal);
+
+        // ✅ NEW: Fetch service data to get item prices
+        if (currentDeal && currentDeal.serviceId) {
+          try {
+            const servicesResponse = await fetch('/api/services');
+            if (servicesResponse.ok) {
+              const servicesData = await servicesResponse.json();
+              const currentService = Array.isArray(servicesData) 
+                ? servicesData.find(s => String(s.id) === String(currentDeal.serviceId))
+                : null;
+              
+              if (currentService) {
+                setService(currentService);
+                
+                // ✅ NEW: Set first item as default
+                if (currentService.items && currentService.items.length > 0) {
+                  const firstItem = currentService.items[0];
+                  const itemPrice = currentService.type === 'barang' 
+                    ? firstItem.hargaPcs 
+                    : firstItem.hargaSesi;
+                  
+                  setSelectedItem({
+                    id: firstItem.id,
+                    name: firstItem.namaBarang || firstItem.namaJasa,
+                    price: itemPrice
+                  });
+                }
+              }
+            }
+          } catch (serviceError) {
+            console.warn('Error fetching service:', serviceError);
+            // Continue anyway, use deal.totalPrice as fallback
+          }
+        }
       } catch (error) {
         console.error('Error fetching deal:', error);
         setDeal(null);
@@ -141,9 +178,11 @@ function PaymentContent() {
   const handlePayment = async (e) => {
     e.preventDefault();
 
+    const isJasaService = service?.type === 'jasa' || deal?.serviceType === 'jasa' || deal?.type === 'jasa';
+
     // AVAILABILITY CHECK - Validasi ketersediaan sebelum payment
     if (availabilityCheck !== 'available') {
-      alert('❌ Barang tidak tersedia untuk periode ini. Silakan ubah tanggal atau jumlah barang.');
+      alert(`❌ ${isJasaService ? 'Availability jasa' : 'Stok barang'} tidak tersedia untuk periode ini. Silakan ubah tanggal atau jumlah.`);
       return;
     }
 
@@ -174,6 +213,10 @@ function PaymentContent() {
         dealId: dealId,
         userId: user.id,
         serviceId: deal?.serviceId || deal?.id,
+        // ✅ NEW: Track selected item
+        itemId: selectedItem?.id || null,
+        itemName: selectedItem?.name || null,
+        itemPrice: selectedItem?.price || basePrice,
         paymentMethod: paymentMethod,
         basePrice: basePrice,
         quantity: quantity,
@@ -291,11 +334,12 @@ function PaymentContent() {
     setPromoMessage('Promo dihapus.');
   };
 
-  // AVAILABILITY CHECK - Validasi ketersediaan barang
+  // AVAILABILITY CHECK - Validasi ketersediaan barang/jasa
   const checkAvailability = async (qty, duration, startDt) => {
     if (!deal?.id || !qty || !startDt) {
       setAvailabilityCheck(null);
       setAvailabilityMessage('');
+      setMaxAvailableQuantity(null);
       return;
     }
 
@@ -320,30 +364,37 @@ function PaymentContent() {
       });
 
       const result = await response.json();
+      const isJasaService = service?.type === 'jasa' || deal?.serviceType === 'jasa' || deal?.type === 'jasa';
+      const availabilityLabel = isJasaService ? 'Availability jasa' : 'Stok';
+      const unitLabel = isJasaService ? 'tim/provider' : 'unit';
       
       if (result.success && result.available) {
         setAvailabilityCheck('available');
-        setAvailabilityMessage(`✅ Stok tersedia: ${result.availableQuantity} dari ${result.totalQuantity} unit`);
+        setMaxAvailableQuantity(Number(result.availableQuantity) || null);
+        setAvailabilityMessage(`✅ ${availabilityLabel} tersedia: ${result.availableQuantity} dari ${result.totalQuantity} ${unitLabel}`);
       } else {
         setAvailabilityCheck('unavailable');
-        setAvailabilityMessage(`❌ ${result.message || 'Stok tidak tersedia untuk periode ini'}`);
+        setMaxAvailableQuantity(Number(result.availableQuantity) || null);
+        setAvailabilityMessage(`❌ ${result.message || `${availabilityLabel} tidak tersedia untuk periode ini`}`);
       }
     } catch (error) {
       console.error('Availability check error:', error);
       setAvailabilityCheck('unavailable');
+      setMaxAvailableQuantity(null);
       setAvailabilityMessage('Gagal mengecek ketersediaan');
     }
   };
 
   const serviceFee = 25000;
-  const basePrice = deal?.totalPrice || 0;
+  // ✅ FIXED: Use selectedItem price instead of deal?.totalPrice
+  const basePrice = selectedItem?.price || 0;
   const totalPrice = basePrice * quantity * durationDays;
   const discountedSubtotal = Math.max(0, totalPrice - discountAmount);
   const totalAmount = discountedSubtotal + serviceFee;
   const downPayment = Math.round(totalAmount * 0.2); // 20% down payment
   const remainingPayment = totalAmount - downPayment; // 80% remaining
-  const isService = deal?.itemName?.toLowerCase().includes('jasa') || false;
-  const quantityLabel = isService ? 'Hari' : 'Item';
+  const isService = service?.type === 'jasa' || deal?.serviceType === 'jasa' || deal?.type === 'jasa';
+  const quantityLabel = isService ? 'Tim/Provider' : 'Item';
   const borrowDateLabel = startDate
     ? new Date(`${startDate}T00:00:00.000Z`).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
     : '-';
@@ -446,6 +497,22 @@ function PaymentContent() {
                 <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#1f2937', marginBottom: '24px' }}>Detail Pesanan</h2>
                 <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>Tentukan jumlah dan durasi peminjaman</p>
 
+                {/* ✅ NEW: Display selected item */}
+                {selectedItem && (
+                  <div style={{ marginBottom: '20px', padding: '12px', background: '#f0f9ff', border: '1px solid #bfdbfe', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px 0' }}>Item yang dipilih</p>
+                        <p style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', margin: '0' }}>{selectedItem.name}</p>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px 0' }}>Harga/unit</p>
+                        <p style={{ fontSize: '16px', fontWeight: '700', color: '#2563eb', margin: '0' }}>Rp {selectedItem.price?.toLocaleString('id-ID')}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ marginBottom: '20px', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', background: '#fafafa' }}>
                   <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Kode Promo</label>
                   <div style={{ display: 'flex', gap: '8px' }}>
@@ -479,14 +546,39 @@ function PaymentContent() {
                   )}
                 </div>
 
-                {/* Jumlah Item */}
+                {/* Jumlah Unit/Tim */}
                 <div style={{ marginBottom: '20px' }}>
-                  <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Jumlah Item</label>
+                  <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Jumlah {quantityLabel}</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <button onClick={() => setQuantity(Math.max(1, quantity - 1))} style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '18px', fontWeight: '700', color: '#7c3aed' }}>−</button>
-                    <input type="number" value={quantity} onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))} style={{ width: '80px', textAlign: 'center', border: '1px solid #ddd', borderRadius: '8px', padding: '8px', fontSize: '14px', fontWeight: '600' }} min="1" />
-                    <button onClick={() => setQuantity(quantity + 1)} style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '18px', fontWeight: '700', color: '#7c3aed' }}>+</button>
-                    <span style={{ fontSize: '14px', color: '#6b7280', marginLeft: '12px' }}>item</span>
+                    <input
+                      type="number"
+                      value={quantity}
+                      onChange={(e) => {
+                        const nextValue = Math.max(1, parseInt(e.target.value, 10) || 1);
+                        if (maxAvailableQuantity && maxAvailableQuantity > 0) {
+                          setQuantity(Math.min(nextValue, maxAvailableQuantity));
+                          return;
+                        }
+                        setQuantity(nextValue);
+                      }}
+                      style={{ width: '80px', textAlign: 'center', border: '1px solid #ddd', borderRadius: '8px', padding: '8px', fontSize: '14px', fontWeight: '600' }}
+                      min="1"
+                    />
+                    <button
+                      onClick={() => {
+                        if (maxAvailableQuantity && maxAvailableQuantity > 0) {
+                          setQuantity(Math.min(quantity + 1, maxAvailableQuantity));
+                          return;
+                        }
+                        setQuantity(quantity + 1);
+                      }}
+                      disabled={Boolean(maxAvailableQuantity && quantity >= maxAvailableQuantity)}
+                      style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: (maxAvailableQuantity && quantity >= maxAvailableQuantity) ? 'not-allowed' : 'pointer', fontSize: '18px', fontWeight: '700', color: '#7c3aed', opacity: (maxAvailableQuantity && quantity >= maxAvailableQuantity) ? 0.5 : 1 }}
+                    >
+                      +
+                    </button>
+                    <span style={{ fontSize: '14px', color: '#6b7280', marginLeft: '12px' }}>{quantityLabel}</span>
                   </div>
 
                   {/* AVAILABILITY STATUS */}
@@ -557,7 +649,7 @@ function PaymentContent() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '13px', color: '#6b7280' }}>Durasi hari</span>
-                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>{durationDays} {quantityLabel}</span>
+                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>{durationDays} Hari</span>
                   </div>
                 </div>
 
@@ -751,7 +843,7 @@ function PaymentContent() {
                   <span style={{ fontSize: '14px', fontWeight: '600' }}>Rp {basePrice.toLocaleString('id-ID')}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Jumlah item × Durasi</span>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Jumlah {quantityLabel} × Hari</span>
                   <span style={{ fontSize: '14px', fontWeight: '600' }}>{quantity} × {durationDays} = {quantity * durationDays}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e5e7eb' }}>

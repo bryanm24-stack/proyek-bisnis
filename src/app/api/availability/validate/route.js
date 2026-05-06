@@ -34,12 +34,22 @@ export async function POST(request) {
       }, { status: 404 });
     }
 
-    // Get available quantity
-    const totalQuantity = Number(service.quantity) || Number(service.jumlahBarang) || 0;
+    // Get available quantity based on service type
+    let totalQuantity = 0;
+    const serviceType = service.type || 'barang';
+    
+    if (serviceType === 'jasa') {
+      // JASA: prefer availability, fallback to quantity for backward compatibility
+      totalQuantity = Number(service.availability ?? service.quantity) || 0;
+    } else {
+      // BARANG: Sum of all items stok
+      totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
+    }
+    
     if (totalQuantity === 0) {
       return NextResponse.json({
         success: false,
-        message: 'Barang tidak memiliki stok',
+        message: serviceType === 'jasa' ? 'Provider/Tim tidak memiliki availability' : 'Barang tidak memiliki stok',
         available: false,
         availableQuantity: 0,
         requestedQuantity: quantity
@@ -89,7 +99,9 @@ export async function POST(request) {
     if (availableQuantity < requestedQuantity) {
       return NextResponse.json({
         success: false,
-        message: `Stok tidak mencukupi. Tersedia: ${availableQuantity}, diminta: ${requestedQuantity}`,
+        message: serviceType === 'jasa'
+          ? `Availability tidak mencukupi. Tersedia: ${availableQuantity}, diminta: ${requestedQuantity}`
+          : `Stok tidak mencukupi. Tersedia: ${availableQuantity}, diminta: ${requestedQuantity}`,
         available: false,
         availableQuantity,
         requestedQuantity,
@@ -102,7 +114,7 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Stok tersedia',
+      message: serviceType === 'jasa' ? 'Availability tersedia' : 'Stok tersedia',
       available: true,
       availableQuantity,
       requestedQuantity,

@@ -84,7 +84,17 @@ export async function POST(request) {
 
         const service = services.find(s => String(s.id) === String(body.serviceId));
         if (service) {
-          const totalQuantity = Number(service.quantity) || Number(service.jumlahBarang) || 0;
+          // Determine total quantity based on service type
+          let totalQuantity = 0;
+          const serviceType = service.type || 'barang'; // default to barang
+          
+          if (serviceType === 'jasa') {
+            // JASA: prefer availability, fallback to quantity for backward compatibility
+            totalQuantity = Number(service.availability ?? service.quantity) || 0;
+          } else {
+            // BARANG: Sum of all items stok (total inventory)
+            totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
+          }
           
           // Calculate end date if not provided
           let endDate = body.endDate;
@@ -120,8 +130,8 @@ export async function POST(request) {
             console.warn(`AVAILABILITY CHECK FAILED: Service ${body.serviceId} - Available: ${availableQuantity}, Requested: ${body.quantity}`);
             return Response.json({
               success: false,
-              error: 'Stok tidak mencukupi',
-              message: `Stok barang tidak cukup untuk periode ini. Tersedia: ${availableQuantity} dari ${body.quantity} yang diminta`,
+              error: serviceType === 'jasa' ? 'Availability tidak mencukupi' : 'Stok tidak mencukupi',
+              message: `${serviceType === 'jasa' ? 'Availability provider/tim' : 'Stok barang'} tidak cukup untuk periode ini. Tersedia: ${availableQuantity} dari ${body.quantity} yang diminta`,
               availableQuantity,
               requestedQuantity: body.quantity,
               status: 'availability_check_failed'
@@ -131,6 +141,44 @@ export async function POST(request) {
       } catch (availabilityError) {
         console.warn('Availability check warning:', availabilityError.message);
         // Don't fail on availability check errors, continue with transaction
+      }
+    }
+
+    // ✅ NEW: ITEM PRICE VERIFICATION - Validate item price matches service data
+    let verifiedItemPrice = body.basePrice || 0;
+    let verifiedItemId = body.itemId || null;
+    
+    if (body.serviceId && body.itemId) {
+      try {
+        const servicesFile = path.join(process.cwd(), 'services.json');
+        let servicesData = fs.readFileSync(servicesFile, 'utf-8');
+        servicesData = servicesData.replace(/^\uFEFF/, '').trim();
+        const services = JSON.parse(servicesData);
+        
+        const service = services.find(s => String(s.id) === String(body.serviceId));
+        if (service && service.items && Array.isArray(service.items)) {
+          const item = service.items.find(i => String(i.id) === String(body.itemId));
+          
+          if (item) {
+            // Get price based on service type
+            const priceField = service.type === 'barang' ? 'hargaPcs' : 'hargaSesi';
+            const itemPrice = item[priceField] || item.price || body.basePrice;
+            
+            verifiedItemPrice = itemPrice;
+            verifiedItemId = item.id;
+            
+            // Log price mismatch if significant difference (> 1000)
+            if (Math.abs(body.basePrice - itemPrice) > 1000) {
+              console.warn(`Price mismatch for item ${body.itemId}: payment sent ${body.basePrice}, but actual is ${itemPrice}`);
+              // Don't fail, just log - customer might have applied discount
+            }
+          } else {
+            console.warn(`Item ${body.itemId} not found in service ${body.serviceId}`);
+          }
+        }
+      } catch (priceVerifyError) {
+        console.warn('Item price verification warning:', priceVerifyError.message);
+        // Continue with transaction using provided price
       }
     }
     
@@ -148,7 +196,10 @@ export async function POST(request) {
     const newTransaction = {
       ...body,
       identityVerification,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      // ✅ ADD: Verified item price for audit trail
+      verifiedItemPrice: verifiedItemPrice,
+      verifiedItemId: verifiedItemId
     };
 
     const rentalTimeline = buildRentalTimeline(body.startDate, body.durationDays);
@@ -334,8 +385,18 @@ export async function POST(request) {
 
           service.bookings.push(newBooking);
 
-          // Recalculate availableQuantity
-          const totalQuantity = Number(service.quantity) || Number(service.jumlahBarang) || 0;
+          // Recalculate availableQuantity based on service type
+          let totalQuantity = 0;
+          const serviceType = service.type || 'barang';
+          
+          if (serviceType === 'jasa') {
+            // JASA: prefer availability, fallback to quantity for backward compatibility
+            totalQuantity = Number(service.availability ?? service.quantity) || 0;
+          } else {
+            // BARANG: Sum of all items stok
+            totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
+          }
+          
           let bookedQuantity = 0;
           for (const booking of service.bookings) {
             if (booking.status !== 'cancelled' && booking.status !== 'completed') {

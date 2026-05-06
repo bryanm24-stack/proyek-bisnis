@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import SearchBar from './SearchBar';
 import SharedNavbar from './SharedNavbar';
 
 export default function HomePageClient() {
+  const router = useRouter();
   const [services, setServices] = useState([]);
   const [promos, setPromos] = useState([]);
   const [user, setUser] = useState(null);
@@ -33,8 +35,16 @@ export default function HomePageClient() {
   const [reviewPage, setReviewPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchFilters, setSearchFilters] = useState({
+    locationTerm: '',
+    minRating: 'all',
+    priceRange: 'all',
+    sortBy: 'recommended'
+  });
   const [userFavorites, setUserFavorites] = useState([]);
   const [favoriteLoading, setFavoriteLoading] = useState({});
+  const [vendorReplyDrafts, setVendorReplyDrafts] = useState({});
+  const [vendorReplySubmittingId, setVendorReplySubmittingId] = useState(null);
 
   const fetchFavorites = useCallback(async (currentUser) => {
     if (!currentUser) return;
@@ -197,6 +207,50 @@ export default function HomePageClient() {
     return '0';
   };
 
+  // Helper function to get display price from items
+  const getItemsPrice = (service) => {
+    if (!service.items || service.items.length === 0) {
+      return null;
+    }
+
+    // Get prices from items based on type
+    const prices = service.items
+      .map(item => item.hargaSesi || item.hargaPcs || 0)
+      .filter(price => price > 0)
+      .sort((a, b) => a - b);
+
+    if (prices.length === 0) {
+      return null;
+    }
+
+    // Single item - show price only
+    if (prices.length === 1) {
+      return {
+        single: true,
+        min: prices[0],
+        max: prices[0],
+        display: formatPrice(prices[0])
+      };
+    }
+
+    // Multiple items - show range
+    const minPrice = prices[0];
+    const maxPrice = prices[prices.length - 1];
+    
+    return {
+      single: false,
+      min: minPrice,
+      max: maxPrice,
+      display: `${formatPrice(minPrice)} - ${formatPrice(maxPrice)}`
+    };
+  };
+
+  const getServicePriceNumber = (service) => {
+    const itemPrice = getItemsPrice(service);
+    if (itemPrice?.min) return Number(itemPrice.min) || 0;
+    return Number(service?.price || service?.tarif || 0) || 0;
+  };
+
   const getNonEmptyObjectEntries = (value) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
     return Object.entries(value).filter(([, entryValue]) => {
@@ -295,11 +349,22 @@ export default function HomePageClient() {
     setReviewPage(1);
     setModalOpen(true);
 
+    // Fetch reviews for this service
+    console.log('Fetching reviews for serviceId:', service.id);
+    
     fetch(`/api/ratings?serviceId=${service.id}`)
-      .then((response) => response.json())
+      .then((response) => {
+        console.log('API Response status:', response.status);
+        return response.json();
+      })
       .then((data) => {
-        if (data.success) {
-          setServiceReviews(data.data || []);
+        console.log('API Response data:', data);
+        if (data.success && data.data && Array.isArray(data.data)) {
+          console.log('Setting reviews:', data.data.length, 'reviews');
+          setServiceReviews(data.data);
+        } else {
+          console.warn('Invalid API response format:', data);
+          setServiceReviews([]);
         }
       })
       .catch((error) => {
@@ -353,6 +418,7 @@ export default function HomePageClient() {
     setShowRatingForm(false);
     setRatingValue(5);
     setRatingReview('');
+    setDealData(null);
     setChatModalOpen(true);
     setModalOpen(false);
 
@@ -373,20 +439,23 @@ export default function HomePageClient() {
         const dealDataResp = await dealResponse.json();
         if (dealDataResp.success && dealDataResp.data) {
           setDealData(dealDataResp.data);
-          if (dealDataResp.data.status === 'completed') {
-            setShowRatingForm(true);
-          }
+          // Rating form moved to dedicated page - not shown in chat
+          setShowRatingForm(false);
+        } else {
+          setDealData(null);
         }
       } else {
         console.log('[openChatModal] No existing chat found, starting new');
         setChatData(null);
         setMessages([]);
+        setDealData(null);
       }
     } catch (error) {
       console.error('[openChatModal] Error:', error);
       // Still open chat, just without history
       setChatData(null);
       setMessages([]);
+      setDealData(null);
     }
   };
 
@@ -395,6 +464,7 @@ export default function HomePageClient() {
     setSelectedService(null);
     setChatData(null);
     setMessages([]);
+    setDealData(null);
     setShowRatingForm(false);
   };
 
@@ -520,9 +590,19 @@ export default function HomePageClient() {
     }
 
     if (dealData.status === 'completed') {
+      // Jika sudah rating, allow new cycle
+      if (dealData.ratingCompleted) {
+        return {
+          label: 'Rating selesai',
+          description: 'Anda dapat melanjutkan dengan penawaran baru untuk produk ini atau lanjut negosiasi.',
+          background: '#fef3c7',
+          color: '#92400e'
+        };
+      }
+      // Jika belum rating, tunggu rating form
       return {
         label: 'Transaksi selesai',
-        description: 'Transaksi sudah selesai. Kamu bisa lanjut isi review.',
+        description: 'Transaksi sudah selesai. Silakan berikan rating di bawah.',
         background: '#dcfce7',
         color: '#166534'
       };
@@ -550,6 +630,7 @@ export default function HomePageClient() {
           serviceId: selectedService.id,
           customerId: user.id,
           vendorId: selectedService.vendorId,
+          dealId: dealData?.id || null,
           rating: ratingValue,
           review: ratingReview
         })
@@ -558,7 +639,19 @@ export default function HomePageClient() {
       const data = await response.json();
       if (data.success) {
         alert('Rating berhasil disimpan!');
-        closeChatModal();
+        
+        // Reset rating form dan deal status untuk allow new cycle
+        setShowRatingForm(false);
+        setRatingValue(5);
+        setRatingReview('');
+        
+        // Mark deal as rating completed
+        if (dealData) {
+          setDealData({
+            ...dealData,
+            ratingCompleted: true
+          });
+        }
         
         setServices(services.map(s =>
           s.id === selectedService.id
@@ -569,6 +662,52 @@ export default function HomePageClient() {
     } catch (error) {
       console.error('Error submitting rating:', error);
       alert('Gagal menyimpan rating');
+    }
+  };
+
+  const submitVendorReply = async (review) => {
+    if (!user || user.role !== 'vendor' || user.id !== selectedService?.vendorId) {
+      alert('Hanya vendor pemilik layanan yang dapat membalas review.');
+      return;
+    }
+
+    const reply = (vendorReplyDrafts[review.id] || '').trim();
+    if (!reply) {
+      alert('Balasan tidak boleh kosong');
+      return;
+    }
+
+    setVendorReplySubmittingId(review.id);
+
+    try {
+      const response = await fetch('/api/ratings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ratingId: review.id,
+          vendorId: selectedService.vendorId,
+          serviceId: selectedService.id,
+          reply
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Gagal menyimpan balasan vendor');
+      }
+
+      setServiceReviews((prev) => prev.map((item) => (
+        item.id === review.id
+          ? { ...item, vendorReply: data.data.vendorReply, vendorReplyAt: data.data.vendorReplyAt, vendorReplyBy: data.data.vendorReplyBy }
+          : item
+      )));
+      setVendorReplyDrafts((prev) => ({ ...prev, [review.id]: '' }));
+      alert('Balasan vendor berhasil disimpan');
+    } catch (error) {
+      console.error('Error saving vendor reply:', error);
+      alert(error.message || 'Gagal menyimpan balasan vendor');
+    } finally {
+      setVendorReplySubmittingId(null);
     }
   };
 
@@ -607,9 +746,53 @@ export default function HomePageClient() {
         service.title?.toLowerCase().includes(term) ||
         service.vendorName?.toLowerCase().includes(term) ||
         service.shortDescription?.toLowerCase().includes(term) ||
-        service.description?.toLowerCase().includes(term)
+        service.description?.toLowerCase().includes(term) ||
+        service.location?.toLowerCase().includes(term) ||
+        service.lokasi?.toLowerCase().includes(term)
       );
     }
+
+    const locationTerm = (searchFilters.locationTerm || '').trim().toLowerCase();
+    if (locationTerm) {
+      filtered = filtered.filter(service =>
+        service.location?.toLowerCase().includes(locationTerm) ||
+        service.lokasi?.toLowerCase().includes(locationTerm)
+      );
+    }
+
+    if (searchFilters.minRating !== 'all') {
+      const minimumRating = Number(searchFilters.minRating) || 0;
+      filtered = filtered.filter(service => Number(service.rating || 0) >= minimumRating);
+    }
+
+    if (searchFilters.priceRange !== 'all') {
+      filtered = filtered.filter((service) => {
+        const price = getServicePriceNumber(service);
+        if (searchFilters.priceRange === 'under_100k') return price > 0 && price < 100000;
+        if (searchFilters.priceRange === '100k_250k') return price >= 100000 && price < 250000;
+        if (searchFilters.priceRange === '250k_500k') return price >= 250000 && price < 500000;
+        if (searchFilters.priceRange === 'above_500k') return price >= 500000;
+        return true;
+      });
+    }
+
+    const sortBy = searchFilters.sortBy || 'recommended';
+    filtered = [...filtered].sort((a, b) => {
+      const ratingA = Number(a.rating || 0);
+      const ratingB = Number(b.rating || 0);
+      const rentA = Number.parseInt(String(a.rentCount || '0').replace(/[K,]/g, ''), 10) || 0;
+      const rentB = Number.parseInt(String(b.rentCount || '0').replace(/[K,]/g, ''), 10) || 0;
+      const priceA = getServicePriceNumber(a);
+      const priceB = getServicePriceNumber(b);
+
+      if (sortBy === 'popular') return rentB - rentA;
+      if (sortBy === 'rating') return ratingB - ratingA || rentB - rentA;
+      if (sortBy === 'price_low') return priceA - priceB || ratingB - ratingA;
+      if (sortBy === 'price_high') return priceB - priceA || ratingB - ratingA;
+      if (sortBy === 'newest') return Number(b.id || 0) - Number(a.id || 0);
+
+      return ratingB - ratingA || rentB - rentA || priceA - priceB;
+    });
 
     return filtered;
   };
@@ -698,6 +881,7 @@ export default function HomePageClient() {
             setSearchTerm(term);
             setSelectedCategory(category);
           }}
+          onFiltersChange={(filters) => setSearchFilters((prev) => ({ ...prev, ...filters }))}
           onCategoryChange={(category) => setSelectedCategory(category)}
         />
 
@@ -725,6 +909,9 @@ export default function HomePageClient() {
               }
               
               const isPopular = rentCountNum >= 100;
+              const mainCategoryText = String(service.mainCategory || service.category || '').toLowerCase();
+              const isJasaService = service.type === 'jasa' || mainCategoryText.includes('jasa');
+              const serviceAvailability = Number(service.availability ?? service.quantity ?? 0);
               const shortDesc = service.detailDescription || service.shortDescription || (service.description ? service.description.substring(0, 80) + '...' : '');
               const imageUrl = service.image || (service.images && service.images.length > 0 ? service.images[0] : 'https://via.placeholder.com/300x200?text=' + encodeURIComponent(service.title || 'Service'));
               
@@ -913,13 +1100,32 @@ export default function HomePageClient() {
                         <span className="rating-stars">⭐ {Number(service.rating || 0).toFixed(1)}</span>
                         <span className="rating-count">({service.rentCount} disewa)</span>
                       </div>
+                      {isJasaService && (
+                        <div style={{ marginTop: '8px' }}>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              color: serviceAvailability > 0 ? '#15803d' : '#b91c1c',
+                              background: serviceAvailability > 0 ? '#dcfce7' : '#fee2e2',
+                              border: `1px solid ${serviceAvailability > 0 ? '#86efac' : '#fca5a5'}`,
+                              borderRadius: '9999px',
+                              padding: '4px 10px',
+                              display: 'inline-block'
+                            }}
+                          >
+                            {serviceAvailability > 0 ? `Availability: ${serviceAvailability} Tim/Provider` : 'Availability Penuh'}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="vendor-footer">
                       <div className="vendor-price">
                         <span className="price-label">Rp</span>
-                        <span className="price-amount">{formatPrice(service.price)}</span>
-                        <span className="price-period">/ hari</span>
+                        <span className="price-amount">
+                          {getItemsPrice(service)?.display || formatPrice(service.price)}
+                        </span>
                       </div>
 
                       <button 
@@ -1048,7 +1254,7 @@ export default function HomePageClient() {
                           {/* Package Gallery */}
                           <div style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
                             gap: '16px',
                             marginBottom: '24px'
                           }}>
@@ -1062,18 +1268,91 @@ export default function HomePageClient() {
                                   overflow: 'hidden',
                                   border: selectedItemDetail?.id === item.id ? '3px solid #5A45D1' : '1px solid #ddd',
                                   transition: 'all 0.3s ease',
-                                  transform: selectedItemDetail?.id === item.id ? 'scale(1.05)' : 'scale(1)'
+                                  transform: selectedItemDetail?.id === item.id ? 'scale(1.05)' : 'scale(1)',
+                                  backgroundColor: '#fff'
                                 }}
                               >
-                                <img
-                                  src={getItemPreviewImage(item)}
-                                  alt={item.namaBarang || item.namaJasa}
-                                  style={{
-                                    width: '100%',
-                                    height: '120px',
-                                    objectFit: 'cover'
-                                  }}
-                                />
+                                <div style={{ position: 'relative' }}>
+                                  <img
+                                    src={getItemPreviewImage(item)}
+                                    alt={item.namaBarang || item.namaJasa}
+                                    style={{
+                                      width: '100%',
+                                      height: '120px',
+                                      objectFit: 'cover'
+                                    }}
+                                  />
+                                </div>
+                                <div style={{ 
+                                  padding: '10px', 
+                                  backgroundColor: selectedItemDetail?.id === item.id ? '#f5f3ff' : '#fafafa',
+                                  borderTop: '1px solid #eee'
+                                }}>
+                                  <h4 style={{ 
+                                    margin: '0 0 6px 0', 
+                                    fontSize: '12px', 
+                                    fontWeight: '600',
+                                    color: '#333',
+                                    lineHeight: '1.3'
+                                  }}>
+                                    {item.namaBarang || item.namaJasa}
+                                  </h4>
+                                  {item.deskripsi && (
+                                    <p style={{ 
+                                      margin: '0 0 6px 0', 
+                                      fontSize: '11px', 
+                                      color: '#666',
+                                      lineHeight: '1.3',
+                                      display: '-webkit-box',
+                                      WebkitLineClamp: 2,
+                                      WebkitBoxOrient: 'vertical',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis'
+                                    }}>
+                                      {item.deskripsi}
+                                    </p>
+                                  )}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                                    <p style={{ 
+                                      margin: '0', 
+                                      fontSize: '11px', 
+                                      fontWeight: '600',
+                                      color: '#5A45D1'
+                                    }}>
+                                      Rp {item.hargaPcs ? Number(item.hargaPcs).toLocaleString('id-ID') : Number(item.hargaSesi).toLocaleString('id-ID')}
+                                    </p>
+                                    {item.stok !== undefined && (
+                                      <p style={{ 
+                                        margin: '0', 
+                                        fontSize: '10px', 
+                                        fontWeight: '600',
+                                        color: item.stok > 0 ? '#10b981' : '#dc2626',
+                                        backgroundColor: item.stok > 0 ? '#d1fae5' : '#fee2e2',
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        whiteSpace: 'nowrap'
+                                      }}>
+                                        {item.stok > 0 ? `Stok: ${item.stok}` : 'Habis'}
+                                      </p>
+                                    )}
+                                    {item.stok === undefined && selectedService?.type === 'jasa' && (
+                                      <p style={{
+                                        margin: '0',
+                                        fontSize: '10px',
+                                        fontWeight: '600',
+                                        color: (Number(selectedService.availability || selectedService.quantity || 0) > 0) ? '#10b981' : '#dc2626',
+                                        backgroundColor: (Number(selectedService.availability || selectedService.quantity || 0) > 0) ? '#d1fae5' : '#fee2e2',
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        whiteSpace: 'nowrap'
+                                      }}>
+                                        {Number(selectedService.availability || selectedService.quantity || 0) > 0
+                                          ? `Availability: ${Number(selectedService.availability || selectedService.quantity || 0)}`
+                                          : 'Penuh'}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -1086,13 +1365,19 @@ export default function HomePageClient() {
                               borderRadius: '14px',
                               marginTop: '16px'
                             }}>
+                              {(() => {
+                                const jasaAvailability = Number(selectedService?.availability || selectedService?.quantity || 0);
+                                const isJasaItem = selectedService?.type === 'jasa' && selectedItemDetail.stok === undefined;
+                                const isUnavailable = isJasaItem ? jasaAvailability <= 0 : selectedItemDetail.stok === 0;
+
+                                return (
+                                  <>
                               <div style={{ marginBottom: '16px' }}>
                                 <img
                                   src={getItemPreviewImage(selectedItemDetail)}
                                   alt={selectedItemDetail.namaBarang || selectedItemDetail.namaJasa}
                                   style={{
                                     width: '100%',
-                                    height: '200px',
                                     objectFit: 'cover',
                                     borderRadius: '14px'
                                   }}
@@ -1101,6 +1386,16 @@ export default function HomePageClient() {
                               <h4 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: 'bold' }}>
                                 {selectedItemDetail.namaBarang || selectedItemDetail.namaJasa}
                               </h4>
+                              {selectedItemDetail.deskripsi && (
+                                <p style={{ 
+                                  margin: '0 0 12px 0', 
+                                  fontSize: '14px', 
+                                  color: '#555',
+                                  lineHeight: '1.5'
+                                }}>
+                                  {selectedItemDetail.deskripsi}
+                                </p>
+                              )}
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                                 <div>
                                   <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Harga</p>
@@ -1109,30 +1404,55 @@ export default function HomePageClient() {
                                     {selectedItemDetail.hargaSesi ? ' / Hari' : ' / Pcs'}
                                   </p>
                                 </div>
-                                {selectedItemDetail.stok && (
+                                {selectedItemDetail.stok !== undefined && (
                                   <div>
-                                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Stok</p>
-                                    <p style={{ margin: '0', fontSize: '16px', fontWeight: 'bold' }}>{selectedItemDetail.stok}</p>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Ketersediaan</p>
+                                    <p style={{ 
+                                      margin: '0', 
+                                      fontSize: '16px', 
+                                      fontWeight: 'bold',
+                                      color: selectedItemDetail.stok > 0 ? '#10b981' : '#dc2626'
+                                    }}>
+                                      {selectedItemDetail.stok > 0 ? `${selectedItemDetail.stok} Tersedia` : 'Habis'}
+                                    </p>
+                                  </div>
+                                )}
+                                {isJasaItem && (
+                                  <div>
+                                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Availability</p>
+                                    <p style={{
+                                      margin: '0',
+                                      fontSize: '16px',
+                                      fontWeight: 'bold',
+                                      color: jasaAvailability > 0 ? '#10b981' : '#dc2626'
+                                    }}>
+                                      {jasaAvailability > 0 ? `${jasaAvailability} Tim/Provider` : 'Penuh'}
+                                    </p>
                                   </div>
                                 )}
                               </div>
                               <button
                                 className="btn-primary-modal"
                                 onClick={() => openChatModal(selectedService)}
-                                disabled={user && user.id === selectedService.vendorId}
+                                disabled={user && user.id === selectedService.vendorId || isUnavailable}
                                 style={{
                                   width: '100%',
                                   padding: '10px',
-                                  backgroundColor: '#5A45D1',
+                                  backgroundColor: isUnavailable ? '#d1d5db' : '#5A45D1',
                                   color: 'white',
                                   border: 'none',
                                   borderRadius: '6px',
-                                  cursor: user && user.id === selectedService.vendorId ? 'not-allowed' : 'pointer',
-                                  opacity: user && user.id === selectedService.vendorId ? 0.5 : 1
+                                  cursor: (user && user.id === selectedService.vendorId) || isUnavailable ? 'not-allowed' : 'pointer',
+                                  opacity: (user && user.id === selectedService.vendorId) || isUnavailable ? 0.5 : 1
                                 }}
                               >
-                                💬 Chat untuk Paket Ini
+                                {isUnavailable
+                                  ? (isJasaItem ? '⛔ Availability Penuh' : '⛔ Stok Habis')
+                                  : '💬 Chat untuk Paket Ini'}
                               </button>
+                                  </>
+                                );
+                              })()}
                             </div>
                           )}
                         </>
@@ -1360,6 +1680,31 @@ export default function HomePageClient() {
                                 </div>
                                 <p className="review-author">{review.customerName || 'Customer'}</p>
                                 <p className="review-text">{review.review?.trim() || 'Customer tidak menulis komentar.'}</p>
+                                {review.vendorReply && (
+                                  <div className="vendor-reply-box">
+                                    <div className="vendor-reply-label">Balasan vendor</div>
+                                    <p className="vendor-reply-text">{review.vendorReply}</p>
+                                  </div>
+                                )}
+                                {user?.role === 'vendor' && user.id === selectedService?.vendorId && !review.vendorReply && (
+                                  <div className="vendor-reply-form">
+                                    <textarea
+                                      className="vendor-reply-input"
+                                      rows={3}
+                                      placeholder="Tulis balasan vendor untuk review ini..."
+                                      value={vendorReplyDrafts[review.id] || ''}
+                                      onChange={(e) => setVendorReplyDrafts((prev) => ({ ...prev, [review.id]: e.target.value }))}
+                                    />
+                                    <button
+                                      type="button"
+                                      className="vendor-reply-btn"
+                                      onClick={() => submitVendorReply(review)}
+                                      disabled={vendorReplySubmittingId === review.id}
+                                    >
+                                      {vendorReplySubmittingId === review.id ? 'Menyimpan...' : 'Kirim Balasan'}
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             ))
                           )}
@@ -1481,40 +1826,13 @@ export default function HomePageClient() {
               )}
             </div>
 
-            {/* Rating Form */}
-            {showRatingForm && dealData?.status === 'completed' && (
-              <div className="rating-form">
-                <h3>Berikan Rating &amp; Review</h3>
-                <div className="rating-stars">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      className={`star ${star <= ratingValue ? 'active' : ''}`}
-                      onClick={() => setRatingValue(star)}
-                    >
-                      ⭐
-                    </button>
-                  ))}
-                </div>
-                <textarea
-                  className="rating-textarea"
-                  placeholder="Tulis review Anda (opsional)"
-                  value={ratingReview}
-                  onChange={(e) => setRatingReview(e.target.value)}
-                  maxLength={500}
-                />
-                <button className="btn-submit-rating" onClick={submitRating}>
-                  Kirim Rating
-                </button>
-              </div>
-            )}
-
-            {/* Chat Input */}
-            {!showRatingForm && (
+            {/* Chat Input / Deal Status */}
+            {(
               <div className="chat-input-section" style={{ flexDirection: 'column', gap: '10px' }}>
                 {(() => {
                   const statusConfig = getDealStatusConfig();
                   const finalPrice = dealData?.finalPrice || dealData?.originalPrice || 0;
+                  // Buttons disabled jika: agreed, cancelled, closed, atau completed tapi belum rating
                   const dealDisabled = dealData?.status === 'agreed' || dealData?.status === 'cancelled' || chatData?.dealStatus === 'closed';
 
                   return (
@@ -1547,33 +1865,41 @@ export default function HomePageClient() {
                             flex: 1,
                             padding: '8px 10px',
                             borderRadius: '8px',
-                            border: '1px solid #10b981',
-                            background: 'rgba(16, 185, 129, 0.08)',
-                            color: '#047857',
+                            border: messages.length === 0 ? '1px solid #7c3aed' : '1px solid #10b981',
+                            background: messages.length === 0 ? 'rgba(124, 58, 237, 0.15)' : 'rgba(16, 185, 129, 0.08)',
+                            color: messages.length === 0 ? '#5b21b6' : '#047857',
                             fontWeight: '700',
                             cursor: dealDisabled ? 'not-allowed' : 'pointer',
-                            opacity: dealDisabled ? 0.55 : 1
+                            opacity: dealDisabled ? 0.55 : 1,
+                            transition: 'all 0.3s ease'
                           }}
                         >
                           {dealData?.status === 'agreed' ? 'Deal Diterima' : 'Terima Deal'}
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDealAction('cancel')}
-                          disabled={dealData?.status === 'cancelled'}
+                          onClick={() => {
+                            if (dealData?.status === 'cancelled') {
+                              // Reset deal untuk mulai negosiasi ulang
+                              setDealData(null);
+                            } else {
+                              handleDealAction('cancel');
+                            }
+                          }}
                           style={{
                             flex: 1,
                             padding: '8px 10px',
                             borderRadius: '8px',
-                            border: '1px solid #ef4444',
-                            background: 'rgba(239, 68, 68, 0.08)',
-                            color: '#b91c1c',
+                            border: dealData?.status === 'cancelled' ? '1px solid #7c3aed' : '1px solid #ef4444',
+                            background: dealData?.status === 'cancelled' ? 'rgba(124, 58, 237, 0.15)' : 'rgba(239, 68, 68, 0.08)',
+                            color: dealData?.status === 'cancelled' ? '#5b21b6' : '#b91c1c',
                             fontWeight: '700',
-                            cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
-                            opacity: dealData?.status === 'cancelled' ? 0.55 : 1
+                            cursor: 'pointer',
+                            opacity: 1,
+                            transition: 'all 0.3s ease'
                           }}
                         >
-                          {dealData?.status === 'cancelled' ? 'Dibatalkan' : 'Cancel'}
+                          {dealData?.status === 'cancelled' ? 'Mulai Ulang Negosiasi' : 'Cancel'}
                         </button>
                       </div>
 
@@ -1879,6 +2205,67 @@ export default function HomePageClient() {
           font-size: 13px;
           color: #374151;
           line-height: 1.5;
+        }
+
+        .vendor-reply-box {
+          margin-top: 10px;
+          padding: 10px 12px;
+          border-radius: 8px;
+          background: #eff6ff;
+          border: 1px solid #bfdbfe;
+        }
+
+        .vendor-reply-label {
+          font-size: 12px;
+          font-weight: 700;
+          color: #1d4ed8;
+          margin-bottom: 4px;
+        }
+
+        .vendor-reply-text {
+          margin: 0;
+          font-size: 13px;
+          color: #1e3a8a;
+          line-height: 1.5;
+        }
+
+        .vendor-reply-form {
+          margin-top: 10px;
+          display: grid;
+          gap: 8px;
+        }
+
+        .vendor-reply-input {
+          width: 100%;
+          border: 1px solid #cbd5e1;
+          border-radius: 8px;
+          padding: 10px 12px;
+          font-size: 13px;
+          font-family: inherit;
+          resize: vertical;
+        }
+
+        .vendor-reply-input:focus {
+          outline: none;
+          border-color: #5A45D1;
+          box-shadow: 0 0 0 3px rgba(90, 69, 209, 0.12);
+        }
+
+        .vendor-reply-btn {
+          justify-self: start;
+          border: none;
+          border-radius: 8px;
+          background: #5A45D1;
+          color: #fff;
+          padding: 8px 12px;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .vendor-reply-btn:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
         }
 
         .review-empty {
@@ -2431,18 +2818,21 @@ export default function HomePageClient() {
 
         .modal-image {
           width: 100%;
-          height: 300px;
+          height: 500px;
           margin-bottom: 24px;
           border-radius: 14px;
           overflow: hidden;
           position: relative;
           background: #f3f4f6;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .modal-image img {
           width: 100%;
           height: 100%;
-          object-fit: cover;
+          object-fit: contain;
         }
 
         .modal-image-nav {
