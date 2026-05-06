@@ -4,21 +4,33 @@ import React, { useState, useEffect, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 
+let cachedUserRaw = null;
+let cachedUserSnapshot = null;
+
 function readUserFromStorage() {
   if (typeof window === 'undefined') {
     return null;
   }
 
   const userData = localStorage.getItem('user');
+  if (userData === cachedUserRaw) {
+    return cachedUserSnapshot;
+  }
+
+  cachedUserRaw = userData;
+
   if (!userData) {
+    cachedUserSnapshot = null;
     return null;
   }
 
   try {
-    return JSON.parse(userData);
+    cachedUserSnapshot = JSON.parse(userData);
   } catch {
-    return null;
+    cachedUserSnapshot = null;
   }
+
+  return cachedUserSnapshot;
 }
 
 function subscribeAuth(listener) {
