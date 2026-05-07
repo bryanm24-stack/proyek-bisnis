@@ -64,8 +64,8 @@ export default function VendorChatsPage() {
   };
 
   // Kategorisasi chats
-  const vendorChats = chats.filter(c => c.vendorId === user?.id); // Dia sebagai vendor
-  const customerChats = chats.filter(c => c.customerId === user?.id && c.vendorId !== user?.id); // Dia sebagai customer ke vendor lain
+  const vendorChats = chats.filter(c => String(c.vendorId) === String(user?.id)); // Dia sebagai vendor
+  const customerChats = chats.filter(c => String(c.customerId) === String(user?.id) && String(c.vendorId) !== String(user?.id)); // Dia sebagai customer ke vendor lain
 
   // Debug logging
   useEffect(() => {
@@ -175,6 +175,13 @@ export default function VendorChatsPage() {
   };
 
   const handleDealAction = async (action) => {
+    if (!selectedChat) return;
+
+    if (String(user?.id) !== String(selectedChat.vendorId)) {
+      alert('Hanya vendor pemilik chat yang bisa menerima atau menolak deal.');
+      return;
+    }
+
     try {
       const response = await fetch('/api/deals', {
         method: 'POST',
@@ -183,7 +190,7 @@ export default function VendorChatsPage() {
           action,
           chatId: selectedChat.id,
           customerId: selectedChat.customerId,
-          vendorId: user.id,
+          vendorId: selectedChat.vendorId,
           serviceId: selectedChat.serviceId
         })
       });
@@ -201,6 +208,36 @@ export default function VendorChatsPage() {
     } catch (error) {
       console.error('Error processing deal:', error);
       alert('Gagal memproses deal');
+    }
+  };
+
+  const handleCustomerDealRequest = async () => {
+    if (!selectedChat) return;
+
+    try {
+      const response = await fetch('/api/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'accept',
+          chatId: selectedChat.id,
+          customerId: selectedChat.customerId,
+          vendorId: selectedChat.vendorId,
+          serviceId: selectedChat.serviceId
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setDealData(data.data.deal);
+        setSelectedChat(data.data.chat);
+        alert(data.message || 'Penawaran deal berhasil dikirim.');
+      } else {
+        alert(data.message || 'Gagal mengirim penawaran deal.');
+      }
+    } catch (error) {
+      console.error('Error requesting deal:', error);
+      alert('Gagal mengirim penawaran deal');
     }
   };
 
@@ -788,15 +825,15 @@ export default function VendorChatsPage() {
             {/* Profile Info */}
             <div style={{ textAlign: 'center', marginBottom: '20px' }}>
               <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>
-                {user.id === selectedChat.customerId ? selectedChat.customerName : selectedChat.vendorName}
+                {String(user?.id) === String(selectedChat.customerId) ? selectedChat.vendorName : selectedChat.customerName}
               </h2>
               <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#666' }}>
                 {selectedChat.serviceTitle}
               </p>
             </div>
 
-              {/* Deal Buttons - VENDOR TAB: HANYA UNTUK VENDOR CHATS, CUSTOMER TAB: UNTUK VENDOR CUSTOMER */}
-              {(user.id === selectedChat.vendorId || (user.id === selectedChat.customerId && chatTab === 'vendor')) && (
+              {/* Deal Buttons - hanya vendor pemilik chat yang boleh accept/reject */}
+              {String(user?.id) === String(selectedChat.vendorId) && (
               <div style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -874,30 +911,21 @@ export default function VendorChatsPage() {
                         💰 Aplikasikan Diskon
                       </button>
                     )}
-                    {user.id === selectedChat.customerId && (
-                      <button
-                        onClick={() => {
-                          if (!dealData?.id) {
-                            alert('Deal belum siap untuk pembayaran.');
-                            return;
-                          }
-                          router.push(`/transaction/payment?dealId=${dealData.id}`);
-                        }}
-                        style={{
-                          padding: '12px 16px',
-                          border: 'none',
-                          borderRadius: '8px',
-                          background: '#7c3aed',
-                          color: 'white',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          fontSize: '14px'
-                        }}
-                      >
-                        💳 Lanjut ke Pembayaran
-                      </button>
-                    )}
                   </>
+                )}
+
+                {selectedChat?.dealStatus === 'closed' && (
+                  <div style={{
+                    padding: '12px',
+                    background: '#ecfdf5',
+                    color: '#065f46',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    textAlign: 'center'
+                  }}>
+                    Pembayaran sudah selesai dan chat telah ditutup.
+                  </div>
                 )}
 
                 {dealData?.status === 'cancelled' && (
@@ -911,6 +939,100 @@ export default function VendorChatsPage() {
                     textAlign: 'center'
                   }}>
                     ✗ Deal Ditolak
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Customer action - lanjut pembayaran hanya setelah vendor accept */}
+            {String(user?.id) === String(selectedChat.customerId) && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+                {dealData?.status === 'agreed' && dealData?.vendorAccepted && !selectedChat?.closedAt && selectedChat?.dealStatus !== 'closed' && (
+                  <button
+                    onClick={() => {
+                      if (selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt || dealData?.status === 'completed') {
+                        alert('Pembayaran sudah selesai. Chat ini sudah ditutup.');
+                        return;
+                      }
+                      if (!dealData?.id) {
+                        alert('Deal belum siap untuk pembayaran.');
+                        return;
+                      }
+                      router.push(`/transaction/payment?dealId=${dealData.id}`);
+                    }}
+                    disabled={selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt || dealData?.status === 'completed'}
+                    style={{
+                      padding: '12px 16px',
+                      border: 'none',
+                      borderRadius: '8px',
+                      background: selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt || dealData?.status === 'completed' ? '#9ca3af' : '#7c3aed',
+                      color: 'white',
+                      fontWeight: '600',
+                      cursor: selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt || dealData?.status === 'completed' ? 'not-allowed' : 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    💳 Lanjut ke Pembayaran
+                  </button>
+                )}
+
+                {(!dealData || dealData?.status === 'cancelled' || dealData?.status === 'completed') && (
+                  <button
+                    onClick={handleCustomerDealRequest}
+                    style={{
+                      padding: '12px 16px',
+                      border: 'none',
+                      borderRadius: '8px',
+                      background: '#5b21b6',
+                      color: 'white',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    📝 Ajukan Deal Ulang
+                  </button>
+                )}
+
+                {dealData?.status === 'pending' && (
+                  <div style={{
+                    padding: '12px',
+                    background: '#fff7ed',
+                    color: '#c2410c',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    textAlign: 'center'
+                  }}>
+                    Menunggu vendor menerima deal sebelum lanjut pembayaran.
+                  </div>
+                )}
+
+                {dealData?.status === 'cancelled' && (
+                  <div style={{
+                    padding: '12px',
+                    background: '#fee2e2',
+                    color: '#dc2626',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    textAlign: 'center'
+                  }}>
+                    Deal ditolak vendor. Lakukan negosiasi ulang dulu.
+                  </div>
+                )}
+
+                {(selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt) && (
+                  <div style={{
+                    padding: '12px',
+                    background: '#ecfdf5',
+                    color: '#065f46',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    textAlign: 'center'
+                  }}>
+                    Pembayaran sudah selesai dan chat telah ditutup.
                   </div>
                 )}
               </div>

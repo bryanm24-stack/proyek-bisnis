@@ -61,8 +61,9 @@ function PaymentContent() {
     }
 
     const parsedUser = JSON.parse(userData);
-    if (parsedUser.role !== 'customer' && parsedUser.role !== 'member') {
-      alert('Hanya customer yang bisa mengakses halaman ini');
+    const allowedRoles = ['customer', 'member', 'vendor'];
+    if (!allowedRoles.includes(parsedUser.role)) {
+      alert('Hanya customer, member, atau vendor yang bisa mengakses halaman ini');
       router.push('/');
       return;
     }

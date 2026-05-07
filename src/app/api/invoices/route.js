@@ -6,6 +6,7 @@ const transactionsFile = path.join(process.cwd(), 'transactions.json');
 const dealsFile = path.join(process.cwd(), 'deals.json');
 const servicesFile = path.join(process.cwd(), 'services.json');
 const ratingsFile = path.join(process.cwd(), 'ratings.json');
+const usersFile = path.join(process.cwd(), 'users.json');
 
 // Helper: Normalize ID for consistent comparison
 const normalizeId = (id) => String(id || '').trim();
@@ -30,6 +31,7 @@ export async function GET(request) {
     ensureFile(dealsFile);
     ensureFile(servicesFile);
     ensureFile(ratingsFile);
+    ensureFile(usersFile);
     
     const searchParams = request.nextUrl.searchParams;
     const customerId = searchParams.get('customerId');
@@ -42,6 +44,13 @@ export async function GET(request) {
     const deals = JSON.parse(fs.readFileSync(dealsFile, 'utf-8'));
     const services = JSON.parse(fs.readFileSync(servicesFile, 'utf-8'));
     const ratings = JSON.parse(fs.readFileSync(ratingsFile, 'utf-8'));
+    const users = JSON.parse(fs.readFileSync(usersFile, 'utf-8'));
+
+    const findUserName = (id, fallbackLabel) => {
+      if (!id) return fallbackLabel;
+      const user = users.find((item) => String(item.id) === String(id));
+      return user?.name || fallbackLabel;
+    };
 
     // Backfill invoices from historical transactions so old paid/full payments also appear.
     let hasGeneratedInvoices = false;
@@ -85,9 +94,9 @@ export async function GET(request) {
         hasGeneratedInvoices = true;
       });
 
-    // Backfill pending invoices directly from discounted agreed deals.
+    // Backfill pending invoices directly from agreed deals that are not paid yet.
     deals
-      .filter((deal) => deal?.id && deal?.status === 'agreed' && deal?.discountGiven && deal?.invoiceStatus !== 'paid')
+      .filter((deal) => deal?.id && deal?.status === 'agreed' && deal?.invoiceStatus !== 'paid')
       .forEach((deal) => {
         // Improved deduplication: check if invoice already exists with same dealId
         const alreadyExists = invoices.some((invoice) => normalizeId(invoice.dealId) === normalizeId(deal.id));
@@ -97,7 +106,24 @@ export async function GET(request) {
         const deadline = new Date(baseDate);
         deadline.setDate(deadline.getDate() + 2);
 
-        const finalAmount = Number(deal.finalPrice ?? deal.originalPrice ?? 0);
+        const relatedService = services.find((item) => String(item.id) === String(deal.serviceId));
+        const firstItem = Array.isArray(relatedService?.items) ? relatedService.items[0] : null;
+        const firstItemPrice = Number(
+          (relatedService?.type === 'jasa' ? firstItem?.hargaSesi : firstItem?.hargaPcs) ??
+          firstItem?.price ??
+          0
+        );
+
+        const finalAmount = Number(
+          deal.finalPrice ??
+          deal.originalPrice ??
+          deal.totalPrice ??
+          deal.price ??
+          relatedService?.price ??
+          relatedService?.harga ??
+          firstItemPrice ??
+          0
+        );
 
         invoices.push({
           id: `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -114,7 +140,7 @@ export async function GET(request) {
           createdAt: baseDate.toISOString(),
           paidAt: null,
           paymentTransactionId: null,
-          notes: 'Menunggu pembayaran setelah deal dan diskon disepakati.'
+          notes: 'Menunggu pembayaran setelah deal disepakati.'
         });
         hasGeneratedInvoices = true;
       });
@@ -169,8 +195,8 @@ export async function GET(request) {
         customerId: invoice.customerId || relatedDeal?.customerId || relatedTransaction?.userId || null,
         vendorId: invoice.vendorId || relatedDeal?.vendorId || relatedTransaction?.vendorId || null,
         serviceId: relatedDeal?.serviceId || invoice.serviceId || null,
-        customerName: relatedDeal?.customerName || relatedTransaction?.customerName || invoice.customerName || 'Customer',
-        vendorName: relatedDeal?.vendorName || relatedTransaction?.vendorName || invoice.vendorName || 'Vendor',
+        customerName: relatedDeal?.customerName || relatedTransaction?.customerName || invoice.customerName || findUserName(invoice.customerId || relatedDeal?.customerId || relatedTransaction?.userId, 'Customer'),
+        vendorName: relatedDeal?.vendorName || relatedTransaction?.vendorName || invoice.vendorName || findUserName(invoice.vendorId || relatedDeal?.vendorId || relatedTransaction?.vendorId, 'Vendor'),
         serviceTitle: relatedService?.title || relatedService?.namaBarang || relatedService?.namaJasa || relatedDeal?.itemName || relatedDeal?.serviceTitle || invoice.serviceTitle || 'Item sewa',
         serviceImage: relatedService?.images?.[0] || relatedDeal?.image || relatedTransaction?.image || '',
         dealStatus: relatedDeal?.status || relatedDeal?.invoiceStatus || 'pending',

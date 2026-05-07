@@ -109,6 +109,11 @@ export default function CustomerChatsPage() {
   };
 
   const proceedToPayment = () => {
+    if (selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt || dealData?.status === 'completed') {
+      alert('Pembayaran sudah selesai. Chat ini sudah ditutup.');
+      return;
+    }
+
     if (!dealData?.id) {
       alert('Deal belum siap untuk pembayaran.');
       return;
@@ -336,7 +341,7 @@ export default function CustomerChatsPage() {
               </div>
 
               {/* Show pricing and discount info when deal agreed */}
-              {dealData?.status === 'agreed' && (
+              {dealData?.status === 'agreed' && selectedChat?.dealStatus !== 'closed' && !selectedChat?.closedAt && (
                 <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '13px', color: '#666' }}>Deal telah disetujui</div>
@@ -610,6 +615,20 @@ export default function CustomerChatsPage() {
                     Gunakan tombol ungu Lanjut ke Pembayaran di area chat untuk melanjutkan pembayaran.
                   </div>
                 </>
+              )}
+
+              {(selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt) && (
+                <div style={{
+                  padding: '12px',
+                  background: '#ecfdf5',
+                  color: '#065f46',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  textAlign: 'center'
+                }}>
+                  Pembayaran sudah selesai dan chat telah ditutup.
+                </div>
               )}
 
               {dealData?.status === 'cancelled' && (
