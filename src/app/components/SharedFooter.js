@@ -1,23 +1,21 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 export default function SharedFooter() {
-  const user = useMemo(() => {
-    if (typeof window === 'undefined') {
-      return null;
-    }
+  const [user, setUser] = useState(null);
 
+  useEffect(() => {
     const userData = localStorage.getItem('user');
     if (!userData) {
-      return null;
+      return;
     }
 
     try {
-      return JSON.parse(userData);
+      setUser(JSON.parse(userData));
     } catch {
-      return null;
+      setUser(null);
     }
   }, []);
 
