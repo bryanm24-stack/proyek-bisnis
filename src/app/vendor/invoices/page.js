@@ -38,35 +38,14 @@ export default function VendorInvoicesPage() {
     try {
       setIsLoading(true);
       const query = status === 'all' ? '' : `&status=${status}`;
-      const [salesResponse, purchaseResponse] = await Promise.all([
-        fetch(`/api/invoices?vendorId=${vendorId}${query}`),
-        fetch(`/api/invoices?customerId=${vendorId}${query}`)
-      ]);
+      const response = await fetch(`/api/invoices?customerId=${vendorId}${query}`);
+      const data = await response.json();
 
-      const salesRaw = await salesResponse.json();
-      const purchaseRaw = await purchaseResponse.json();
+      const ownInvoices = Array.isArray(data)
+        ? data
+        : (data?.data && Array.isArray(data.data) ? data.data : []);
 
-      const salesInvoices = Array.isArray(salesRaw)
-        ? salesRaw
-        : (salesRaw?.data && Array.isArray(salesRaw.data) ? salesRaw.data : []);
-
-      const purchaseInvoices = Array.isArray(purchaseRaw)
-        ? purchaseRaw
-        : (purchaseRaw?.data && Array.isArray(purchaseRaw.data) ? purchaseRaw.data : []);
-
-      const mergedMap = new Map();
-      [...salesInvoices, ...purchaseInvoices].forEach((invoice) => {
-        if (!invoice?.id) return;
-        if (!mergedMap.has(invoice.id)) {
-          mergedMap.set(invoice.id, invoice);
-        }
-      });
-
-      const mergedInvoices = Array.from(mergedMap.values()).sort(
-        (a, b) => new Date(b.createdAt || b.paymentDeadline || 0) - new Date(a.createdAt || a.paymentDeadline || 0)
-      );
-
-      setInvoices(mergedInvoices);
+      setInvoices(ownInvoices);
     } catch (error) {
       console.error('Error fetching invoices:', error);
       setInvoices([]);
@@ -157,7 +136,7 @@ export default function VendorInvoicesPage() {
             📋 Invoice Transaksi
           </h1>
           <p style={{ color: '#666', fontSize: '16px' }}>
-            Kelola invoice transaksi sewa kamu (penjualan dan pembelian antar-vendor)
+            Riwayat invoice akun kamu saat menyewa barang/jasa.
           </p>
         </div>
 
@@ -208,11 +187,9 @@ export default function VendorInvoicesPage() {
           <div style={{ display: 'grid', gap: '20px' }}>
             {invoices.map((invoice) => (
               (() => {
-                const isBuyingInvoice = String(invoice.customerId) === String(user?.id) && String(invoice.vendorId) !== String(user?.id);
-                const counterpartyLabel = isBuyingInvoice ? 'Vendor' : 'Penyewa';
-                const counterpartyName = isBuyingInvoice
-                  ? (invoice.vendorName || 'Unknown')
-                  : (invoice.customerName || 'Unknown');
+                const isBuyingInvoice = true;
+                const counterpartyLabel = 'Vendor';
+                const counterpartyName = invoice.vendorName || 'Unknown';
 
                 return (
               <div

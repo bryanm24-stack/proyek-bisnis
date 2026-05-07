@@ -11,6 +11,20 @@ const usersFile = path.join(process.cwd(), 'users.json');
 // Helper: Normalize ID for consistent comparison
 const normalizeId = (id) => String(id || '').trim();
 
+const parseJsonFile = (filePath, fallback = []) => {
+  try {
+    const raw = fs.readFileSync(filePath, 'utf-8');
+    const sanitized = raw.replace(/^\uFEFF/, '').trim();
+    if (!sanitized) {
+      return fallback;
+    }
+    return JSON.parse(sanitized);
+  } catch (error) {
+    console.warn(`Failed parsing JSON file ${path.basename(filePath)}:`, error.message);
+    return fallback;
+  }
+};
+
 // Ensure invoices.json exists
 const ensureInvoicesFile = () => {
   if (!fs.existsSync(invoicesFile)) {
@@ -38,13 +52,12 @@ export async function GET(request) {
     const vendorId = searchParams.get('vendorId');
     const status = searchParams.get('status');
 
-    const data = fs.readFileSync(invoicesFile, 'utf-8');
-    let invoices = JSON.parse(data);
-    const transactions = JSON.parse(fs.readFileSync(transactionsFile, 'utf-8'));
-    const deals = JSON.parse(fs.readFileSync(dealsFile, 'utf-8'));
-    const services = JSON.parse(fs.readFileSync(servicesFile, 'utf-8'));
-    const ratings = JSON.parse(fs.readFileSync(ratingsFile, 'utf-8'));
-    const users = JSON.parse(fs.readFileSync(usersFile, 'utf-8'));
+    let invoices = parseJsonFile(invoicesFile, []);
+    const transactions = parseJsonFile(transactionsFile, []);
+    const deals = parseJsonFile(dealsFile, []);
+    const services = parseJsonFile(servicesFile, []);
+    const ratings = parseJsonFile(ratingsFile, []);
+    const users = parseJsonFile(usersFile, []);
 
     const findUserName = (id, fallbackLabel) => {
       if (!id) return fallbackLabel;
@@ -247,8 +260,7 @@ export async function POST(request) {
     const body = await request.json();
 
     ensureInvoicesFile();
-    const data = fs.readFileSync(invoicesFile, 'utf-8');
-    let invoices = JSON.parse(data);
+    let invoices = parseJsonFile(invoicesFile, []);
 
     // Create new invoice
     const newInvoice = {
@@ -283,8 +295,7 @@ export async function PUT(request) {
     const { invoiceId, status, paymentMethod, transactionId } = body;
 
     ensureInvoicesFile();
-    const data = fs.readFileSync(invoicesFile, 'utf-8');
-    let invoices = JSON.parse(data);
+    let invoices = parseJsonFile(invoicesFile, []);
 
     const invoiceIndex = invoices.findIndex(inv => inv.id === invoiceId);
     if (invoiceIndex === -1) {
