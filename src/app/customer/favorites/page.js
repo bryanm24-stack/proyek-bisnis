@@ -238,6 +238,10 @@ export default function FavoritesPage() {
     if (!newMessage.trim()) return;
     if (!selectedService) return;
     if (!user) return;
+    if (chatData?.dealStatus === 'closed' || chatData?.closedAt) {
+      alert('Chat sudah ditutup setelah pembayaran selesai.');
+      return;
+    }
 
     try {
       const response = await fetch('/api/chat', {
@@ -1096,7 +1100,7 @@ export default function FavoritesPage() {
                 {(() => {
                   const statusConfig = getDealStatusConfig();
                   const finalPrice = dealData?.finalPrice || dealData?.originalPrice || 0;
-                  const dealDisabled = dealData?.status === 'agreed' || dealData?.status === 'cancelled';
+                  const dealDisabled = dealData?.status === 'agreed' || dealData?.status === 'cancelled' || chatData?.dealStatus === 'closed' || chatData?.closedAt;
 
                   return (
                     <div
@@ -1113,6 +1117,12 @@ export default function FavoritesPage() {
                       <div style={{ fontSize: '12px', color: '#4b5563', marginTop: '3px' }}>
                         {statusConfig.description}
                       </div>
+
+                      {(chatData?.dealStatus === 'closed' || chatData?.closedAt) && (
+                        <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: '700', color: '#92400e' }}>
+                          Chat sudah ditutup setelah pembayaran selesai.
+                        </div>
+                      )}
 
                       <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                         <button
@@ -1153,7 +1163,7 @@ export default function FavoritesPage() {
                         </button>
                       </div>
 
-                      {dealData?.status === 'agreed' && (
+                      {dealData?.status === 'agreed' && chatData?.dealStatus !== 'closed' && !chatData?.closedAt && (
                         <div style={{ marginTop: '8px', fontSize: '12px', color: '#1e40af' }}>
                           <div style={{ fontWeight: '700' }}>
                             Harga akhir: Rp {Number(finalPrice).toLocaleString('id-ID')}
@@ -1195,6 +1205,7 @@ export default function FavoritesPage() {
                     placeholder="Ketik pesan..."
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
+                    disabled={chatData?.dealStatus === 'closed' || chatData?.closedAt}
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         sendMessage();
