@@ -472,7 +472,7 @@ export default function HomePageClient() {
     if (!newMessage.trim()) return;
     if (!selectedService) return;
     if (!user) return;
-    if (chatData?.dealStatus === 'closed') {
+    if (chatData?.dealStatus === 'closed' || chatData?.closedAt) {
       alert('Chat sudah ditutup setelah pembayaran selesai.');
       return;
     }
@@ -797,6 +797,10 @@ export default function HomePageClient() {
     return filtered;
   };
 
+  const getServiceAvailability = (service) => Number(
+    service?.availableQuantity ?? service?.availability ?? service?.quantity ?? 0
+  );
+
   const filteredServices = getFilteredServices();
   const specificationEntries = getNonEmptyObjectEntries(selectedService?.specifications);
   const descriptionTableEntries = getNonEmptyObjectEntries(selectedService?.descriptionTable);
@@ -911,7 +915,7 @@ export default function HomePageClient() {
               const isPopular = rentCountNum >= 100;
               const mainCategoryText = String(service.mainCategory || service.category || '').toLowerCase();
               const isJasaService = service.type === 'jasa' || mainCategoryText.includes('jasa');
-              const serviceAvailability = Number(service.availability ?? service.quantity ?? 0);
+              const serviceAvailability = getServiceAvailability(service);
               const shortDesc = service.detailDescription || service.shortDescription || (service.description ? service.description.substring(0, 80) + '...' : '');
               const imageUrl = service.image || (service.images && service.images.length > 0 ? service.images[0] : 'https://via.placeholder.com/300x200?text=' + encodeURIComponent(service.title || 'Service'));
               
@@ -1340,14 +1344,14 @@ export default function HomePageClient() {
                                         margin: '0',
                                         fontSize: '10px',
                                         fontWeight: '600',
-                                        color: (Number(selectedService.availability || selectedService.quantity || 0) > 0) ? '#10b981' : '#dc2626',
-                                        backgroundColor: (Number(selectedService.availability || selectedService.quantity || 0) > 0) ? '#d1fae5' : '#fee2e2',
+                                        color: (getServiceAvailability(selectedService) > 0) ? '#10b981' : '#dc2626',
+                                        backgroundColor: (getServiceAvailability(selectedService) > 0) ? '#d1fae5' : '#fee2e2',
                                         padding: '2px 8px',
                                         borderRadius: '4px',
                                         whiteSpace: 'nowrap'
                                       }}>
-                                        {Number(selectedService.availability || selectedService.quantity || 0) > 0
-                                          ? `Availability: ${Number(selectedService.availability || selectedService.quantity || 0)}`
+                                        {getServiceAvailability(selectedService) > 0
+                                          ? `Availability: ${getServiceAvailability(selectedService)}`
                                           : 'Penuh'}
                                       </p>
                                     )}
@@ -1366,7 +1370,7 @@ export default function HomePageClient() {
                               marginTop: '16px'
                             }}>
                               {(() => {
-                                const jasaAvailability = Number(selectedService?.availability || selectedService?.quantity || 0);
+                                const jasaAvailability = getServiceAvailability(selectedService);
                                 const isJasaItem = selectedService?.type === 'jasa' && selectedItemDetail.stok === undefined;
                                 const isUnavailable = isJasaItem ? jasaAvailability <= 0 : selectedItemDetail.stok === 0;
 
@@ -1833,7 +1837,7 @@ export default function HomePageClient() {
                   const statusConfig = getDealStatusConfig();
                   const finalPrice = dealData?.finalPrice || dealData?.originalPrice || 0;
                   // Buttons disabled jika: agreed, cancelled, closed, atau completed tapi belum rating
-                  const dealDisabled = dealData?.status === 'agreed' || dealData?.status === 'cancelled' || chatData?.dealStatus === 'closed';
+                  const dealDisabled = dealData?.status === 'agreed' || dealData?.status === 'cancelled' || chatData?.dealStatus === 'closed' || chatData?.closedAt;
 
                   return (
                     <div
@@ -1850,7 +1854,7 @@ export default function HomePageClient() {
                       <div style={{ fontSize: '12px', color: '#4b5563', marginTop: '3px' }}>
                         {statusConfig.description}
                       </div>
-                      {chatData?.dealStatus === 'closed' && (
+                      {(chatData?.dealStatus === 'closed' || chatData?.closedAt) && (
                         <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: '700', color: '#92400e' }}>
                           Chat sudah ditutup setelah pembayaran selesai.
                         </div>
@@ -1903,7 +1907,7 @@ export default function HomePageClient() {
                         </button>
                       </div>
 
-                      {dealData?.status === 'agreed' && (
+                      {dealData?.status === 'agreed' && chatData?.dealStatus !== 'closed' && !chatData?.closedAt && (
                         <div style={{ marginTop: '8px', fontSize: '12px', color: '#1e40af' }}>
                           <div style={{ fontWeight: '700' }}>
                             Harga akhir: Rp {Number(finalPrice).toLocaleString('id-ID')}
@@ -1945,7 +1949,7 @@ export default function HomePageClient() {
                     placeholder="Ketik pesan..."
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    disabled={chatData?.dealStatus === 'closed'}
+                    disabled={chatData?.dealStatus === 'closed' || chatData?.closedAt}
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         sendMessage();

@@ -52,6 +52,8 @@ function SuccessContent() {
 
   const serviceFee = transaction?.serviceFee || 1000;
   const totalAmount = transaction?.totalAmount || ((transaction?.amount || 0) + serviceFee);
+  const invoicePath = user?.role === 'vendor' ? '/vendor/invoices' : '/customer/invoices';
+  const chatPath = user?.role === 'vendor' ? '/vendor/chats' : '/customer/chats';
 
   if (isLoading) {
     return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>;
@@ -142,7 +144,7 @@ function SuccessContent() {
           {/* Action Buttons */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
             <button
-              onClick={() => router.push('/customer/invoices')}
+              onClick={() => router.push(invoicePath)}
               style={{
                 padding: '14px 24px',
                 background: '#ecfeff',
@@ -158,7 +160,7 @@ function SuccessContent() {
               📄 Lihat Invoice
             </button>
             <button
-              onClick={() => router.push('/customer/chats')}
+              onClick={() => router.push(chatPath)}
               style={{
                 padding: '14px 24px',
                 background: '#f3f4f6',

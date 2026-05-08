@@ -235,8 +235,10 @@ export async function POST(request) {
 
       const isPayAfter = body.paymentType === 'pay_after';
       const createdAt = new Date().toISOString();
+      const paymentCompletedAt = body.timestamp || createdAt;
       const paymentDeadlineDate = new Date();
       paymentDeadlineDate.setDate(paymentDeadlineDate.getDate() + 2);
+      let upsertedInvoiceId = null;
 
       const existingInvoice = invoices.find(
         (item) =>
@@ -257,9 +259,10 @@ export async function POST(request) {
         existingInvoice.paymentType = body.paymentType || existingInvoice.paymentType || 'full';
         existingInvoice.status = isPayAfter ? 'pending' : 'paid';
         existingInvoice.createdAt = existingInvoice.createdAt || createdAt;
-        existingInvoice.paidAt = isPayAfter ? null : (body.timestamp || createdAt);
+        existingInvoice.paidAt = isPayAfter ? null : paymentCompletedAt;
         existingInvoice.paymentTransactionId = isPayAfter ? null : body.id;
         existingInvoice.notes = body.notes || existingInvoice.notes || '';
+        upsertedInvoiceId = existingInvoice.id;
         fs.writeFileSync(invoicesFile, JSON.stringify(invoices, null, 2));
       } else {
 
@@ -278,12 +281,13 @@ export async function POST(request) {
         paymentType: body.paymentType || 'full',
         status: isPayAfter ? 'pending' : 'paid',
         createdAt,
-        paidAt: isPayAfter ? null : (body.timestamp || createdAt),
+        paidAt: isPayAfter ? null : paymentCompletedAt,
         paymentTransactionId: isPayAfter ? null : body.id,
         notes: body.notes || ''
       };
 
       invoices.push(newInvoice);
+      upsertedInvoiceId = newInvoice.id;
       fs.writeFileSync(invoicesFile, JSON.stringify(invoices, null, 2));
       }
 
@@ -300,8 +304,10 @@ export async function POST(request) {
             downPayment: isPayAfter ? body.downPayment : null,
             remainingPayment: isPayAfter ? body.remainingPayment : 0,
             invoiceStatus: isPayAfter ? 'pending' : 'paid',
+            status: isPayAfter ? (deals[dealIndex].status || 'agreed') : 'completed',
+            completedAt: isPayAfter ? (deals[dealIndex].completedAt || null) : paymentCompletedAt,
             paymentDeadline: isPayAfter ? paymentDeadlineDate.toISOString() : null,
-            invoiceId: newInvoice.id,
+            invoiceId: upsertedInvoiceId || deals[dealIndex].invoiceId || null,
             borrowDate: rentalTimeline.borrowDate || deals[dealIndex].borrowDate || null,
             expectedReturnDate: rentalTimeline.expectedReturnDate || deals[dealIndex].expectedReturnDate || null,
             returnDeadline: rentalTimeline.returnDeadline || deals[dealIndex].returnDeadline || null,
@@ -321,7 +327,7 @@ export async function POST(request) {
         console.warn('Could not update deal:', dealError);
       }
 
-        // Close the related chat after payment is successful so the conversation stops.
+        // Keep chat open after payment; only progress status so the flow can continue to rating/new cycle.
         try {
           if (body.dealId) {
             const chatsData = fs.readFileSync(chatsFile, 'utf-8');
@@ -332,15 +338,15 @@ export async function POST(request) {
             if (chatIndex !== -1) {
               chats[chatIndex] = {
                 ...chats[chatIndex],
-                dealStatus: 'closed',
-                closedAt: new Date().toISOString(),
-                closedReason: 'payment_completed'
+                dealStatus: isPayAfter ? 'agreed' : 'completed',
+                closedAt: null,
+                closedReason: null
               };
               fs.writeFileSync(chatsFile, JSON.stringify(chats, null, 2));
             }
           }
         } catch (chatError) {
-          console.warn('Could not close chat after payment:', chatError);
+          console.warn('Could not update chat status after payment:', chatError);
         }
     }
 
