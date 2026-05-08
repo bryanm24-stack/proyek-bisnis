@@ -20,7 +20,7 @@ export async function GET(request) {
     const chats = JSON.parse(chatsData);
 
     // Filter chats untuk customer ini
-    const customerChats = chats.filter(c => c.customerId === customerId);
+    const customerChats = chats.filter(c => String(c.customerId) === String(customerId));
 
     return NextResponse.json({
       success: true,

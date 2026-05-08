@@ -74,6 +74,10 @@ export async function POST(request) {
         return NextResponse.json({ success: false, message: 'Chat room tidak ditemukan' }, { status: 404 });
       }
 
+      if (normalizeId(chatRoom.vendorId) !== normalizeId(vendorId)) {
+        return NextResponse.json({ success: false, message: 'Vendor tidak sesuai dengan chat ini' }, { status: 403 });
+      }
+
       const deal = findLatestDealByChatId(deals, chatId);
       if (!deal) {
         return NextResponse.json({ success: false, message: 'Deal belum dibuat' }, { status: 404 });
@@ -207,6 +211,10 @@ export async function POST(request) {
         return NextResponse.json({ success: false, message: 'Chat room tidak ditemukan' }, { status: 404 });
       }
 
+      if (normalizeId(chatRoom.vendorId) !== normalizeId(vendorId) || normalizeId(chatRoom.customerId) !== normalizeId(customerId)) {
+        return NextResponse.json({ success: false, message: 'Data pihak chat tidak valid' }, { status: 403 });
+      }
+
       // Find existing deal
       const existingDeal = findLatestDealByChatId(deals, chatId);
       
@@ -251,6 +259,10 @@ export async function POST(request) {
       const chatRoom = chats.find(c => c.id === chatId);
       if (!chatRoom) {
         return NextResponse.json({ success: false, message: 'Chat room tidak ditemukan' }, { status: 404 });
+      }
+
+      if (normalizeId(chatRoom.vendorId) !== normalizeId(vendorId) || normalizeId(chatRoom.customerId) !== normalizeId(customerId)) {
+        return NextResponse.json({ success: false, message: 'Data pihak chat tidak valid' }, { status: 403 });
       }
 
       // Check if deal sudah ada dari pihak lain
@@ -299,6 +311,8 @@ export async function POST(request) {
 
         deals.push(newDeal);
         chatRoom.dealStatus = 'pending';
+        chatRoom.closedAt = null;
+        chatRoom.closedReason = null;
         await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
         await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
 
@@ -308,9 +322,9 @@ export async function POST(request) {
         return NextResponse.json({ success: true, message: 'Penawaran dikirim, menunggu vendor menerima', data: { deal: newDeal, chat: chatRoom } }, { status: 201 });
       } else {
         // Vendor menerima deal dari customer
-        // ✅ FIX #3: If deal is 'completed' or 'cancelled', CREATE FRESH DEAL instead of reusing!
+        // If deal is completed/cancelled, create a fresh pending cycle first.
         if (existingDeal.status === 'completed' || existingDeal.status === 'cancelled') {
-          console.log(`✅ FIX #3: Deal ${existingDeal.id} is ${existingDeal.status}. Creating fresh deal for new rental cycle.`);
+          console.log(`Deal ${existingDeal.id} is ${existingDeal.status}. Creating fresh pending deal for new rental cycle.`);
           
           // Create FRESH deal with reset dates
           let originalPrice = null;
@@ -329,11 +343,11 @@ export async function POST(request) {
             customerId: customerId,
             vendorId: vendorId,
             serviceId: existingDeal.serviceId,
-            customerAccepted: true,  // Customer initiates, now vendor accepts
-            vendorAccepted: true,    // Vendor just accepted
-            status: 'agreed',
+            customerAccepted: true,
+            vendorAccepted: false,
+            status: 'pending',
             createdAt: new Date().toISOString(),
-            agreedAt: new Date().toISOString(),
+            agreedAt: null,
             discountGiven: false,
             discount: { type: null, value: 0, amount: 0 },
             originalPrice: originalPrice,
@@ -360,14 +374,16 @@ export async function POST(request) {
           };
 
           deals.push(freshDeal);
-          chatRoom.dealStatus = 'agreed';
+          chatRoom.dealStatus = 'pending';
+          chatRoom.closedAt = null;
+          chatRoom.closedReason = null;
           await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
           await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
 
-          // Create notification
-          await createNotification(customerId, 'deal_accepted', 'Vendor menerima penawaran baru Anda!', chatId, { vendorId, serviceId });
+          // Notify vendor to accept this new cycle
+          await createNotification(vendorId, 'deal_pending', 'Ada penawaran baru dari customer', chatId, { customerId, serviceId });
 
-          return NextResponse.json({ success: true, message: 'Deal siklus baru berhasil dibuat.', data: { deal: freshDeal, chat: chatRoom, readyForRating: false } }, { status: 200 });
+          return NextResponse.json({ success: true, message: 'Penawaran baru dikirim. Menunggu vendor menerima.', data: { deal: freshDeal, chat: chatRoom, readyForRating: false } }, { status: 200 });
         }
 
         // ❌ If deal is in other invalid states, reject
@@ -441,6 +457,8 @@ export async function POST(request) {
         }
 
         chatRoom.dealStatus = 'agreed';
+        chatRoom.closedAt = null;
+        chatRoom.closedReason = null;
         await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
         await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
 

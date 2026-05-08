@@ -21,7 +21,7 @@ export async function GET(request) {
 
     // Filter chats untuk vendor ini - bisa sebagai vendor (vendorId) atau sebagai customer (customerId)
     // Ini memungkinkan vendor menjalin hubungan dengan vendor lain dengan bertindak sebagai customer
-    const vendorChats = chats.filter(c => c.vendorId === vendorId || c.customerId === vendorId);
+    const vendorChats = chats.filter(c => String(c.vendorId) === String(vendorId) || String(c.customerId) === String(vendorId));
 
     return NextResponse.json({
       success: true,
