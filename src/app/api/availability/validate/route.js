@@ -2,6 +2,10 @@ import fs from 'fs/promises';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
+function getServiceCapacity(service) {
+  return Number(service?.availableQuantity ?? service?.availability ?? service?.quantity ?? 0) || 0;
+}
+
 // Validasi ketersediaan barang untuk periode tertentu
 export async function POST(request) {
   try {
@@ -39,8 +43,8 @@ export async function POST(request) {
     const serviceType = service.type || 'barang';
     
     if (serviceType === 'jasa') {
-      // JASA: prefer availability, fallback to quantity for backward compatibility
-      totalQuantity = Number(service.availability ?? service.quantity) || 0;
+      // JASA: prefer availableQuantity, fallback to availability/quantity for backward compatibility
+      totalQuantity = getServiceCapacity(service);
     } else {
       // BARANG: Sum of all items stok
       totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
