@@ -3,6 +3,7 @@ import path from 'path';
 import { NextResponse } from 'next/server';
 
 const CHATS_FILE = path.join(process.cwd(), 'chats.json');
+const DEALS_FILE = path.join(process.cwd(), 'deals.json');
 
 // HELPER: Baca chats.json
 async function readChatsFile() {
@@ -26,12 +27,51 @@ async function writeChatsFile(chats) {
   }
 }
 
+// HELPER: Baca deals.json
+async function readDealsFile() {
+  try {
+    const data = await fs.readFile(DEALS_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('[chat] Failed to read deals file:', error.message);
+    return [];
+  }
+}
+
+// HELPER: Check if chat should be closed (deal is completed)
+async function isChatClosed(chatId) {
+  const deals = await readDealsFile();
+  const deal = deals.find(d => d.chatId === chatId);
+  
+  // Chat ditutup jika:
+  // 1. Deal status = 'completed' (pembayaran selesai)
+  // 2. Deal status = 'cancelled' (deal ditolak)
+  if (deal && (deal.status === 'completed' || deal.status === 'cancelled')) {
+    return true;
+  }
+  
+  return false;
+}
+
+function findChatByContext(chats, serviceId, customerId, itemId) {
+  return chats.find(c => {
+    const sameService = String(c.serviceId) === String(serviceId);
+    const sameCustomer = String(c.customerId) === String(customerId);
+    const sameItem = itemId
+      ? String(c.itemId || '') === String(itemId)
+      : !c.itemId;
+
+    return sameService && sameCustomer && sameItem;
+  });
+}
+
 // GET - Load existing chat or return null if not found
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const serviceId = searchParams.get('serviceId');
     const customerId = searchParams.get('customerId');
+    const itemId = searchParams.get('itemId');
 
     if (!serviceId || !customerId) {
       return NextResponse.json(
@@ -41,7 +81,20 @@ export async function GET(request) {
     }
 
     const chats = await readChatsFile();
-    const chat = chats.find(c => c.serviceId === serviceId && c.customerId === customerId);
+    const chat = findChatByContext(chats, serviceId, customerId, itemId);
+
+    // Cek apakah chat sudah ditutup (deal completed/cancelled)
+    if (chat) {
+      const closed = await isChatClosed(chat.id);
+      if (closed) {
+        // Chat sudah ditutup, return null untuk trigger buat chat baru
+        console.log('[chat] Chat sudah closed, return null untuk buat chat baru');
+        return NextResponse.json({
+          success: true,
+          data: null
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -71,7 +124,7 @@ export async function POST(request) {
     }
 
     // 2. Extract fields
-    const { serviceId, serviceTitle, vendorId, vendorName, customerId, customerName, message, senderId, senderName } = body;
+    const { serviceId, serviceTitle, vendorId, vendorName, customerId, customerName, itemId, itemName, message, senderId, senderName } = body;
 
     // 3. Validate required fields
     if (!serviceId || !vendorId || !customerId || !message || !senderId) {
@@ -85,13 +138,26 @@ export async function POST(request) {
     const chats = await readChatsFile();
 
     // 5. Find or create chat room
-    let chatRoom = chats.find(c => c.serviceId === serviceId && c.customerId === customerId);
+    let chatRoom = findChatByContext(chats, serviceId, customerId, itemId);
+    
+    // Cek apakah chat lama sudah closed (deal completed/cancelled)
+    let shouldCreateNewChat = false;
+    if (chatRoom) {
+      const closed = await isChatClosed(chatRoom.id);
+      if (closed) {
+        console.log('[chat] Chat lama sudah closed, akan buat chat baru');
+        shouldCreateNewChat = true;
+        chatRoom = null; // Reset untuk buat baru
+      }
+    }
 
     if (!chatRoom) {
       chatRoom = {
         id: Date.now().toString(),
         serviceId,
         serviceTitle: serviceTitle || 'Unknown',
+        itemId: itemId || null,
+        itemName: itemName || null,
         vendorId,
         vendorName: vendorName || 'Unknown',
         customerId,
@@ -101,6 +167,10 @@ export async function POST(request) {
         dealStatus: null
       };
       chats.push(chatRoom);
+      
+      if (shouldCreateNewChat) {
+        console.log('[chat] Berhasil buat chat baru dengan ID:', chatRoom.id);
+      }
     }
 
     // 6. Add message

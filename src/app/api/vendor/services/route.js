@@ -2,6 +2,22 @@ import fs from 'fs/promises';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
+function normalizeServiceCapacity(service) {
+  if (!service) return service;
+
+  if (service.type === 'jasa') {
+    const capacity = Number(service.availableQuantity ?? service.availability ?? service.quantity ?? 0);
+    return {
+      ...service,
+      availableQuantity: capacity,
+      availability: capacity,
+      quantity: capacity
+    };
+  }
+
+  return service;
+}
+
 // GET - Mengambil services dengan filter vendorId
 export async function GET(request) {
   try {
@@ -11,7 +27,7 @@ export async function GET(request) {
     const filePath = path.join(process.cwd(), 'services.json');
     let fileData = await fs.readFile(filePath, 'utf-8');
     fileData = fileData.replace(/^\uFEFF/, '').trim();
-    let services = JSON.parse(fileData);
+    let services = JSON.parse(fileData).map(normalizeServiceCapacity);
 
     // Filter berdasarkan vendorId jika diberikan
     if (vendorId) {
@@ -148,7 +164,7 @@ export async function POST(request) {
         detailDescription: detailDescription || description || '',
         price: Number.isNaN(parsedPrice) ? 0 : parsedPrice,
         minimumDays: Number.isNaN(parsedMinimumDays) ? 1 : parsedMinimumDays,
-        availability: normalizedAvailability,
+        availableQuantity: normalizedAvailability,
         quantity: normalizedQuantity,
         rentalPolicy: rentalPolicy || '',
         location,
@@ -218,7 +234,7 @@ export async function POST(request) {
         type: 'barang',
         jenisBarang,
         jumlahBarang: parseInt(jumlahBarang),
-        availability: legacyAvailability,
+        availableQuantity: legacyAvailability,
         lokasi,
         latitude,
         longitude,
@@ -247,6 +263,9 @@ export async function POST(request) {
         garansiLayanan,
         rating: 5.0,
         rentCount: '0',
+        availability: 0,
+        availableQuantity: 0,
+        quantity: 0,
         images: images && images.length > 0 ? images : ['https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=150&q=80']
       };
     }
@@ -275,6 +294,7 @@ export async function PUT(request) {
     const {
       id,
       vendorId,
+      type,
       mainCategory,
       subCategory,
       superSubCategory,
@@ -305,7 +325,7 @@ export async function PUT(request) {
     const filePath = path.join(process.cwd(), 'services.json');
     let fileData = await fs.readFile(filePath, 'utf-8');
     fileData = fileData.replace(/^\uFEFF/, '').trim();
-    let services = JSON.parse(fileData);
+    let services = JSON.parse(fileData).map(normalizeServiceCapacity);
 
     // Cari dan update service
     const serviceIndex = services.findIndex(s => s.id === id && s.vendorId === vendorId);
@@ -331,6 +351,9 @@ export async function PUT(request) {
       availability: availability !== undefined
         ? availability
         : (services[serviceIndex].availability ?? 0),
+      availableQuantity: availability !== undefined
+        ? availability
+        : (services[serviceIndex].availableQuantity ?? services[serviceIndex].availability ?? 0),
       quantity: quantity !== undefined
         ? quantity
         : (
@@ -356,6 +379,8 @@ export async function PUT(request) {
         ? items
         : (services[serviceIndex].items || [])
     };
+
+    services[serviceIndex] = normalizeServiceCapacity(services[serviceIndex]);
 
     await fs.writeFile(filePath, JSON.stringify(services, null, 2));
 

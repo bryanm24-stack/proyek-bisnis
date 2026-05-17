@@ -2,6 +2,10 @@ import fs from 'fs/promises';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
+function getServiceCapacity(service) {
+  return Number(service?.availableQuantity ?? service?.availability ?? service?.quantity ?? 0) || 0;
+}
+
 // POST - Reserve items untuk booking tertentu
 export async function POST(request) {
   try {
@@ -59,8 +63,8 @@ export async function POST(request) {
     const serviceType = service.type || 'barang';
     
     if (serviceType === 'jasa') {
-      // JASA: prefer availability, fallback to quantity for backward compatibility
-      totalQuantity = Number(service.availability ?? service.quantity) || 0;
+      // JASA: prefer availableQuantity, fallback to availability/quantity for backward compatibility
+      totalQuantity = getServiceCapacity(service);
     } else {
       // BARANG: Sum of all items stok
       totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
@@ -73,6 +77,10 @@ export async function POST(request) {
       }
     }
     service.availableQuantity = Math.max(0, totalQuantity - bookedQuantity);
+    if (serviceType === 'jasa') {
+      service.availability = service.availableQuantity;
+      service.quantity = service.availableQuantity;
+    }
 
     // Save updated services
     await fs.writeFile(servicesPath, JSON.stringify(services, null, 2));
@@ -148,8 +156,8 @@ export async function GET(request) {
     const svcType = service.type || 'barang';
     
     if (svcType === 'jasa') {
-      // JASA: prefer availability, fallback to quantity for backward compatibility
-      totalQty = Number(service.availability ?? service.quantity) || 0;
+      // JASA: prefer availableQuantity, fallback to availability/quantity for backward compatibility
+      totalQty = getServiceCapacity(service);
     } else {
       // BARANG: Sum of all items stok
       totalQty = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
