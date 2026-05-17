@@ -86,7 +86,8 @@ export default function VendorChatsPage() {
     return vendorChats.filter(chat => {
       const customerName = (chat.customerName || '').toLowerCase();
       const serviceTitle = (chat.serviceTitle || '').toLowerCase();
-      return customerName.includes(searchLower) || serviceTitle.includes(searchLower);
+      const itemName = (chat.itemName || '').toLowerCase();
+      return customerName.includes(searchLower) || serviceTitle.includes(searchLower) || itemName.includes(searchLower);
     });
   }, [vendorChats, searchQuery]);
 
@@ -99,7 +100,8 @@ export default function VendorChatsPage() {
     return customerChats.filter(chat => {
       const vendorName = (chat.vendorName || '').toLowerCase();
       const serviceTitle = (chat.serviceTitle || '').toLowerCase();
-      return vendorName.includes(searchLower) || serviceTitle.includes(searchLower);
+      const itemName = (chat.itemName || '').toLowerCase();
+      return vendorName.includes(searchLower) || serviceTitle.includes(searchLower) || itemName.includes(searchLower);
     });
   }, [customerChats, searchQuery]);
 
@@ -133,13 +135,6 @@ export default function VendorChatsPage() {
     setDealData(null);
   };
 
-  const sendMessage = async () => {
-    if (!newMessage.trim()) return;
-    if (selectedChat?.dealStatus === 'closed') {
-      alert('Chat sudah ditutup setelah pembayaran selesai.');
-      return;
-    }
-
   const getChatTopicLabel = (chat) => {
     if (!chat) return '';
     if (chat.itemName) {
@@ -148,6 +143,13 @@ export default function VendorChatsPage() {
 
     return chat.serviceTitle || '';
   };
+
+  const sendMessage = async () => {
+    if (!newMessage.trim()) return;
+    if (selectedChat?.dealStatus === 'closed') {
+      alert('Chat sudah ditutup setelah pembayaran selesai.');
+      return;
+    }
 
     try {
       const response = await fetch('/api/chat', {
@@ -165,8 +167,7 @@ export default function VendorChatsPage() {
           senderName: user.vendorName || user.name
         })
       });
-      const itemName = (chat.itemName || '').toLowerCase();
-      return customerName.includes(searchLower) || serviceTitle.includes(searchLower) || itemName.includes(searchLower);
+
       const data = await response.json();
       if (data.success) {
         setMessages(data.data.messages || []);
@@ -179,8 +180,7 @@ export default function VendorChatsPage() {
         setSelectedChat(data.data);
       }
     } catch (error) {
-      const itemName = (chat.itemName || '').toLowerCase();
-      return vendorName.includes(searchLower) || serviceTitle.includes(searchLower) || itemName.includes(searchLower);
+      console.error('Error sending message:', error);
       alert('Gagal mengirim pesan');
     }
   };
