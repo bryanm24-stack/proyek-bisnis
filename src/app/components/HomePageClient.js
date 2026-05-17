@@ -306,38 +306,30 @@ export default function HomePageClient() {
   const getPromoOffers = (service) => {
     if (!service) return [];
 
-    const promoMatches = promos.filter((promo) =>
-      promo.active !== false &&
-      (promo.productId === service.id || promo.vendorId === service.vendorId)
+    // Filter promo yang aktif dari vendor ini
+    const vendorPromos = promos.filter((promo) =>
+      promo.active !== false && promo.vendorId === service.vendorId
     );
 
+    // Jika ada promo dari vendor, gunakan itu, kalau tidak tampilkan produk serupa
+    if (vendorPromos.length > 0) {
+      return vendorPromos.slice(0, 3);
+    }
+
+    // Fallback: rekomendasi produk serupa dari vendor yang sama
     const fallbackMatches = services.filter((item) =>
       item.id !== service.id &&
-      (item.vendorId === service.vendorId || item.mainCategory === service.mainCategory || item.category === service.category)
+      item.vendorId === service.vendorId
     );
 
-    const mappedPromos = promoMatches.map((promo) => ({
-      id: promo.id,
-      title: promo.productName,
-      image: promo.productImage || service.image || service.images?.[0],
-      originalPrice: promo.originalPrice || service.price || 0,
-      promoPrice: promo.promoPrice ?? null,
-      description: promo.description || 'Promo spesial dari vendor',
-      code: promo.code
-    }));
-
-    const mappedFallbacks = fallbackMatches.map((item) => ({
+    return fallbackMatches.slice(0, 3).map((item) => ({
       id: item.id,
       title: item.title || item.namaBarang || item.namaJasa,
-      image: item.images?.[0],
-      originalPrice: item.price || 0,
-      promoPrice: item.price ? Math.max(0, Math.round(item.price * 0.85)) : null,
-      description: 'Rekomendasi produk serupa dengan penawaran menarik',
-      code: null
+      image: item.thumbnail || item.image || (Array.isArray(item.images) && item.images.length > 0 ? item.images[0] : null),
+      promoPrice: item.price || item.hargaBarang || item.hargaPerHari || 0,
+      description: `Rekomendasi produk dari ${service.vendorName || 'vendor'}`,
+      vendorId: item.vendorId
     }));
-
-    const pool = mappedPromos.length > 0 ? mappedPromos : mappedFallbacks;
-    return pool.sort(() => Math.random() - 0.5).slice(0, 3);
   };
 
   const openModal = (service) => {
@@ -1765,18 +1757,52 @@ export default function HomePageClient() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
                     {getPromoOffers(selectedService).map((offer) => (
-                      <div key={offer.id} style={{ background: 'white', borderRadius: '14px', overflow: 'hidden', border: '1px solid #e5e7eb', boxShadow: '0 8px 20px rgba(91, 69, 209, 0.08)' }}>
-                        <div style={{ height: '120px', background: '#f3f4f6' }}>
-                          <img src={offer.image || 'https://via.placeholder.com/400x240?text=Promo'} alt={offer.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <div 
+                        key={offer.id} 
+                        onClick={() => {
+                          if (offer.promoPrice) {
+                            // Navigate ke payment page dengan promo terpilih
+                            router.push(`/transaction/payment?promoId=${offer.id}`);
+                          }
+                        }}
+                        style={{ 
+                          background: 'white', 
+                          borderRadius: '14px', 
+                          overflow: 'hidden', 
+                          border: '1px solid #e5e7eb', 
+                          boxShadow: '0 8px 20px rgba(91, 69, 209, 0.08)',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.boxShadow = '0 12px 28px rgba(91, 69, 209, 0.16)';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.boxShadow = '0 8px 20px rgba(91, 69, 209, 0.08)';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                      >
+                        <div style={{ height: '120px', background: '#f3f4f6', position: 'relative' }}>
+                          <img 
+                            src={offer.image || 'https://via.placeholder.com/400x240?text=Promo'} 
+                            alt={offer.title} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            onError={(e) => {
+                              e.target.src = 'https://via.placeholder.com/400x240?text=Gambar+Error';
+                            }}
+                          />
+                          <div style={{ position: 'absolute', top: '8px', right: '8px', background: '#dc2626', color: 'white', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '800' }}>
+                            ✨ PROMO
+                          </div>
                         </div>
                         <div style={{ padding: '14px' }}>
-                          <div style={{ fontSize: '12px', color: '#7c3aed', fontWeight: '700', marginBottom: '6px' }}>Promo {offer.code ? `• ${offer.code}` : 'spesial'}</div>
-                          <div style={{ fontSize: '15px', fontWeight: '800', color: '#111827', marginBottom: '8px' }}>{offer.title}</div>
-                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '18px', fontWeight: '900', color: '#dc2626' }}>Rp {Number(offer.promoPrice ?? offer.originalPrice).toLocaleString('id-ID')}</span>
-                            <span style={{ fontSize: '12px', color: '#6b7280', textDecoration: 'line-through' }}>Rp {Number(offer.originalPrice || 0).toLocaleString('id-ID')}</span>
+                          <div style={{ fontSize: '12px', color: '#7c3aed', fontWeight: '700', marginBottom: '6px' }}>Penawaran Spesial</div>
+                          <div style={{ fontSize: '15px', fontWeight: '800', color: '#111827', marginBottom: '8px', lineHeight: '1.3' }}>{offer.title}</div>
+                          <div style={{ fontSize: '18px', fontWeight: '900', color: '#dc2626', marginBottom: '8px' }}>
+                            Rp {Number(offer.promoPrice).toLocaleString('id-ID')}
                           </div>
-                          <div style={{ fontSize: '12px', color: '#4b5563', minHeight: '36px' }}>{offer.description}</div>
+                          <div style={{ fontSize: '12px', color: '#4b5563', minHeight: '36px', lineHeight: '1.4' }}>{offer.description}</div>
                         </div>
                       </div>
                     ))}
