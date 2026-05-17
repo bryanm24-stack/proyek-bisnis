@@ -140,6 +140,15 @@ export default function VendorChatsPage() {
       return;
     }
 
+  const getChatTopicLabel = (chat) => {
+    if (!chat) return '';
+    if (chat.itemName) {
+      return `${chat.serviceTitle} • ${chat.itemName}`;
+    }
+
+    return chat.serviceTitle || '';
+  };
+
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -156,7 +165,8 @@ export default function VendorChatsPage() {
           senderName: user.vendorName || user.name
         })
       });
-
+      const itemName = (chat.itemName || '').toLowerCase();
+      return customerName.includes(searchLower) || serviceTitle.includes(searchLower) || itemName.includes(searchLower);
       const data = await response.json();
       if (data.success) {
         setMessages(data.data.messages || []);
@@ -169,7 +179,8 @@ export default function VendorChatsPage() {
         setSelectedChat(data.data);
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      const itemName = (chat.itemName || '').toLowerCase();
+      return vendorName.includes(searchLower) || serviceTitle.includes(searchLower) || itemName.includes(searchLower);
       alert('Gagal mengirim pesan');
     }
   };
@@ -471,7 +482,7 @@ export default function VendorChatsPage() {
                               {chat.vendorName}
                             </div>
                             <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '4px' }}>
-                              {chat.serviceTitle}
+                              {getChatTopicLabel(chat)}
                             </div>
                             <div style={{ fontSize: '12px', opacity: 0.6, marginTop: '4px' }}>
                               {chat.messages?.length || 0} pesan
@@ -513,7 +524,7 @@ export default function VendorChatsPage() {
                               {chat.customerName}
                             </div>
                             <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '4px' }}>
-                              {chat.serviceTitle}
+                              {getChatTopicLabel(chat)}
                             </div>
                             <div style={{ fontSize: '12px', opacity: 0.6, marginTop: '4px' }}>
                               {chat.messages?.length || 0} pesan
@@ -558,7 +569,7 @@ export default function VendorChatsPage() {
                     {user.id === selectedChat.customerId ? selectedChat.customerName : selectedChat.vendorName}
                   </h2>
                   <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#666' }}>
-                    {selectedChat.serviceTitle}
+                    {getChatTopicLabel(selectedChat)}
                   </p>
                 </div>
                 <button
@@ -828,7 +839,7 @@ export default function VendorChatsPage() {
                 {String(user?.id) === String(selectedChat.customerId) ? selectedChat.vendorName : selectedChat.customerName}
               </h2>
               <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#666' }}>
-                {selectedChat.serviceTitle}
+                {getChatTopicLabel(selectedChat)}
               </p>
             </div>
 

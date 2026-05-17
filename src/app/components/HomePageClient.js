@@ -14,6 +14,7 @@ export default function HomePageClient() {
   const [loading, setLoading] = useState(true);
   const [selectedService, setSelectedService] = useState(null);
   const [selectedItemDetail, setSelectedItemDetail] = useState(null);
+  const [selectedChatItem, setSelectedChatItem] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [detailTab, setDetailTab] = useState('packages');
   const [modalImageIndex, setModalImageIndex] = useState(0);
@@ -45,6 +46,7 @@ export default function HomePageClient() {
   const [favoriteLoading, setFavoriteLoading] = useState({});
   const [vendorReplyDrafts, setVendorReplyDrafts] = useState({});
   const [vendorReplySubmittingId, setVendorReplySubmittingId] = useState(null);
+  const activeChatItem = selectedChatItem || selectedItemDetail;
 
   const fetchFavorites = useCallback(async (currentUser) => {
     if (!currentUser) return;
@@ -406,13 +408,14 @@ export default function HomePageClient() {
     }
   };
 
-  const openChatModal = async (service) => {
+  const openChatModal = async (service, itemDetail = null) => {
     if (!user) {
       alert('Silakan login terlebih dahulu');
       return;
     }
 
     setSelectedService(service);
+    setSelectedChatItem(itemDetail);
     setMessages([]);
     setNewMessage('');
     setShowRatingForm(false);
@@ -426,7 +429,16 @@ export default function HomePageClient() {
       console.log('[openChatModal] Loading chat for service:', service.id);
 
       // Load existing chat if any
-      const response = await fetch(`/api/chat?serviceId=${service.id}&customerId=${user.id}`);
+      const chatQuery = new URLSearchParams({
+        serviceId: service.id,
+        customerId: user.id
+      });
+
+      if (itemDetail?.id) {
+        chatQuery.set('itemId', itemDetail.id);
+      }
+
+      const response = await fetch(`/api/chat?${chatQuery.toString()}`);
       const data = await response.json();
 
       if (data.success && data.data) {
@@ -449,6 +461,7 @@ export default function HomePageClient() {
         setChatData(null);
         setMessages([]);
         setDealData(null);
+        setSelectedChatItem(null);
       }
     } catch (error) {
       console.error('[openChatModal] Error:', error);
@@ -490,6 +503,8 @@ export default function HomePageClient() {
           vendorName: selectedService.vendorName,
           customerId: user.id,
           customerName: user.name,
+          itemId: activeChatItem?.id || null,
+          itemName: activeChatItem?.namaBarang || activeChatItem?.namaJasa || null,
           message: newMessage,
           senderId: user.id,
           senderName: user.name
@@ -1437,7 +1452,7 @@ export default function HomePageClient() {
                               </div>
                               <button
                                 className="btn-primary-modal"
-                                onClick={() => openChatModal(selectedService)}
+                                onClick={() => openChatModal(selectedService, selectedItemDetail)}
                                 disabled={user && user.id === selectedService.vendorId || isUnavailable}
                                 style={{
                                   width: '100%',
@@ -1796,6 +1811,11 @@ export default function HomePageClient() {
                 <p style={{ margin: '4px 0 0 0', color: '#666', fontSize: '13px' }}>
                   {selectedService.title}
                 </p>
+                {activeChatItem && (
+                  <p style={{ margin: '2px 0 0 0', color: '#5A45D1', fontSize: '12px', fontWeight: 600 }}>
+                    Paket: {activeChatItem.namaBarang || activeChatItem.namaJasa}
+                  </p>
+                )}
               </div>
               <button className="modal-close" onClick={closeChatModal}>✕</button>
             </div>
