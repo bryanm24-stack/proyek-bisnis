@@ -1831,9 +1831,9 @@ export default function HomePageClient() {
                   <p>Mulai percakapan dengan vendor ini</p>
                 </div>
               ) : (
-                messages.map((msg) => (
+                messages.map((msg, index) => (
                   <div
-                    key={msg.id}
+                    key={`${msg.id || msg.timestamp}-${index}`}
                     className={`chat-message ${msg.senderId === user.id ? 'customer' : 'vendor'}`}
                   >
                     <div className="message-content">

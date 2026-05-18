@@ -260,9 +260,9 @@ export default function CustomerChatsPage() {
               </div>
             ) : (
               <div>
-                {filteredChats.map((chat) => (
+                {filteredChats.map((chat, index) => (
                   <div
-                    key={chat.id}
+                    key={`${chat.id || chat.createdAt}-${index}`}
                     onClick={() => openChat(chat)}
                     style={{
                       padding: '12px',
@@ -384,12 +384,12 @@ export default function CustomerChatsPage() {
                     Mulai percakapan
                   </div>
                 ) : (
-                  messages.map((msg) => {
+                  messages.map((msg, index) => {
                     const isCustomerMessage = msg.senderId === user?.id;
                     
                     return (
                       <div
-                        key={msg.id}
+                        key={`${msg.id || msg.timestamp}-${index}`}
                         style={{
                           display: 'flex',
                           justifyContent: isCustomerMessage ? 'flex-end' : 'flex-start',
