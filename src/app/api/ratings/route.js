@@ -42,6 +42,8 @@ export async function POST(request) {
       }, { status: 404 });
     }
 
+    const serviceType = String(service.type || 'barang').toLowerCase();
+
     // Check duplikasi rating per siklus deal; fallback ke service untuk data lama tanpa dealId.
     const existingRating = dealId
       ? ratings.find(
@@ -100,14 +102,16 @@ export async function POST(request) {
           deal.ratingCompleted = true;
           updatedDeal = deal;
 
-          // Vendor-to-vendor: setelah rating, buka kembali chat agar siap siklus deal baru.
+          const shouldResetForNewCycle = serviceType === 'barang';
+
+          // Barang: setelah rating, buka kembali deal/chat agar siap siklus beli berikutnya.
           const usersData = await fs.readFile(usersPath, 'utf-8');
           const users = JSON.parse(usersData.trim());
           const customerUser = users.find((u) => String(u.id) === String(deal.customerId));
           const vendorUser = users.find((u) => String(u.id) === String(deal.vendorId));
           const isVendorToVendor = customerUser?.role === 'vendor' && vendorUser?.role === 'vendor';
 
-          if (isVendorToVendor && deal.chatId) {
+          if ((shouldResetForNewCycle || isVendorToVendor) && deal.chatId) {
             const chatsData = await fs.readFile(chatsPath, 'utf-8');
             const chats = JSON.parse(chatsData.trim());
             const chat = chats.find((c) => String(c.id) === String(deal.chatId));
