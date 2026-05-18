@@ -1,9 +1,9 @@
 import fs from 'fs/promises';
+import { randomUUID } from 'crypto';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
 const CHATS_FILE = path.join(process.cwd(), 'chats.json');
-const DEALS_FILE = path.join(process.cwd(), 'deals.json');
 
 // HELPER: Baca chats.json
 async function readChatsFile() {
@@ -25,32 +25,6 @@ async function writeChatsFile(chats) {
     console.error('[chat] Failed to write chats file:', error.message);
     throw error;
   }
-}
-
-// HELPER: Baca deals.json
-async function readDealsFile() {
-  try {
-    const data = await fs.readFile(DEALS_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('[chat] Failed to read deals file:', error.message);
-    return [];
-  }
-}
-
-// HELPER: Check if chat should be closed (deal is completed)
-async function isChatClosed(chatId) {
-  const deals = await readDealsFile();
-  const deal = deals.find(d => d.chatId === chatId);
-  
-  // Chat ditutup jika:
-  // 1. Deal status = 'completed' (pembayaran selesai)
-  // 2. Deal status = 'cancelled' (deal ditolak)
-  if (deal && (deal.status === 'completed' || deal.status === 'cancelled')) {
-    return true;
-  }
-  
-  return false;
 }
 
 function findChatByContext(chats, serviceId, customerId, itemId) {
@@ -82,19 +56,6 @@ export async function GET(request) {
 
     const chats = await readChatsFile();
     const chat = findChatByContext(chats, serviceId, customerId, itemId);
-
-    // Cek apakah chat sudah ditutup (deal completed/cancelled)
-    if (chat) {
-      const closed = await isChatClosed(chat.id);
-      if (closed) {
-        // Chat sudah ditutup, return null untuk trigger buat chat baru
-        console.log('[chat] Chat sudah closed, return null untuk buat chat baru');
-        return NextResponse.json({
-          success: true,
-          data: null
-        });
-      }
-    }
 
     return NextResponse.json({
       success: true,
@@ -139,21 +100,10 @@ export async function POST(request) {
 
     // 5. Find or create chat room
     let chatRoom = findChatByContext(chats, serviceId, customerId, itemId);
-    
-    // Cek apakah chat lama sudah closed (deal completed/cancelled)
-    let shouldCreateNewChat = false;
-    if (chatRoom) {
-      const closed = await isChatClosed(chatRoom.id);
-      if (closed) {
-        console.log('[chat] Chat lama sudah closed, akan buat chat baru');
-        shouldCreateNewChat = true;
-        chatRoom = null; // Reset untuk buat baru
-      }
-    }
 
     if (!chatRoom) {
       chatRoom = {
-        id: Date.now().toString(),
+        id: randomUUID(),
         serviceId,
         serviceTitle: serviceTitle || 'Unknown',
         itemId: itemId || null,
@@ -167,15 +117,11 @@ export async function POST(request) {
         dealStatus: null
       };
       chats.push(chatRoom);
-      
-      if (shouldCreateNewChat) {
-        console.log('[chat] Berhasil buat chat baru dengan ID:', chatRoom.id);
-      }
     }
 
     // 6. Add message
     chatRoom.messages.push({
-      id: Date.now().toString(),
+      id: randomUUID(),
       senderId: senderId,
       senderName: senderName || 'Unknown',
       message,
