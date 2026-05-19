@@ -20,6 +20,7 @@ export default function HomePageClient() {
   const [modalImageIndex, setModalImageIndex] = useState(0);
   // ✅ NEW: Track image carousel for product cards
   const [currentImageIndex, setCurrentImageIndex] = useState({});
+  const [heroImageIndex, setHeroImageIndex] = useState(0);
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [chatData, setChatData] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -155,6 +156,18 @@ export default function HomePageClient() {
       clearInterval(promoInterval);
     };
   }, []);
+
+  const featuredServices = services.slice(0, 4);
+
+  useEffect(() => {
+    if (featuredServices.length === 0) return;
+
+    const interval = setInterval(() => {
+      setHeroImageIndex((prev) => (prev + 1) % featuredServices.length);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [featuredServices.length]);
 
   // Fetch notifications for current user
   useEffect(() => {
@@ -813,25 +826,100 @@ export default function HomePageClient() {
 
       {/* Hero Section */}
       <div className="hero-section">
-        <div className="hero-content">
-          <h1>Sewa Apa Saja,<br/>dari Vendor Terbaik</h1>
-          <p>Ribuan vendor penyewaan terpercaya siap melayani kebutuhan sewa kamu</p>
-          <div className="hero-buttons">
-            <button className="btn-white">Cari Vendor Sekarang</button>
-            {!user && (
-              <>
+        <div className="hero-inner">
+          <div className="hero-content">
+            <h1>Sewa Apa Saja,<br/>dari Vendor Terbaik</h1>
+            <p>Ribuan vendor penyewaan terpercaya siap melayani kebutuhan sewa kamu</p>
+            <div className="hero-buttons">
+              <button className="btn-white">Cari Vendor Sekarang</button>
+              {!user && (
+                <>
+                  <Link href="/vendor/register" className="btn-outline" style={{textDecoration: 'none', display: 'inline-block'}}>
+                    Menjadi Vendor
+                  </Link>
+                  <Link href="/login" className="btn-white" style={{marginLeft: '10px', background: '#333', color: 'white', textDecoration: 'none', display: 'inline-block'}}>
+                    Masuk / Login
+                  </Link>
+                </>
+              )}
+              {user && user.role === 'customer' && (
                 <Link href="/vendor/register" className="btn-outline" style={{textDecoration: 'none', display: 'inline-block'}}>
                   Menjadi Vendor
                 </Link>
-                <Link href="/login" className="btn-white" style={{marginLeft: '10px', background: '#333', color: 'white', textDecoration: 'none', display: 'inline-block'}}>
-                  Masuk / Login
-                </Link>
+              )}
+            </div>
+          </div>
+
+          <div className="hero-carousel">
+            {featuredServices.length > 0 ? (
+              <>
+                <div className="hero-featured-card">
+                  {(() => {
+                    const service = featuredServices[heroImageIndex % featuredServices.length];
+                    const serviceImage = service.image || (service.images && service.images.length > 0 ? service.images[0] : 'https://via.placeholder.com/420x400?text=Service');
+                    const priceInfo = getServicePriceNumber(service);
+                    const rentCountNum = typeof service.rentCount === 'string' 
+                      ? parseInt(service.rentCount.replace(/[K,]/g, '')) || 0
+                      : service.rentCount || 0;
+
+                    return (
+                      <div
+                        className="featured-card-content"
+                        onClick={() => {
+                          setSelectedService(service);
+                          setModalOpen(true);
+                          setDetailTab('overview');
+                          setModalImageIndex(0);
+                        }}
+                      >
+                        <div className="featured-card-image">
+                          <img src={serviceImage} alt={service.title} />
+                          <button
+                            className="featured-card-favorite"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFavorite(service, isFavorited(service.id));
+                            }}
+                            disabled={favoriteLoading[service.id]}
+                          >
+                            {isFavorited(service.id) ? '❤️' : '🤍'}
+                          </button>
+                        </div>
+                        <div className="featured-card-info">
+                          <h3>{service.title}</h3>
+                          <p className="featured-vendor">{service.vendorName}</p>
+                          <div className="featured-stats">
+                            <span>⭐ {Number(service.rating || 0).toFixed(1)}</span>
+                            <span>👥 {rentCountNum > 1000 ? (rentCountNum / 1000).toFixed(1) + 'K' : rentCountNum}</span>
+                          </div>
+                          <div className="featured-price">
+                            <span>Mulai dari</span>
+                            <strong>{priceInfo ? `Rp${priceInfo.toLocaleString('id-ID')}` : 'Hubungi'}</strong>
+                          </div>
+                          <button className="btn-featured-detail">
+                            Lihat Detail →
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+                <div className="hero-carousel-dots">
+                  {featuredServices.map((_, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className={`hero-carousel-dot ${idx === (heroImageIndex % featuredServices.length) ? 'active' : ''}`}
+                      onClick={() => setHeroImageIndex(idx)}
+                      aria-label={`Tampilkan layanan ${idx + 1}`}
+                    />
+                  ))}
+                </div>
               </>
-            )}
-            {user && user.role === 'customer' && (
-              <Link href="/vendor/register" className="btn-outline" style={{textDecoration: 'none', display: 'inline-block'}}>
-                Menjadi Vendor
-              </Link>
+            ) : (
+              <div className="hero-carousel-placeholder">
+                <p>Memuat layanan unggulan...</p>
+              </div>
             )}
           </div>
         </div>
@@ -1937,6 +2025,296 @@ export default function HomePageClient() {
           font-family: system-ui, -apple-system, sans-serif;
         }
 
+        .hero-section {
+          padding: 80px 40px 40px;
+          background: linear-gradient(135deg, #4338ca 0%, #2e60ff 100%);
+          color: white;
+        }
+
+        .hero-inner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 36px;
+          max-width: 1180px;
+          margin: 0 auto;
+          flex-wrap: wrap;
+        }
+
+        .hero-content {
+          flex: 1 1 420px;
+          min-width: 280px;
+        }
+
+        .hero-content h1 {
+          font-size: clamp(2.8rem, 5vw, 4.8rem);
+          line-height: 1.05;
+          margin: 0;
+          letter-spacing: -0.03em;
+        }
+
+        .hero-content p {
+          color: rgba(255,255,255,0.88);
+          font-size: 1.05rem;
+          margin: 24px 0 30px;
+          max-width: 540px;
+          line-height: 1.7;
+        }
+
+        .hero-buttons {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          align-items: center;
+        }
+
+        .hero-carousel {
+          flex: 0 0 420px;
+          min-width: 280px;
+          width: 100%;
+          max-width: 480px;
+        }
+
+        .hero-carousel-frame {
+          position: relative;
+          overflow: hidden;
+          border-radius: 26px;
+          box-shadow: 0 28px 80px rgba(15, 23, 42, 0.22);
+          background: #000;
+        }
+
+        .hero-carousel-frame img {
+          width: 100%;
+          height: 420px;
+          object-fit: cover;
+          display: block;
+          transition: transform 0.4s ease;
+        }
+
+        .hero-carousel-frame:hover img {
+          transform: scale(1.03);
+        }
+
+        .hero-carousel-overlay {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          padding: 18px 20px;
+          background: linear-gradient(180deg, transparent 0%, rgba(15, 23, 42, 0.82) 100%);
+          display: flex;
+          align-items: flex-end;
+          color: white;
+          font-weight: 700;
+          letter-spacing: 0.01em;
+          font-size: 14px;
+        }
+
+        /* Featured Card in Hero */
+        .hero-featured-card {
+          position: relative;
+          width: 100%;
+          border-radius: 26px;
+          overflow: hidden;
+          box-shadow: 0 28px 80px rgba(15, 23, 42, 0.22);
+          background: white;
+        }
+
+        .featured-card-content {
+          cursor: pointer;
+          transition: transform 0.3s ease;
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+        }
+
+        .featured-card-content:hover {
+          transform: translateY(-4px);
+        }
+
+        .featured-card-image {
+          position: relative;
+          width: 100%;
+          height: 240px;
+          overflow: hidden;
+          background: #f3f4f6;
+        }
+
+        .featured-card-image img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: transform 0.4s ease;
+        }
+
+        .featured-card-content:hover .featured-card-image img {
+          transform: scale(1.08);
+        }
+
+        .featured-card-favorite {
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          background: rgba(255, 255, 255, 0.92);
+          border: none;
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          cursor: pointer;
+          font-size: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+          transition: all 0.3s ease;
+          z-index: 3;
+        }
+
+        .featured-card-favorite:hover:not(:disabled) {
+          transform: scale(1.12);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .featured-card-favorite:disabled {
+          opacity: 0.6;
+        }
+
+        .featured-card-info {
+          padding: 20px;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .featured-card-info h3 {
+          font-size: 18px;
+          font-weight: 700;
+          color: #1a1a1a;
+          margin: 0 0 6px 0;
+          line-height: 1.3;
+        }
+
+        .featured-vendor {
+          font-size: 14px;
+          color: #7c3aed;
+          margin: 0 0 10px 0;
+          font-weight: 600;
+        }
+
+        .featured-stats {
+          display: flex;
+          gap: 14px;
+          margin-bottom: 12px;
+          font-size: 14px;
+          color: #666;
+        }
+
+        .featured-price {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          margin: 10px 0;
+        }
+
+        .featured-price span {
+          font-size: 12px;
+          color: #999;
+        }
+
+        .featured-price strong {
+          font-size: 18px;
+          font-weight: 700;
+          color: #7c3aed;
+        }
+
+        .btn-featured-detail {
+          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          color: white;
+          border: none;
+          padding: 10px 16px;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          margin-top: auto;
+        }
+
+        .btn-featured-detail:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+        }
+
+        .hero-carousel-dots {
+          position: relative;
+          display: flex;
+          gap: 8px;
+          justify-content: center;
+          padding: 12px;
+          z-index: 3;
+        }
+
+        .hero-carousel-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          border: none;
+          background: rgba(255,255,255,0.45);
+          cursor: pointer;
+          transition: transform 0.2s ease, background 0.2s ease;
+        }
+
+        .hero-carousel-dot.active {
+          background: white;
+          transform: scale(1.2);
+        }
+
+        .hero-carousel-placeholder {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 360px;
+          border-radius: 26px;
+          background: rgba(255,255,255,0.08);
+          border: 1px dashed rgba(255,255,255,0.3);
+          color: rgba(255,255,255,0.8);
+          text-align: center;
+          padding: 24px;
+        }
+
+        @media (max-width: 900px) {
+          .hero-inner {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .hero-carousel {
+            max-width: 100%;
+          }
+
+          .hero-carousel-frame img {
+            height: 320px;
+          }
+        }
+
+        @media (max-width: 620px) {
+          .hero-section {
+            padding: 60px 20px 30px;
+          }
+
+          .hero-content h1 {
+            font-size: 2.6rem;
+          }
+
+          .hero-content p {
+            font-size: 1rem;
+          }
+
+          .hero-carousel-frame img {
+            height: 260px;
+          }
+        }
+
         .nav-left {
           display: flex;
           align-items: center;
@@ -2456,6 +2834,215 @@ export default function HomePageClient() {
 
         .jadi-vendor-btn.admin-btn:hover {
           background-color: #d97706;
+        }
+
+        /* Featured Section - Layanan Unggulan */
+        .featured-section {
+          padding: 60px 40px;
+          background: #f9fafb;
+          border-top: 1px solid #e5e7eb;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .featured-section h2 {
+          font-size: 32px;
+          font-weight: 700;
+          margin: 0 0 36px 0;
+          color: #1a1a1a;
+          text-align: center;
+        }
+
+        .featured-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+          gap: 24px;
+          max-width: 1180px;
+          margin: 0 auto;
+        }
+
+        /* Home Card Styles */
+        .home-card {
+          background: white;
+          border-radius: 16px;
+          overflow: hidden;
+          border: 1px solid #e5e7eb;
+          box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .home-card:hover {
+          box-shadow: 0 16px 32px rgba(124, 58, 237, 0.15);
+          transform: translateY(-8px);
+          border-color: #7c3aed;
+        }
+
+        .home-card-image {
+          position: relative;
+          width: 100%;
+          height: 200px;
+          overflow: hidden;
+          background: #f3f4f6;
+        }
+
+        .home-card-image img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: transform 0.4s ease;
+        }
+
+        .home-card:hover .home-card-image img {
+          transform: scale(1.08);
+        }
+
+        .home-card-favorite {
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          background: rgba(255, 255, 255, 0.92);
+          border: none;
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          cursor: pointer;
+          font-size: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+          transition: all 0.3s ease;
+          z-index: 3;
+        }
+
+        .home-card-favorite:hover:not(:disabled) {
+          transform: scale(1.12);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .home-card-favorite:disabled {
+          opacity: 0.6;
+        }
+
+        .home-card-content {
+          padding: 16px;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .home-card-title {
+          font-size: 16px;
+          font-weight: 700;
+          color: #1a1a1a;
+          margin: 0 0 6px 0;
+          line-height: 1.35;
+        }
+
+        .home-card-vendor {
+          font-size: 13px;
+          color: #7c3aed;
+          margin: 0 0 12px 0;
+          font-weight: 600;
+        }
+
+        .home-card-stats {
+          display: flex;
+          gap: 16px;
+          margin-bottom: 12px;
+          padding-bottom: 12px;
+          border-bottom: 1px solid #f0f0f0;
+        }
+
+        .home-card-stats .stat {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .stat-label {
+          font-size: 11px;
+          color: #999;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: 0.02em;
+        }
+
+        .stat-value {
+          font-size: 15px;
+          font-weight: 700;
+          color: #1a1a1a;
+        }
+
+        .home-card-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          gap: 12px;
+          margin-top: auto;
+        }
+
+        .home-card-price {
+          flex: 1;
+        }
+
+        .price-text {
+          font-size: 11px;
+          color: #999;
+          font-weight: 500;
+          margin-bottom: 4px;
+        }
+
+        .price-amount {
+          font-size: 15px;
+          font-weight: 700;
+          color: #7c3aed;
+          line-height: 1.2;
+        }
+
+        .btn-home-detail {
+          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          color: white;
+          border: none;
+          padding: 8px 14px;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+
+        .btn-home-detail:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+        }
+
+        .btn-home-detail:active {
+          transform: translateY(0);
+        }
+
+        @media (max-width: 768px) {
+          .featured-section {
+            padding: 40px 20px;
+          }
+
+          .featured-section h2 {
+            font-size: 24px;
+            margin-bottom: 24px;
+          }
+
+          .featured-grid {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+          }
+
+          .home-card-image {
+            height: 160px;
+          }
         }
 
         /* Refined Card Styles */
