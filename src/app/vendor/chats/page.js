@@ -151,6 +151,11 @@ export default function VendorChatsPage() {
       return;
     }
 
+    const vendorId = selectedChat.vendorId;
+    const customerId = selectedChat.customerId;
+    const vendorName = selectedChat.vendorName;
+    const customerName = selectedChat.customerName;
+
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -158,10 +163,12 @@ export default function VendorChatsPage() {
         body: JSON.stringify({
           serviceId: selectedChat.serviceId,
           serviceTitle: selectedChat.serviceTitle,
-          vendorId: user.id,
-          vendorName: user.vendorName || user.name,
-          customerId: selectedChat.customerId,
-          customerName: selectedChat.customerName,
+          itemId: selectedChat.itemId || null,
+          itemName: selectedChat.itemName || null,
+          vendorId,
+          vendorName,
+          customerId,
+          customerName,
           message: newMessage,
           senderId: user.id,
           senderName: user.vendorName || user.name
