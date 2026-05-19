@@ -42,6 +42,7 @@ export default function HomePageClient() {
     priceRange: 'all',
     sortBy: 'recommended'
   });
+  const [activePromoIndex, setActivePromoIndex] = useState(0);
   const [userFavorites, setUserFavorites] = useState([]);
   const [favoriteLoading, setFavoriteLoading] = useState({});
   const [vendorReplyDrafts, setVendorReplyDrafts] = useState({});
@@ -308,6 +309,7 @@ export default function HomePageClient() {
     setDetailTab('packages');
     setSelectedItemDetail(null);
     setModalImageIndex(0);
+    setActivePromoIndex(0);
     setServiceReviews([]);
     setReviewsLoading(true);
     setReviewFilter('all');
@@ -346,6 +348,7 @@ export default function HomePageClient() {
     setSelectedService(null);
     setSelectedItemDetail(null);
     setModalImageIndex(0);
+    setActivePromoIndex(0);
     setServiceReviews([]);
     setReviewsLoading(false);
     setReviewFilter('all');
@@ -780,6 +783,39 @@ export default function HomePageClient() {
   );
 
   const filteredServices = getFilteredServices();
+  const visiblePromos = Array.isArray(promos)
+    ? promos.filter((promo) => Number(promo?.promoPrice) > 0)
+    : [];
+
+  const handlePromoCheckout = (promoId) => {
+    if (!promoId) return;
+    router.push(`/transaction/payment?promoId=${encodeURIComponent(promoId)}`);
+  };
+
+  const getPromosForService = (service) => {
+    if (!service) return [];
+    const serviceVendorId = service.vendorId ?? service.vendor?.id;
+    return visiblePromos
+      .filter((promo) => String(promo.vendorId) === String(serviceVendorId))
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  };
+
+  const selectedServicePromos = getPromosForService(selectedService);
+  const normalizedPromoIndex = selectedServicePromos.length > 0
+    ? ((activePromoIndex % selectedServicePromos.length) + selectedServicePromos.length) % selectedServicePromos.length
+    : 0;
+  const activeServicePromo = selectedServicePromos[normalizedPromoIndex] || null;
+
+  const showNextPromo = () => {
+    if (selectedServicePromos.length <= 1) return;
+    setActivePromoIndex((prev) => (prev + 1) % selectedServicePromos.length);
+  };
+
+  const showPrevPromo = () => {
+    if (selectedServicePromos.length <= 1) return;
+    setActivePromoIndex((prev) => (prev - 1 + selectedServicePromos.length) % selectedServicePromos.length);
+  };
+
   const specificationEntries = getNonEmptyObjectEntries(selectedService?.specifications);
   const descriptionTableEntries = getNonEmptyObjectEntries(selectedService?.descriptionTable);
   const variationEntries = getNonEmptyObjectEntries(selectedService?.variations);
@@ -1443,6 +1479,164 @@ export default function HomePageClient() {
                           <p style={{ color: '#999', textAlign: 'center', padding: '40px 0' }}>
                             Belum ada paket tersedia
                           </p>
+                        </div>
+                      )}
+
+                      {selectedServicePromos.length > 0 && (
+                        <div
+                          style={{
+                            marginTop: '20px',
+                            padding: '14px',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '14px',
+                            background: 'linear-gradient(135deg, #eff6ff, #f8fafc)'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#1d4ed8' }}>
+                              Promo Vendor
+                            </h4>
+                            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
+                              {selectedServicePromos.length} promo tersedia
+                            </span>
+                          </div>
+
+                          {activeServicePromo && (
+                            <div
+                              onWheel={(event) => {
+                                if (Math.abs(event.deltaX) < 8 && Math.abs(event.deltaY) < 8) return;
+                                if (event.deltaX > 0 || event.deltaY > 0) {
+                                  showNextPromo();
+                                } else {
+                                  showPrevPromo();
+                                }
+                              }}
+                              style={{
+                                border: '1px solid #dbeafe',
+                                borderRadius: '14px',
+                                background: 'white',
+                                overflow: 'hidden'
+                              }}
+                            >
+                              <div style={{ position: 'relative', height: '190px', background: '#e5e7eb' }}>
+                                <img
+                                  src={activeServicePromo.image || 'https://via.placeholder.com/800x500?text=Promo'}
+                                  alt={activeServicePromo.title || 'Promo'}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  onError={(event) => {
+                                    event.currentTarget.src = 'https://via.placeholder.com/800x500?text=Promo';
+                                  }}
+                                />
+
+                                {selectedServicePromos.length > 1 && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={showPrevPromo}
+                                      style={{
+                                        position: 'absolute',
+                                        left: '10px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        width: '34px',
+                                        height: '34px',
+                                        borderRadius: '999px',
+                                        border: 'none',
+                                        background: 'rgba(15, 23, 42, 0.55)',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontWeight: '800'
+                                      }}
+                                      aria-label="Promo sebelumnya"
+                                    >
+                                      ◀
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={showNextPromo}
+                                      style={{
+                                        position: 'absolute',
+                                        right: '10px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        width: '34px',
+                                        height: '34px',
+                                        borderRadius: '999px',
+                                        border: 'none',
+                                        background: 'rgba(15, 23, 42, 0.55)',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontWeight: '800'
+                                      }}
+                                      aria-label="Promo berikutnya"
+                                    >
+                                      ▶
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+
+                              <div style={{ padding: '14px' }}>
+                                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#64748b', fontWeight: '700' }}>
+                                  Promo {normalizedPromoIndex + 1} dari {selectedServicePromos.length}
+                                </p>
+                                <h4 style={{ margin: '0 0 6px 0', fontSize: '27px', lineHeight: '1.2', color: '#1f2937' }}>
+                                  {activeServicePromo.title || 'Promo Spesial'}
+                                </h4>
+                                <p style={{ margin: '0 0 10px 0', color: '#475569', fontSize: '14px', lineHeight: '1.45' }}>
+                                  {activeServicePromo.description || 'Promo vendor dengan harga spesial. Geser kiri atau kanan untuk melihat promo lain.'}
+                                </p>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                                  <div>
+                                    <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Harga Promo</p>
+                                    <p style={{ margin: 0, fontSize: '32px', fontWeight: '900', color: '#dc2626', lineHeight: '1.1' }}>
+                                      Rp {Number(activeServicePromo.promoPrice || 0).toLocaleString('id-ID')}
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePromoCheckout(activeServicePromo.id)}
+                                    style={{
+                                      border: 'none',
+                                      borderRadius: '10px',
+                                      background: '#2563eb',
+                                      color: '#fff',
+                                      padding: '11px 14px',
+                                      fontSize: '13px',
+                                      fontWeight: '700',
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    Ambil Promo
+                                  </button>
+                                </div>
+
+                                {selectedServicePromos.length > 1 && (
+                                  <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
+                                    {selectedServicePromos.map((promo, index) => (
+                                      <button
+                                        key={promo.id}
+                                        type="button"
+                                        onClick={() => setActivePromoIndex(index)}
+                                        style={{
+                                          width: '8px',
+                                          height: '8px',
+                                          borderRadius: '999px',
+                                          border: 'none',
+                                          cursor: 'pointer',
+                                          background: index === normalizedPromoIndex ? '#2563eb' : '#cbd5e1',
+                                          padding: 0
+                                        }}
+                                        aria-label={`Lihat promo ${index + 1}`}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </>
