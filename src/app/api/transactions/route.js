@@ -5,6 +5,7 @@ const transactionsFile = path.join(process.cwd(), 'transactions.json');
 const invoicesFile = path.join(process.cwd(), 'invoices.json');
 const dealsFile = path.join(process.cwd(), 'deals.json');
 const chatsFile = path.join(process.cwd(), 'chats.json');
+const promosFile = path.join(process.cwd(), 'promos.json');
 
 const buildRentalTimeline = (startDate, durationDays) => {
   const parsedStartDate = startDate ? new Date(`${startDate}T00:00:00.000Z`) : null;
@@ -31,6 +32,95 @@ const buildRentalTimeline = (startDate, durationDays) => {
   };
 };
 
+const parseDateOrNull = (value) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const normalizePromo = (promo) => {
+  const startAt = parseDateOrNull(promo.startAt);
+  const endAt = parseDateOrNull(promo.endAt);
+  const claimedUserIds = Array.isArray(promo.claimedUserIds)
+    ? promo.claimedUserIds.map((userId) => String(userId))
+    : [];
+  const maxApplicants = promo.maxApplicants === undefined || promo.maxApplicants === null || promo.maxApplicants === ''
+    ? null
+    : Number(promo.maxApplicants);
+  const claimedCount = Number.isFinite(Number(promo.claimedCount))
+    ? Number(promo.claimedCount)
+    : claimedUserIds.length;
+
+  return {
+    ...promo,
+    startAt: startAt ? startAt.toISOString() : (promo.startAt || null),
+    endAt: endAt ? endAt.toISOString() : (promo.endAt || null),
+    maxApplicants: Number.isFinite(maxApplicants) ? maxApplicants : null,
+    claimedCount,
+    claimedUserIds
+  };
+};
+
+const validatePromoAvailability = (promo, userId, transactions) => {
+  const now = Date.now();
+  const normalizedPromo = normalizePromo(promo);
+
+  if (normalizedPromo.active === false) {
+    return 'Promo sedang tidak aktif.';
+  }
+
+  if (normalizedPromo.startAt && new Date(normalizedPromo.startAt).getTime() > now) {
+    return 'Promo belum dimulai.';
+  }
+
+  if (normalizedPromo.endAt && new Date(normalizedPromo.endAt).getTime() <= now) {
+    return 'Promo sudah berakhir.';
+  }
+
+  if (Number.isFinite(normalizedPromo.maxApplicants) && normalizedPromo.claimedCount >= normalizedPromo.maxApplicants) {
+    return 'Kuota promo sudah habis.';
+  }
+
+  if (userId) {
+    const userKey = String(userId);
+    const hasClaimedBefore = normalizedPromo.claimedUserIds.includes(userKey) || transactions.some((transaction) =>
+      String(transaction.promoId) === String(normalizedPromo.id) &&
+      String(transaction.userId) === userKey &&
+      transaction.status === 'success'
+    );
+
+    if (hasClaimedBefore) {
+      return 'User hanya dapat menggunakan promo ini 1 kali.';
+    }
+  }
+
+  return null;
+};
+
+const markPromoClaimed = (promoId, userId) => {
+  if (!promoId || !userId) return;
+
+  ensurePromosFile();
+  const raw = fs.readFileSync(promosFile, 'utf-8');
+  const promos = JSON.parse(raw);
+  const promoIndex = promos.findIndex((item) => String(item.id) === String(promoId));
+
+  if (promoIndex === -1) return;
+
+  const promo = normalizePromo(promos[promoIndex]);
+  const userKey = String(userId);
+  const claimedUserIds = Array.from(new Set([...(promo.claimedUserIds || []), userKey]));
+
+  promos[promoIndex] = {
+    ...promos[promoIndex],
+    claimedUserIds,
+    claimedCount: claimedUserIds.length,
+    updatedAt: new Date().toISOString()
+  };
+
+  fs.writeFileSync(promosFile, JSON.stringify(promos, null, 2));
+};
+
 // Ensure JSON files exist
 const ensureTransactionsFile = () => {
   if (!fs.existsSync(transactionsFile)) {
@@ -47,6 +137,12 @@ const ensureInvoicesFile = () => {
 const ensureDealsFile = () => {
   if (!fs.existsSync(dealsFile)) {
     fs.writeFileSync(dealsFile, JSON.stringify([], null, 2));
+  }
+};
+
+const ensurePromosFile = () => {
+  if (!fs.existsSync(promosFile)) {
+    fs.writeFileSync(promosFile, JSON.stringify([], null, 2));
   }
 };
 
@@ -70,9 +166,45 @@ export async function POST(request) {
     ensureTransactionsFile();
     ensureInvoicesFile();
     ensureDealsFile();
+    ensurePromosFile();
     
     const transactionsData = fs.readFileSync(transactionsFile, 'utf-8');
     let transactions = JSON.parse(transactionsData);
+
+    // PROMO CHECK - Validate promo rules before writing the transaction
+    if (body.promoId) {
+      try {
+        const promosData = fs.readFileSync(promosFile, 'utf-8');
+        const promos = JSON.parse(promosData);
+        const promo = promos.find((item) => String(item.id) === String(body.promoId));
+
+        if (!promo) {
+          return Response.json({
+            success: false,
+            error: 'Promo tidak ditemukan',
+            message: 'Promo tidak ditemukan atau sudah dihapus.'
+          }, { status: 404 });
+        }
+
+        const promoError = validatePromoAvailability(promo, body.userId, transactions);
+        if (promoError) {
+          return Response.json({
+            success: false,
+            error: 'Promo tidak tersedia',
+            message: promoError,
+            status: 'promo_unavailable'
+          }, { status: 400 });
+        }
+      } catch (promoError) {
+        console.warn('Promo check warning:', promoError.message);
+        return Response.json({
+          success: false,
+          error: 'Promo tidak tersedia',
+          message: 'Gagal memvalidasi promo.',
+          status: 'promo_validation_failed'
+        }, { status: 400 });
+      }
+    }
     
     // AVAILABILITY CHECK - Validasi stok sebelum payment diproses
     if (body.serviceId && body.quantity && body.startDate) {
@@ -218,6 +350,14 @@ export async function POST(request) {
     
     // Write transaction
     fs.writeFileSync(transactionsFile, JSON.stringify(transactions, null, 2));
+
+    if (body.promoId && body.status === 'success') {
+      try {
+        markPromoClaimed(body.promoId, body.userId);
+      } catch (promoWriteError) {
+        console.warn('Could not update promo claim state:', promoWriteError);
+      }
+    }
 
     let currentDeal = null;
     try {
