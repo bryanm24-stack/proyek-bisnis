@@ -43,6 +43,7 @@ export default function HomePageClient() {
     sortBy: 'recommended'
   });
   const [activePromoIndex, setActivePromoIndex] = useState(0);
+  const [promoNow, setPromoNow] = useState(Date.now());
   const [userFavorites, setUserFavorites] = useState([]);
   const [favoriteLoading, setFavoriteLoading] = useState({});
   const [vendorReplyDrafts, setVendorReplyDrafts] = useState({});
@@ -135,7 +136,11 @@ export default function HomePageClient() {
 
     const fetchPromos = async () => {
       try {
-        const response = await fetch('/api/promos?active=true', { cache: 'no-store' });
+        const cachedUser = JSON.parse(localStorage.getItem('user') || 'null');
+        const promoQuery = cachedUser?.id
+          ? `/api/promos?active=true&userId=${encodeURIComponent(cachedUser.id)}`
+          : '/api/promos?active=true';
+        const response = await fetch(promoQuery, { cache: 'no-store' });
         const data = await response.json();
         if (data.success) {
           setPromos(Array.isArray(data.data) ? data.data : []);
@@ -155,6 +160,11 @@ export default function HomePageClient() {
       clearInterval(serviceInterval);
       clearInterval(promoInterval);
     };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setPromoNow(Date.now()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   // Fetch notifications for current user
@@ -789,6 +799,28 @@ export default function HomePageClient() {
 
   const handlePromoCheckout = (promoId) => {
     if (!promoId) return;
+    if (!user) {
+      alert('Silakan login terlebih dahulu untuk mengambil promo.');
+      return;
+    }
+
+    const promo = selectedServicePromos.find((item) => String(item.id) === String(promoId));
+    if (promo?.userHasClaimed) {
+      alert('Promo ini hanya bisa dipakai 1 kali per user.');
+      return;
+    }
+
+    const remainingApplicants = getPromoRemainingApplicants(promo);
+    if (Number.isFinite(remainingApplicants) && remainingApplicants <= 0) {
+      alert('Kuota promo sudah habis.');
+      return;
+    }
+
+    if (promo?.endAt && new Date(promo.endAt).getTime() <= promoNow) {
+      alert('Promo sudah berakhir.');
+      return;
+    }
+
     router.push(`/transaction/payment?promoId=${encodeURIComponent(promoId)}`);
   };
 
@@ -800,11 +832,48 @@ export default function HomePageClient() {
       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   };
 
+  const getPromoCountdownLabel = (promo) => {
+    if (!promo?.endAt) return 'Tanpa batas waktu';
+
+    const endTime = new Date(promo.endAt).getTime();
+    if (Number.isNaN(endTime)) return 'Tanpa batas waktu';
+
+    const diff = endTime - promoNow;
+    if (diff <= 0) return 'Berakhir';
+
+    const totalSeconds = Math.floor(diff / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${days > 0 ? `${days}d ` : ''}${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`.trim();
+  };
+
+  const getPromoRemainingApplicants = (promo) => {
+    if (Number.isFinite(Number(promo?.remainingApplicants))) {
+      return Number(promo.remainingApplicants);
+    }
+
+    if (Number.isFinite(Number(promo?.maxApplicants)) && Number.isFinite(Number(promo?.claimedCount))) {
+      return Math.max(0, Number(promo.maxApplicants) - Number(promo.claimedCount));
+    }
+
+    return null;
+  };
+
   const selectedServicePromos = getPromosForService(selectedService);
   const normalizedPromoIndex = selectedServicePromos.length > 0
     ? ((activePromoIndex % selectedServicePromos.length) + selectedServicePromos.length) % selectedServicePromos.length
     : 0;
   const activeServicePromo = selectedServicePromos[normalizedPromoIndex] || null;
+  const activeServicePromoRemainingApplicants = getPromoRemainingApplicants(activeServicePromo);
+  const activeServicePromoIsExpired = Boolean(activeServicePromo?.endAt && new Date(activeServicePromo.endAt).getTime() <= promoNow);
+  const activeServicePromoIsClaimed = Boolean(activeServicePromo?.userHasClaimed);
+  const activeServicePromoCanCheckout = Boolean(activeServicePromo)
+    && !activeServicePromoIsExpired
+    && !activeServicePromoIsClaimed
+    && (activeServicePromoRemainingApplicants === null || activeServicePromoRemainingApplicants > 0);
 
   const showNextPromo = () => {
     if (selectedServicePromos.length <= 1) return;
@@ -1593,23 +1662,33 @@ export default function HomePageClient() {
                                     <p style={{ margin: 0, fontSize: '32px', fontWeight: '900', color: '#dc2626', lineHeight: '1.1' }}>
                                       Rp {Number(activeServicePromo.promoPrice || 0).toLocaleString('id-ID')}
                                     </p>
+                                    <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '12px', color: '#475569' }}>
+                                      <span>⏳ {getPromoCountdownLabel(activeServicePromo)}</span>
+                                      <span>
+                                        👤 {activeServicePromoRemainingApplicants === null
+                                          ? 'Kuota tidak dibatasi'
+                                          : `${activeServicePromoRemainingApplicants} kuota tersisa`}
+                                      </span>
+                                      {activeServicePromoIsClaimed && <span>1x/user</span>}
+                                    </div>
                                   </div>
                                   <button
                                     type="button"
                                     onClick={() => handlePromoCheckout(activeServicePromo.id)}
+                                    disabled={!activeServicePromoCanCheckout}
                                     style={{
                                       border: 'none',
                                       borderRadius: '10px',
-                                      background: '#2563eb',
-                                      color: '#fff',
+                                      background: activeServicePromoCanCheckout ? '#2563eb' : '#cbd5e1',
+                                      color: activeServicePromoCanCheckout ? '#fff' : '#64748b',
                                       padding: '11px 14px',
                                       fontSize: '13px',
                                       fontWeight: '700',
-                                      cursor: 'pointer',
+                                      cursor: activeServicePromoCanCheckout ? 'pointer' : 'not-allowed',
                                       whiteSpace: 'nowrap'
                                     }}
                                   >
-                                    Ambil Promo
+                                    {activeServicePromoCanCheckout ? 'Ambil Promo' : 'Promo Tidak Tersedia'}
                                   </button>
                                 </div>
 

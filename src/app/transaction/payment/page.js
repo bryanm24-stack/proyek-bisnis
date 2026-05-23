@@ -9,6 +9,7 @@ function PaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const dealId = searchParams.get('dealId');
+  const promoId = searchParams.get('promoId');
 
   const [user, setUser] = useState(null);
   const [deal, setDeal] = useState(null);
@@ -31,6 +32,8 @@ function PaymentContent() {
   const [cardErrors, setCardErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedPromo, setSelectedPromo] = useState(null); // ✅ NEW: Promo yang dipilih dari home
+  const [promoError, setPromoError] = useState('');
+  const [promoNow, setPromoNow] = useState(Date.now());
   const [paymentType, setPaymentType] = useState('full'); // 'full' or 'pay_after'
   const [availabilityCheck, setAvailabilityCheck] = useState(null); // null, 'checking', 'available', 'unavailable'
   const [availabilityMessage, setAvailabilityMessage] = useState('');
@@ -49,6 +52,24 @@ function PaymentContent() {
 
   const [qrCode] = useState(generateRandomQR());
 
+  const formatPromoCountdown = (endAt) => {
+    if (!endAt) return null;
+
+    const endTime = new Date(endAt).getTime();
+    if (Number.isNaN(endTime)) return null;
+
+    const diff = Math.max(0, endTime - promoNow);
+    if (diff <= 0) return '00h 00m 00s';
+
+    const totalSeconds = Math.floor(diff / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${days > 0 ? `${days}d ` : ''}${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`.trim();
+  };
+
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (!userData) {
@@ -63,9 +84,6 @@ function PaymentContent() {
       router.push('/');
       return;
     }
-
-    // ✅ NEW: Handle promo dari URL
-    const promoId = searchParams.get('promoId');
 
     const verificationRaw = localStorage.getItem('verificationData');
 
@@ -84,7 +102,7 @@ function PaymentContent() {
     if (promoId) {
       const fetchPromoData = async () => {
         try {
-          const response = await fetch(`/api/promos`);
+          const response = await fetch(`/api/promos?promoId=${encodeURIComponent(promoId)}&userId=${encodeURIComponent(parsedUser.id)}`, { cache: 'no-store' });
           if (!response.ok) throw new Error('Failed to fetch promos');
           
           const result = await response.json();
@@ -95,17 +113,31 @@ function PaymentContent() {
             : null;
 
           if (foundPromo) {
+            setPromoError('');
             setSelectedPromo({
               id: foundPromo.id,
               title: foundPromo.title,
               price: foundPromo.promoPrice,
               image: foundPromo.image,
               description: foundPromo.description,
-              vendorName: foundPromo.vendorName
+              vendorName: foundPromo.vendorName,
+              startAt: foundPromo.startAt || null,
+              endAt: foundPromo.endAt || null,
+              maxApplicants: foundPromo.maxApplicants ?? null,
+              claimedCount: Number(foundPromo.claimedCount || 0),
+              remainingApplicants: foundPromo.remainingApplicants ?? null,
+              userHasClaimed: Boolean(foundPromo.userHasClaimed),
+              isActiveNow: Boolean(foundPromo.isActiveNow),
+              claimLimitPerUser: Number(foundPromo.claimLimitPerUser || 1)
             });
+          } else {
+            setSelectedPromo(null);
+            setPromoError('Promo tidak ditemukan atau sudah tidak tersedia.');
           }
         } catch (error) {
           console.error('Error fetching promo:', error);
+          setSelectedPromo(null);
+          setPromoError('Gagal memuat promo. Silakan coba lagi.');
         } finally {
           setIsLoading(false);
         }
@@ -172,6 +204,16 @@ function PaymentContent() {
     }
   }, [router, dealId, searchParams]);
 
+  useEffect(() => {
+    if (!selectedPromo?.endAt) return undefined;
+
+    const interval = setInterval(() => {
+      setPromoNow(Date.now());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [selectedPromo]);
+
   const handleCardPhotoUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -215,6 +257,23 @@ function PaymentContent() {
 
     const isJasaService = service?.type === 'jasa' || deal?.serviceType === 'jasa' || deal?.type === 'jasa';
 
+    if (selectedPromo) {
+      if (selectedPromo.userHasClaimed) {
+        alert('Promo ini hanya bisa dipakai 1 kali per user.');
+        return;
+      }
+
+      if (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() <= promoNow) {
+        alert('Promo sudah berakhir.');
+        return;
+      }
+
+      if (Number.isFinite(Number(selectedPromo.remainingApplicants)) && Number(selectedPromo.remainingApplicants) <= 0) {
+        alert('Kuota promo sudah habis.');
+        return;
+      }
+    }
+
     // ✅ NEW: Skip availability check untuk promo
     if (!selectedPromo) {
       // AVAILABILITY CHECK - Validasi ketersediaan sebelum payment (hanya untuk deal)
@@ -251,11 +310,11 @@ function PaymentContent() {
         dealId: selectedPromo ? null : dealId,
         promoId: selectedPromo ? selectedPromo.id : null,
         userId: user.id,
-        serviceId: deal?.serviceId || deal?.id,
+        serviceId: selectedPromo ? null : (deal?.serviceId || deal?.id),
         // ✅ NEW: Track selected item
-        itemId: selectedItem?.id || null,
-        itemName: selectedItem?.name || null,
-        itemPrice: selectedItem?.price || basePrice,
+        itemId: selectedPromo ? null : (selectedItem?.id || null),
+        itemName: selectedPromo ? null : (selectedItem?.name || null),
+        itemPrice: selectedPromo ? null : (selectedItem?.price || basePrice),
         paymentMethod: paymentMethod,
         basePrice: basePrice,
         quantity: selectedPromo ? 1 : quantity,
@@ -296,7 +355,13 @@ function PaymentContent() {
               price: selectedPromo.price,
               description: selectedPromo.description,
               image: selectedPromo.image,
-              vendorName: selectedPromo.vendorName
+              vendorName: selectedPromo.vendorName,
+              startAt: selectedPromo.startAt,
+              endAt: selectedPromo.endAt,
+              maxApplicants: selectedPromo.maxApplicants,
+              claimedCount: selectedPromo.claimedCount,
+              remainingApplicants: selectedPromo.remainingApplicants,
+              claimLimitPerUser: selectedPromo.claimLimitPerUser
             }
           : null,
         cardDetails: paymentMethod === 'card' ? {
@@ -429,7 +494,7 @@ function PaymentContent() {
     return (
       <div style={{ minHeight: '100vh', background: '#f5f3ff', padding: '40px' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto', background: 'white', padding: '40px', borderRadius: '12px', textAlign: 'center' }}>
-          <p style={{ fontSize: '18px', color: '#dc2626', fontWeight: '700', marginBottom: '16px' }}>❌ Promo atau deal tidak ditemukan</p>
+          <p style={{ fontSize: '18px', color: '#dc2626', fontWeight: '700', marginBottom: '16px' }}>{promoError || '❌ Promo atau deal tidak ditemukan'}</p>
           <button onClick={() => router.back()} style={{ padding: '12px 24px', background: '#7c3aed', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
             Kembali
           </button>
@@ -501,6 +566,10 @@ function PaymentContent() {
                           <div style={{ fontSize: '16px', fontWeight: '800', color: 'white' }}>
                             {selectedPromo.title}
                           </div>
+                          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px', fontSize: '12px', color: '#e2e8f0' }}>
+                            <span>⏳ {formatPromoCountdown(selectedPromo.endAt) || 'Tanpa batas waktu'}</span>
+                            <span>👤 {Number.isFinite(Number(selectedPromo.remainingApplicants)) ? `${selectedPromo.remainingApplicants} kuota tersisa` : 'Kuota tidak dibatasi'}</span>
+                          </div>
                         </div>
                       </>
                     )}
@@ -548,6 +617,9 @@ function PaymentContent() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                       <span style={{ fontSize: '24px' }}>✨</span>
                       <span style={{ fontSize: '18px', fontWeight: '800', color: '#dc2626' }}>PROMO SPESIAL</span>
+                      <span style={{ fontSize: '12px', fontWeight: '800', background: selectedPromo.userHasClaimed ? '#fee2e2' : '#dcfce7', color: selectedPromo.userHasClaimed ? '#b91c1c' : '#166534', padding: '6px 10px', borderRadius: '999px' }}>
+                        {selectedPromo.userHasClaimed ? 'Sudah dipakai' : (selectedPromo.isActiveNow ? 'Aktif' : 'Tidak aktif')}
+                      </span>
                     </div>
 
                     <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1f2937', marginBottom: '12px', lineHeight: '1.3' }}>
@@ -561,13 +633,33 @@ function PaymentContent() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', paddingTop: '24px', borderTop: '1px solid #e5e7eb' }}>
                       <div>
                         <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '6px' }}>Status</div>
-                        <div style={{ fontSize: '16px', fontWeight: '700', color: '#16a34a' }}>✅ Tersedia</div>
+                        <div style={{ fontSize: '16px', fontWeight: '700', color: selectedPromo.userHasClaimed ? '#dc2626' : '#16a34a' }}>
+                          {selectedPromo.userHasClaimed ? '⛔ Pernah dipakai' : (selectedPromo.isActiveNow ? '✅ Tersedia' : '⛔ Tidak aktif')}
+                        </div>
                       </div>
                       <div>
                         <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '6px' }}>Vendor</div>
                         <div style={{ fontSize: '16px', fontWeight: '700', color: '#1f2937' }}>{selectedPromo?.vendorName || 'Vendor'}</div>
                       </div>
+                      <div>
+                        <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '6px' }}>Tanggal Promo</div>
+                        <div style={{ fontSize: '14px', fontWeight: '700', color: '#1f2937' }}>
+                          {selectedPromo.startAt ? new Date(selectedPromo.startAt).toLocaleDateString('id-ID') : 'Mulai sekarang'} - {selectedPromo.endAt ? new Date(selectedPromo.endAt).toLocaleDateString('id-ID') : 'Tanpa batas'}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '6px' }}>Kuota</div>
+                        <div style={{ fontSize: '14px', fontWeight: '700', color: '#1f2937' }}>
+                          {Number.isFinite(Number(selectedPromo.maxApplicants)) ? `${selectedPromo.claimedCount || 0} / ${selectedPromo.maxApplicants}` : 'Tidak dibatasi'}
+                        </div>
+                      </div>
                     </div>
+
+                    {selectedPromo.userHasClaimed && (
+                      <div style={{ marginTop: '18px', padding: '14px 16px', borderRadius: '10px', background: '#fef2f2', color: '#991b1b', fontSize: '14px', fontWeight: '600' }}>
+                        Promo ini hanya bisa digunakan satu kali per user. Silakan pilih promo lain.
+                      </div>
+                    )}
                   </>
                 ) : null}
               </div>
@@ -580,6 +672,23 @@ function PaymentContent() {
                   // PROMO FLOW - Simplified
                   <div>
                     <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>Promo siap untuk dibeli dengan harga spesial</p>
+
+                    <div style={{ marginBottom: '20px', padding: '14px', border: '1px solid #ddd6fe', borderRadius: '12px', background: '#faf5ff' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                        <div>
+                          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Timer promo</div>
+                          <div style={{ fontSize: '18px', fontWeight: '900', color: '#7c3aed' }}>{formatPromoCountdown(selectedPromo.endAt) || 'Tanpa batas waktu'}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Sisa kuota</div>
+                          <div style={{ fontSize: '18px', fontWeight: '900', color: '#7c3aed' }}>{Number.isFinite(Number(selectedPromo.remainingApplicants)) ? selectedPromo.remainingApplicants : 'Tidak dibatasi'}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Limit user</div>
+                          <div style={{ fontSize: '18px', fontWeight: '900', color: '#7c3aed' }}>1x</div>
+                        </div>
+                      </div>
+                    </div>
                     
                     {/* Catatan untuk Promo */}
                     <div style={{ marginBottom: '20px' }}>
@@ -588,7 +697,7 @@ function PaymentContent() {
                     </div>
 
                     {/* Continue Button */}
-                    <button onClick={() => setStep('payment')} style={{ width: '100%', padding: '14px 16px', background: '#7c3aed', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '16px', cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={(e) => e.target.style.background = '#6d28d9'} onMouseLeave={(e) => e.target.style.background = '#7c3aed'}>
+                    <button onClick={() => setStep('payment')} disabled={selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() <= promoNow)} style={{ width: '100%', padding: '14px 16px', background: (selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() <= promoNow)) ? '#c4b5fd' : '#7c3aed', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '16px', cursor: (selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() <= promoNow)) ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }} onMouseEnter={(e) => { if (!(selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() <= promoNow))) e.target.style.background = '#6d28d9'; }} onMouseLeave={(e) => { if (!(selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() <= promoNow))) e.target.style.background = '#7c3aed'; }}>
                       Lanjut ke Pembayaran →
                     </button>
                   </div>
