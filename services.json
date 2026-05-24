@@ -16,7 +16,7 @@
     "minimumDays": 4,
     "quantity": 3,
     "rentalPolicy": "Pembayaran 50% di awal, 50% di hari acara. Biaya tambahan untuk venue di luar Jakarta Rp 500.000 per jam perjalanan.",
-    "location": "Jakarta Selatan, Indonesia",
+    "location": "Surabaya, Indonesia",
     "rating": 4.8,
     "rentCount": 24,
     "images": [
@@ -60,7 +60,7 @@
       "descWorkflow": "Konsultasi awal → Pre-shoot planning → Dokumentasi hari H → Editing & Color grading → Delivery soft copy",
       "descDeliverable": "Minimal 500 foto terseleksi dalam resolusi tinggi, 2-3 video cinematic, soft copy dalam drive cloud",
       "descRevision": "Unlimited editing revision untuk kepuasan klien",
-      "descOperationalArea": "Jakarta, Bogor, Depok, Tangerang. Tersedia jasa ke luar kota dengan biaya tambahan."
+      "descOperationalArea": "Surabaya dan sekitarnya. Tersedia jasa ke luar kota dengan biaya tambahan."
     },
     "checklist": {
       "Portofolio/riwayat kerja tersedia": true,
@@ -121,7 +121,7 @@
     "minimumDays": 1,
     "quantity": 5,
     "rentalPolicy": "Konsultasi gratis. Pembayaran 40% untuk booking, 60% sebelum hari H. Biaya dibatalkan jika klien membatalkan 7 hari sebelumnya.",
-    "location": "Bintaro, Jakarta Selatan",
+    "location": "Surabaya, Indonesia",
     "rating": 4.6,
     "rentCount": 18,
     "images": [
@@ -168,7 +168,7 @@
       "descWorkflow": "Konsultasi tema → Design preview → Persiapan material → Setup hari H → Dokumentasi → Takedown",
       "descDeliverable": "Dekorasi lengkap, dokumentasi foto setup, konsultasi tema gratis",
       "descRevision": "Revisi konsep hingga klien puas sebelum eksekusi",
-      "descOperationalArea": "Jakarta, Tangerang, Bogor untuk jangkauan maksimal"
+      "descOperationalArea": "Surabaya dan sekitarnya untuk jangkauan maksimal"
     },
     "checklist": {
       "Portofolio/riwayat kerja tersedia": true,
@@ -218,7 +218,7 @@
     "price": 50000,
     "minimumDays": 1,
     "rentalPolicy": "Biaya sewa per unit per hari. Garansi uang kembali jika ada kerusakan pabrik. Denda Rp 50.000 untuk kerusakan akibat penyewaan.",
-    "location": "Kebayoran Baru, Jakarta Selatan",
+    "location": "Surabaya, Indonesia",
     "rating": 4.7,
     "rentCount": 45,
     "images": [
@@ -269,7 +269,7 @@
       "descCondition": "Semua kursi dan meja dalam kondisi prima, bersih, dan terawat",
       "descCompleteness": "Kursi dengan bantalan empuk, meja dengan permukaan rata dan stabil",
       "descUsageRules": "Hanya untuk acara indoor maupun outdoor. Hindari beban lebih dari kapasitas maksimal. Pembersih yang lembut saja.",
-      "descDelivery": "Pengiriman dan pemasangan gratis untuk area Jakarta. Pickup juga tersedia.",
+      "descDelivery": "Pengiriman dan pemasangan gratis untuk area Surabaya. Pickup juga tersedia.",
       "descDamagePolicy": "Kerusakan parah dihitung 30-50% dari harga sewa. Kehilangan barang diperhitungkan 100%."
     },
     "checklist": {

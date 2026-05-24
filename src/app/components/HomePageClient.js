@@ -43,6 +43,8 @@ export default function HomePageClient() {
     priceRange: 'all',
     sortBy: 'recommended'
   });
+  const [activePromoIndex, setActivePromoIndex] = useState(0);
+  const [promoNow, setPromoNow] = useState(Date.now());
   const [userFavorites, setUserFavorites] = useState([]);
   const [favoriteLoading, setFavoriteLoading] = useState({});
   const [vendorReplyDrafts, setVendorReplyDrafts] = useState({});
@@ -135,7 +137,11 @@ export default function HomePageClient() {
 
     const fetchPromos = async () => {
       try {
-        const response = await fetch('/api/promos?active=true', { cache: 'no-store' });
+        const cachedUser = JSON.parse(localStorage.getItem('user') || 'null');
+        const promoQuery = cachedUser?.id
+          ? `/api/promos?active=true&userId=${encodeURIComponent(cachedUser.id)}`
+          : '/api/promos?active=true';
+        const response = await fetch(promoQuery, { cache: 'no-store' });
         const data = await response.json();
         if (data.success) {
           setPromos(Array.isArray(data.data) ? data.data : []);
@@ -157,17 +163,10 @@ export default function HomePageClient() {
     };
   }, []);
 
-  const featuredServices = services.slice(0, 4);
-
   useEffect(() => {
-    if (featuredServices.length === 0) return;
-
-    const interval = setInterval(() => {
-      setHeroImageIndex((prev) => (prev + 1) % featuredServices.length);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [featuredServices.length]);
+    const timer = setInterval(() => setPromoNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Fetch notifications for current user
   useEffect(() => {
@@ -321,6 +320,7 @@ export default function HomePageClient() {
     setDetailTab('packages');
     setSelectedItemDetail(null);
     setModalImageIndex(0);
+    setActivePromoIndex(0);
     setServiceReviews([]);
     setReviewsLoading(true);
     setReviewFilter('all');
@@ -359,6 +359,7 @@ export default function HomePageClient() {
     setSelectedService(null);
     setSelectedItemDetail(null);
     setModalImageIndex(0);
+    setActivePromoIndex(0);
     setServiceReviews([]);
     setReviewsLoading(false);
     setReviewFilter('all');
@@ -793,6 +794,98 @@ export default function HomePageClient() {
   );
 
   const filteredServices = getFilteredServices();
+  const visiblePromos = Array.isArray(promos)
+    ? promos.filter((promo) => Number(promo?.promoPrice) > 0)
+    : [];
+
+  const handlePromoCheckout = (promoId) => {
+    if (!promoId) return;
+    if (!user) {
+      alert('Silakan login terlebih dahulu untuk mengambil promo.');
+      return;
+    }
+
+    const promo = selectedServicePromos.find((item) => String(item.id) === String(promoId));
+    if (promo?.userHasClaimed) {
+      alert('Promo ini hanya bisa dipakai 1 kali per user.');
+      return;
+    }
+
+    const remainingApplicants = getPromoRemainingApplicants(promo);
+    if (Number.isFinite(remainingApplicants) && remainingApplicants <= 0) {
+      alert('Kuota promo sudah habis.');
+      return;
+    }
+
+    if (promo?.endAt && new Date(promo.endAt).getTime() <= promoNow) {
+      alert('Promo sudah berakhir.');
+      return;
+    }
+
+    router.push(`/transaction/payment?promoId=${encodeURIComponent(promoId)}`);
+  };
+
+  const getPromosForService = (service) => {
+    if (!service) return [];
+    const serviceVendorId = service.vendorId ?? service.vendor?.id;
+    return visiblePromos
+      .filter((promo) => String(promo.vendorId) === String(serviceVendorId))
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  };
+
+  const getPromoCountdownLabel = (promo) => {
+    if (!promo?.endAt) return 'Tanpa batas waktu';
+
+    const endTime = new Date(promo.endAt).getTime();
+    if (Number.isNaN(endTime)) return 'Tanpa batas waktu';
+
+    const diff = endTime - promoNow;
+    if (diff <= 0) return 'Berakhir';
+
+    const totalSeconds = Math.floor(diff / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${days > 0 ? `${days}d ` : ''}${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`.trim();
+  };
+
+  const getPromoRemainingApplicants = (promo) => {
+    if (Number.isFinite(Number(promo?.remainingApplicants))) {
+      return Number(promo.remainingApplicants);
+    }
+
+    if (Number.isFinite(Number(promo?.maxApplicants)) && Number.isFinite(Number(promo?.claimedCount))) {
+      return Math.max(0, Number(promo.maxApplicants) - Number(promo.claimedCount));
+    }
+
+    return null;
+  };
+
+  const selectedServicePromos = getPromosForService(selectedService);
+  const normalizedPromoIndex = selectedServicePromos.length > 0
+    ? ((activePromoIndex % selectedServicePromos.length) + selectedServicePromos.length) % selectedServicePromos.length
+    : 0;
+  const activeServicePromo = selectedServicePromos[normalizedPromoIndex] || null;
+  const activeServicePromoRemainingApplicants = getPromoRemainingApplicants(activeServicePromo);
+  const activeServicePromoIsExpired = Boolean(activeServicePromo?.endAt && new Date(activeServicePromo.endAt).getTime() <= promoNow);
+  const activeServicePromoIsClaimed = Boolean(activeServicePromo?.userHasClaimed);
+  const activeServicePromoCanCheckout = Boolean(activeServicePromo)
+    && !activeServicePromoIsExpired
+    && !activeServicePromoIsClaimed
+    && (activeServicePromoRemainingApplicants === null || activeServicePromoRemainingApplicants > 0);
+
+  const showNextPromo = () => {
+    if (selectedServicePromos.length <= 1) return;
+    setActivePromoIndex((prev) => (prev + 1) % selectedServicePromos.length);
+  };
+
+  const showPrevPromo = () => {
+    if (selectedServicePromos.length <= 1) return;
+    setActivePromoIndex((prev) => (prev - 1 + selectedServicePromos.length) % selectedServicePromos.length);
+  };
+
   const specificationEntries = getNonEmptyObjectEntries(selectedService?.specifications);
   const descriptionTableEntries = getNonEmptyObjectEntries(selectedService?.descriptionTable);
   const variationEntries = getNonEmptyObjectEntries(selectedService?.variations);
@@ -1531,6 +1624,174 @@ export default function HomePageClient() {
                           <p style={{ color: '#999', textAlign: 'center', padding: '40px 0' }}>
                             Belum ada paket tersedia
                           </p>
+                        </div>
+                      )}
+
+                      {selectedServicePromos.length > 0 && (
+                        <div
+                          style={{
+                            marginTop: '20px',
+                            padding: '14px',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '14px',
+                            background: 'linear-gradient(135deg, #eff6ff, #f8fafc)'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#1d4ed8' }}>
+                              Promo Vendor
+                            </h4>
+                            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
+                              {selectedServicePromos.length} promo tersedia
+                            </span>
+                          </div>
+
+                          {activeServicePromo && (
+                            <div
+                              onWheel={(event) => {
+                                if (Math.abs(event.deltaX) < 8 && Math.abs(event.deltaY) < 8) return;
+                                if (event.deltaX > 0 || event.deltaY > 0) {
+                                  showNextPromo();
+                                } else {
+                                  showPrevPromo();
+                                }
+                              }}
+                              style={{
+                                border: '1px solid #dbeafe',
+                                borderRadius: '14px',
+                                background: 'white',
+                                overflow: 'hidden'
+                              }}
+                            >
+                              <div style={{ position: 'relative', height: '190px', background: '#e5e7eb' }}>
+                                <img
+                                  src={activeServicePromo.image || 'https://via.placeholder.com/800x500?text=Promo'}
+                                  alt={activeServicePromo.title || 'Promo'}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  onError={(event) => {
+                                    event.currentTarget.src = 'https://via.placeholder.com/800x500?text=Promo';
+                                  }}
+                                />
+
+                                {selectedServicePromos.length > 1 && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={showPrevPromo}
+                                      style={{
+                                        position: 'absolute',
+                                        left: '10px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        width: '34px',
+                                        height: '34px',
+                                        borderRadius: '999px',
+                                        border: 'none',
+                                        background: 'rgba(15, 23, 42, 0.55)',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontWeight: '800'
+                                      }}
+                                      aria-label="Promo sebelumnya"
+                                    >
+                                      ◀
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={showNextPromo}
+                                      style={{
+                                        position: 'absolute',
+                                        right: '10px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        width: '34px',
+                                        height: '34px',
+                                        borderRadius: '999px',
+                                        border: 'none',
+                                        background: 'rgba(15, 23, 42, 0.55)',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontWeight: '800'
+                                      }}
+                                      aria-label="Promo berikutnya"
+                                    >
+                                      ▶
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+
+                              <div style={{ padding: '14px' }}>
+                                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#64748b', fontWeight: '700' }}>
+                                  Promo {normalizedPromoIndex + 1} dari {selectedServicePromos.length}
+                                </p>
+                                <h4 style={{ margin: '0 0 6px 0', fontSize: '27px', lineHeight: '1.2', color: '#1f2937' }}>
+                                  {activeServicePromo.title || 'Promo Spesial'}
+                                </h4>
+                                <p style={{ margin: '0 0 10px 0', color: '#475569', fontSize: '14px', lineHeight: '1.45' }}>
+                                  {activeServicePromo.description || 'Promo vendor dengan harga spesial. Geser kiri atau kanan untuk melihat promo lain.'}
+                                </p>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                                  <div>
+                                    <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Harga Promo</p>
+                                    <p style={{ margin: 0, fontSize: '32px', fontWeight: '900', color: '#dc2626', lineHeight: '1.1' }}>
+                                      Rp {Number(activeServicePromo.promoPrice || 0).toLocaleString('id-ID')}
+                                    </p>
+                                    <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '12px', color: '#475569' }}>
+                                      <span>⏳ {getPromoCountdownLabel(activeServicePromo)}</span>
+                                      <span>
+                                        👤 {activeServicePromoRemainingApplicants === null
+                                          ? 'Kuota tidak dibatasi'
+                                          : `${activeServicePromoRemainingApplicants} kuota tersisa`}
+                                      </span>
+                                      {activeServicePromoIsClaimed && <span>1x/user</span>}
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePromoCheckout(activeServicePromo.id)}
+                                    disabled={!activeServicePromoCanCheckout}
+                                    style={{
+                                      border: 'none',
+                                      borderRadius: '10px',
+                                      background: activeServicePromoCanCheckout ? '#2563eb' : '#cbd5e1',
+                                      color: activeServicePromoCanCheckout ? '#fff' : '#64748b',
+                                      padding: '11px 14px',
+                                      fontSize: '13px',
+                                      fontWeight: '700',
+                                      cursor: activeServicePromoCanCheckout ? 'pointer' : 'not-allowed',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    {activeServicePromoCanCheckout ? 'Ambil Promo' : 'Promo Tidak Tersedia'}
+                                  </button>
+                                </div>
+
+                                {selectedServicePromos.length > 1 && (
+                                  <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
+                                    {selectedServicePromos.map((promo, index) => (
+                                      <button
+                                        key={promo.id}
+                                        type="button"
+                                        onClick={() => setActivePromoIndex(index)}
+                                        style={{
+                                          width: '8px',
+                                          height: '8px',
+                                          borderRadius: '999px',
+                                          border: 'none',
+                                          cursor: 'pointer',
+                                          background: index === normalizedPromoIndex ? '#2563eb' : '#cbd5e1',
+                                          padding: 0
+                                        }}
+                                        aria-label={`Lihat promo ${index + 1}`}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </>

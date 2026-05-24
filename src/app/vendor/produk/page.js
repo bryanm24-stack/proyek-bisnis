@@ -20,7 +20,10 @@ export default function VendorProdukPage() {
     image: '',
     promoPrice: '',
     description: '',
-    active: true
+    active: true,
+    startAt: '',
+    endAt: '',
+    maxApplicants: ''
   });
   const [dragOver, setDragOver] = useState(false);
 
@@ -107,7 +110,10 @@ export default function VendorProdukPage() {
       image: '',
       promoPrice: '',
       description: '',
-      active: true
+      active: true,
+      startAt: '',
+      endAt: '',
+      maxApplicants: ''
     });
     setPromoMessage('');
     setPromoModalOpen(true);
@@ -173,7 +179,10 @@ export default function VendorProdukPage() {
           image: promoForm.image,
           promoPrice: Number.parseInt(promoForm.promoPrice, 10),
           description: promoForm.description,
-          active: promoForm.active
+          active: promoForm.active,
+          startAt: promoForm.startAt || null,
+          endAt: promoForm.endAt || null,
+          maxApplicants: promoForm.maxApplicants === '' ? null : Number.parseInt(promoForm.maxApplicants, 10)
         })
       });
 
@@ -615,6 +624,11 @@ export default function VendorProdukPage() {
                       <div style={{ fontSize: '16px', fontWeight: '800', color: 'white', lineHeight: '1.3' }}>
                         {promoForm.title}
                       </div>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px', fontSize: '12px', color: '#e2e8f0' }}>
+                          <span>⏳ {promoForm.endAt ? new Date(promoForm.endAt).toLocaleString('id-ID') : 'Tanpa batas waktu'}</span>
+                          <span>👤 {promoForm.maxApplicants ? `${promoForm.maxApplicants} kuota` : 'Kuota tidak dibatasi'}</span>
+                          <span>1x/user</span>
+                        </div>
                     </div>
                   </div>
                   
@@ -704,6 +718,42 @@ export default function VendorProdukPage() {
                   style={{ width: '100%', padding: '12px', border: '1px solid #d1d5db', borderRadius: '10px', fontSize: '14px' }}
                 />
                 <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>Harga final yang akan dibayar customer untuk promo ini</div>
+              </div>
+
+              {/* Limit Tanggal Promo */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>Mulai Promo</label>
+                  <input
+                    type="datetime-local"
+                    value={promoForm.startAt}
+                    onChange={(e) => setPromoForm(prev => ({ ...prev, startAt: e.target.value }))}
+                    style={{ width: '100%', padding: '12px', border: '1px solid #d1d5db', borderRadius: '10px', fontSize: '14px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>Selesai Promo</label>
+                  <input
+                    type="datetime-local"
+                    value={promoForm.endAt}
+                    onChange={(e) => setPromoForm(prev => ({ ...prev, endAt: e.target.value }))}
+                    style={{ width: '100%', padding: '12px', border: '1px solid #d1d5db', borderRadius: '10px', fontSize: '14px' }}
+                  />
+                </div>
+              </div>
+
+              {/* Limit Applicant */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>Limit Applicant</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={promoForm.maxApplicants}
+                  onChange={(e) => setPromoForm(prev => ({ ...prev, maxApplicants: e.target.value }))}
+                  placeholder="Contoh: 50"
+                  style={{ width: '100%', padding: '12px', border: '1px solid #d1d5db', borderRadius: '10px', fontSize: '14px' }}
+                />
+                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>Kosongkan jika kuota tidak dibatasi. User tetap hanya bisa klaim 1 kali.</div>
               </div>
 
               {/* Input Deskripsi Promo */}

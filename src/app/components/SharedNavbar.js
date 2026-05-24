@@ -51,6 +51,10 @@ export default function SharedNavbar() {
   const user = useSyncExternalStore(subscribeAuth, readUserFromStorage, () => null);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showReturns, setShowReturns] = useState(false);
+  const [returnItems, setReturnItems] = useState([]);
+  const [returnsLoading, setReturnsLoading] = useState(false);
+  const [returnsError, setReturnsError] = useState('');
   const router = useRouter();
   const pathname = usePathname();
 
@@ -72,6 +76,34 @@ export default function SharedNavbar() {
     return () => clearInterval(interval);
   }, [user]);
 
+  useEffect(() => {
+    if (!showReturns || !user) return;
+
+    const fetchReturns = async () => {
+      setReturnsLoading(true);
+      setReturnsError('');
+
+      try {
+        const response = await fetch(`/api/returns?userId=${user.id}&userRole=${user.role}`);
+        const data = await response.json();
+
+        if (!response.ok || data.success === false) {
+          throw new Error(data.message || 'Gagal memuat retur');
+        }
+
+        setReturnItems(Array.isArray(data.data) ? data.data : []);
+      } catch (error) {
+        console.error('Error fetching return items:', error);
+        setReturnItems([]);
+        setReturnsError(error.message || 'Gagal memuat retur');
+      } finally {
+        setReturnsLoading(false);
+      }
+    };
+
+    fetchReturns();
+  }, [showReturns, user]);
+
   const handleLogout = () => {
     localStorage.removeItem('user');
     window.dispatchEvent(new Event('auth-change'));
@@ -90,6 +122,11 @@ export default function SharedNavbar() {
 
   const isActive = (href) => {
     return pathname === href || pathname.startsWith(href + '/');
+  };
+
+  const closeReturnsModal = () => {
+    setShowReturns(false);
+    setReturnsError('');
   };
 
   if (!user) {
@@ -272,6 +309,23 @@ export default function SharedNavbar() {
 
       {/* Right Side - User Menu */}
       <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+        <button
+          onClick={() => setShowReturns(true)}
+          style={{
+            background: '#f8fafc',
+            color: '#374151',
+            border: '1px solid #d1d5db',
+            padding: '8px 12px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: '600'
+          }}
+          title="Lihat retur"
+        >
+          🧾 Retur
+        </button>
+
         {/* Notifications */}
         <div style={{ position: 'relative' }}>
           <button 
@@ -405,6 +459,128 @@ export default function SharedNavbar() {
           🚪 Logout
         </button>
       </div>
+
+      {showReturns && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.45)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '24px'
+        }} onClick={closeReturnsModal}>
+          <div style={{
+            width: 'min(720px, 100%)',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            background: '#ffffff',
+            borderRadius: '16px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+            border: '1px solid #e5e7eb'
+          }} onClick={(event) => event.stopPropagation()}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '18px 20px',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <div>
+                <div style={{ fontSize: '18px', fontWeight: '700', color: '#111827' }}>Barang Retur</div>
+                <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>
+                  Daftar retur untuk {user.role === 'vendor' ? 'vendor' : 'customer'} aktif
+                </div>
+              </div>
+              <button
+                onClick={closeReturnsModal}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '20px',
+                  cursor: 'pointer',
+                  color: '#6b7280'
+                }}
+                aria-label="Tutup retur"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: '20px' }}>
+              {returnsLoading ? (
+                <div style={{ textAlign: 'center', color: '#6b7280', padding: '24px 0' }}>
+                  Memuat data retur...
+                </div>
+              ) : returnsError ? (
+                <div style={{ textAlign: 'center', color: '#b91c1c', padding: '24px 0' }}>
+                  {returnsError}
+                </div>
+              ) : returnItems.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#6b7280', padding: '24px 0' }}>
+                  Tidak ada barang yang direturkan
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: '12px' }}>
+                  {returnItems.map((item) => {
+                    const statusLabel = item.returnStatus === 'completed'
+                      ? 'Selesai'
+                      : item.returnStatus === 'inspected'
+                        ? 'Sudah Diinspeksi'
+                        : item.returnStatus === 'pending_inspection'
+                          ? 'Menunggu Inspeksi'
+                          : item.returnStatus === 'returning'
+                            ? 'Sedang Retur'
+                            : 'Menunggu';
+
+                    return (
+                      <div key={item.id} style={{
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '12px',
+                        padding: '14px 16px',
+                        background: '#fafafa'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                          <div>
+                            <div style={{ fontWeight: '700', color: '#111827' }}>
+                              {item.service?.title || item.itemName || 'Item Retur'}
+                            </div>
+                            <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>
+                              {user.role === 'vendor'
+                                ? `Customer: ${item.otherUser?.name || item.customerName || '-'}`
+                                : `Vendor: ${item.otherUser?.name || item.vendorName || '-'}`}
+                            </div>
+                            <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>
+                              Tanggal retur: {item.actualReturnDate || '-'}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{
+                              display: 'inline-block',
+                              padding: '6px 10px',
+                              borderRadius: '999px',
+                              background: '#f3e8ff',
+                              color: '#7c3aed',
+                              fontSize: '12px',
+                              fontWeight: '700'
+                            }}>
+                              {statusLabel}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>
+                              Refund: Rp {(item.totalRefund || 0).toLocaleString('id-ID')}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
