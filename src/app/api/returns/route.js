@@ -4,6 +4,10 @@ import { NextResponse } from 'next/server';
 
 // Helpers: date-only UTC handling to avoid timezone off-by-one
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+async function readJsonFile(filePath) {
+  const fileData = await fs.readFile(filePath, 'utf-8');
+  return JSON.parse(fileData.replace(/^\uFEFF/, '').trim());
+}
 function toDateOnlyUTC(dateStr) {
   if (!dateStr) return null;
   const d = new Date(dateStr);
@@ -27,17 +31,74 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const dealId = searchParams.get('dealId');
+    const userId = searchParams.get('userId');
+    const userRole = searchParams.get('userRole');
 
-    if (!dealId) {
+    if (!dealId && (!userId || !userRole)) {
       return NextResponse.json({
         success: false,
-        message: 'dealId diperlukan'
+        message: 'dealId atau userId dan userRole diperlukan'
       }, { status: 400 });
     }
 
     const dealsPath = path.join(process.cwd(), 'deals.json');
-    const dealsData = await fs.readFile(dealsPath, 'utf-8');
-    const deals = JSON.parse(dealsData);
+    const servicesPath = path.join(process.cwd(), 'services.json');
+    const usersPath = path.join(process.cwd(), 'users.json');
+    const deals = await readJsonFile(dealsPath);
+    const services = await readJsonFile(servicesPath);
+    const users = await readJsonFile(usersPath);
+
+    if (userId && userRole) {
+      const normalizedUserId = String(userId);
+      const returnDeals = deals.filter((deal) => {
+        const matchesUser = userRole === 'vendor'
+          ? String(deal.vendorId) === normalizedUserId
+          : String(deal.customerId) === normalizedUserId;
+
+        const hasReturnActivity = Boolean(
+          deal.actualReturnDate ||
+          deal.itemCondition ||
+          deal.returnPhotos?.length ||
+          deal.damageDescription ||
+          deal.returnStatus === 'pending_inspection' ||
+          deal.returnStatus === 'inspected' ||
+          deal.returnStatus === 'completed' ||
+          deal.returnStatus === 'returning' ||
+          deal.refundStatus === 'pending_payment' ||
+          deal.refundStatus === 'processed'
+        );
+
+        return matchesUser && hasReturnActivity;
+      });
+
+      const enrichedReturns = returnDeals
+        .map((deal) => {
+          const service = services.find((item) => String(item.id) === String(deal.serviceId)) || null;
+          const otherUser = userRole === 'vendor'
+            ? users.find((item) => String(item.id) === String(deal.customerId)) || null
+            : users.find((item) => String(item.id) === String(deal.vendorId)) || null;
+
+          return {
+            ...deal,
+            service,
+            otherUser,
+            returnSummary: deal.returnStatus === 'completed'
+              ? 'Retur selesai'
+              : deal.returnStatus === 'inspected'
+                ? 'Retur sudah diinspeksi'
+                : deal.returnStatus === 'pending_inspection'
+                  ? 'Menunggu inspeksi vendor'
+                  : 'Proses retur berjalan'
+          };
+        })
+        .sort((a, b) => new Date(b.actualReturnDate || b.agreedAt || b.createdAt || 0) - new Date(a.actualReturnDate || a.agreedAt || a.createdAt || 0));
+
+      return NextResponse.json({
+        success: true,
+        data: enrichedReturns,
+        message: enrichedReturns.length === 0 ? 'Tidak ada barang yang direturkan' : 'Data retur ditemukan'
+      }, { status: 200 });
+    }
 
     const deal = deals.find(d => d.id === dealId);
     if (!deal) {
