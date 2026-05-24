@@ -43,9 +43,18 @@ function findChatByContext(chats, serviceId, customerId, itemId) {
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
+    const chatId = searchParams.get('chatId');
     const serviceId = searchParams.get('serviceId');
     const customerId = searchParams.get('customerId');
     const itemId = searchParams.get('itemId');
+
+    const chats = await readChatsFile();
+
+    // If chatId provided, return by id
+    if (chatId) {
+      const chatById = chats.find(c => String(c.id) === String(chatId));
+      return NextResponse.json({ success: true, data: chatById || null });
+    }
 
     if (!serviceId || !customerId) {
       return NextResponse.json(
@@ -54,13 +63,9 @@ export async function GET(request) {
       );
     }
 
-    const chats = await readChatsFile();
     const chat = findChatByContext(chats, serviceId, customerId, itemId);
 
-    return NextResponse.json({
-      success: true,
-      data: chat || null
-    });
+    return NextResponse.json({ success: true, data: chat || null });
   } catch (error) {
     console.error('[chat] GET error:', error);
     return NextResponse.json(

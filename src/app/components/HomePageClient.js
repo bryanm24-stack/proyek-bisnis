@@ -114,53 +114,67 @@ export default function HomePageClient() {
     }
   }, []);
 
+  const loadServices = useCallback(async () => {
+    try {
+      const response = await fetch('/api/vendor/services', { cache: 'no-store' });
+      const data = await response.json();
+      if (data.success) {
+        setServices(Array.isArray(data.data) ? data.data : []);
+      }
+    } catch (error) {
+      console.error('Error fetching services:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadPromos = useCallback(async () => {
+    try {
+      const cachedUser = JSON.parse(localStorage.getItem('user') || 'null');
+      const promoQuery = cachedUser?.id
+        ? `/api/promos?active=true&userId=${encodeURIComponent(cachedUser.id)}`
+        : '/api/promos?active=true';
+      const response = await fetch(promoQuery, { cache: 'no-store' });
+      const data = await response.json();
+      if (data.success) {
+        setPromos(Array.isArray(data.data) ? data.data : []);
+      }
+    } catch (error) {
+      console.error('Error fetching promos:', error);
+    }
+  }, []);
+
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (userData) {
       setUser(JSON.parse(userData));
     }
 
-    const fetchServices = async () => {
-      try {
-        const response = await fetch('/api/vendor/services', { cache: 'no-store' });
-        const data = await response.json();
-        if (data.success) {
-          setServices(Array.isArray(data.data) ? data.data : []);
-        }
-      } catch (error) {
-        console.error('Error fetching services:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const fetchPromos = async () => {
-      try {
-        const cachedUser = JSON.parse(localStorage.getItem('user') || 'null');
-        const promoQuery = cachedUser?.id
-          ? `/api/promos?active=true&userId=${encodeURIComponent(cachedUser.id)}`
-          : '/api/promos?active=true';
-        const response = await fetch(promoQuery, { cache: 'no-store' });
-        const data = await response.json();
-        if (data.success) {
-          setPromos(Array.isArray(data.data) ? data.data : []);
-        }
-      } catch (error) {
-        console.error('Error fetching promos:', error);
-      }
-    };
-
-    fetchServices();
-    fetchPromos();
+    loadServices();
+    loadPromos();
 
     // Refresh services setiap 10 detik untuk deteksi service baru dari vendor
-    const serviceInterval = setInterval(fetchServices, 10000);
-    const promoInterval = setInterval(fetchPromos, 15000);
+    const serviceInterval = setInterval(loadServices, 10000);
+    const promoInterval = setInterval(loadPromos, 15000);
     return () => {
       clearInterval(serviceInterval);
       clearInterval(promoInterval);
     };
-  }, []);
+  }, [loadServices, loadPromos]);
+
+  // Auto-refresh when payment completes in another tab/component
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (!e) return;
+      if (e.key === 'lastPaymentAt') {
+        // reload services to reflect reserved/decremented stock
+        loadServices();
+      }
+    };
+
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [loadServices]);
 
   useEffect(() => {
     const timer = setInterval(() => setPromoNow(Date.now()), 1000);
