@@ -146,8 +146,43 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
-    const body = await request.json();
-    const { dealId, customerId, itemCondition, damageDescription, returnPhotos } = body;
+    // Support both JSON body (existing clients) and multipart/form-data (file uploads)
+    let dealId, customerId, itemCondition, damageDescription, returnPhotos = [];
+    const contentType = request.headers.get('content-type') || '';
+
+    if (contentType.includes('multipart/form-data')) {
+      const form = await request.formData();
+      dealId = form.get('dealId');
+      customerId = form.get('customerId');
+      itemCondition = form.get('itemCondition');
+      damageDescription = form.get('damageDescription') || '';
+
+      // Handle uploaded files under field name 'photos' (multiple)
+      const files = form.getAll('photos') || [];
+      if (files.length > 0) {
+        const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'returns');
+        await fs.mkdir(uploadsDir, { recursive: true });
+
+        for (const f of files) {
+          try {
+            // 'f' is a File-like object provided by Web platform in Next.js route handlers
+            const arrayBuffer = await f.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const safeName = (f.name || 'photo').replace(/[^a-zA-Z0-9_.-]/g, '_');
+            const filename = `${Date.now()}-${safeName}`;
+            const dest = path.join(uploadsDir, filename);
+            await fs.writeFile(dest, buffer);
+            const url = `/uploads/returns/${filename}`;
+            returnPhotos.push({ url, filename, uploadedAt: new Date().toISOString() });
+          } catch (fileErr) {
+            console.warn('Could not save uploaded file:', fileErr?.message || fileErr);
+          }
+        }
+      }
+    } else {
+      const body = await request.json();
+      ({ dealId, customerId, itemCondition, damageDescription, returnPhotos = [] } = body || {});
+    }
 
     if (!dealId || !customerId || !itemCondition) {
       return NextResponse.json({
@@ -203,7 +238,8 @@ export async function POST(request) {
 
     // Store item condition and damage info
     deal.itemCondition = itemCondition; // 'good', 'minor_damage', 'major_damage', 'lost'
-    deal.returnPhotos = returnPhotos || [];
+    // Merge any newly uploaded photos with existing array
+    deal.returnPhotos = Array.isArray(deal.returnPhotos) ? deal.returnPhotos.concat(returnPhotos || []) : (returnPhotos || []);
     deal.returnStatus = 'pending_inspection'; // Waiting for vendor inspection
     deal.damageDescription = damageDescription || '';
     
