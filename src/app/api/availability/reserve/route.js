@@ -55,6 +55,21 @@ export async function POST(request) {
       updatedAt: new Date().toISOString()
     };
 
+    // Reserve/decrement actual stock at reservation time and mark booking.stockReserved
+    if (service.type !== 'jasa') {
+      let remaining = Number(quantity);
+      for (const item of service.items || []) {
+        if (remaining <= 0) break;
+        const dec = Math.min(Number(item.stok) || 0, remaining);
+        item.stok = (Number(item.stok) || 0) - dec;
+        remaining -= dec;
+      }
+    } else {
+      service.quantity = Math.max(0, (service.quantity || 0) - Number(quantity));
+    }
+
+    newBooking.stockReserved = true;
+
     // Add booking to service
     service.bookings.push(newBooking);
 

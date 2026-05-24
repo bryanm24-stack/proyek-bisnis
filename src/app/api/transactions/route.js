@@ -529,6 +529,25 @@ export async function POST(request) {
             updatedAt: new Date().toISOString()
           };
 
+          // Reserve/decrement actual stock immediately on successful payment
+          // and mark booking.stockReserved to avoid double-decrement at pickup.
+          // For goods (barang), decrement item.stok greedily by quantity.
+          if (service.type !== 'jasa') {
+            let remaining = Number(body.quantity);
+            for (const item of service.items || []) {
+              if (remaining <= 0) break;
+              const dec = Math.min(Number(item.stok) || 0, remaining);
+              item.stok = (Number(item.stok) || 0) - dec;
+              remaining -= dec;
+            }
+          } else {
+            // For jasa, decrement service.quantity
+            service.quantity = Math.max(0, (service.quantity || 0) - Number(body.quantity));
+          }
+
+          // mark booking as having reserved stock
+          newBooking.stockReserved = true;
+
           service.bookings.push(newBooking);
 
           // Recalculate availableQuantity based on service type

@@ -173,15 +173,34 @@ function PaymentContent() {
                 
                 // ✅ NEW: Set first item as default
                 if (currentService.items && currentService.items.length > 0) {
-                  const firstItem = currentService.items[0];
+                  // Try to pick item from deal/chat context if available
+                  let chosenItem = null;
+                  // If deal exists and has chatId, fetch chat to find itemId
+                  try {
+                    if (currentDeal?.chatId) {
+                      const chatResp = await fetch(`/api/chat?chatId=${encodeURIComponent(currentDeal.chatId)}`);
+                      if (chatResp.ok) {
+                        const chatJson = await chatResp.json();
+                        if (chatJson.success && chatJson.data && chatJson.data.itemId) {
+                          chosenItem = currentService.items.find(it => String(it.id) === String(chatJson.data.itemId));
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    // ignore
+                  }
+
+                  // Fallback to first item
+                  const firstItem = chosenItem || currentService.items[0];
                   const itemPrice = currentService.type === 'barang' 
                     ? firstItem.hargaPcs 
                     : firstItem.hargaSesi;
-                  
+
                   setSelectedItem({
                     id: firstItem.id,
                     name: firstItem.namaBarang || firstItem.namaJasa,
-                    price: itemPrice
+                    price: itemPrice,
+                    stok: firstItem.stok // include per-item stok for payment UI
                   });
                 }
               }
@@ -387,6 +406,8 @@ function PaymentContent() {
 
       if (response.ok) {
         localStorage.removeItem('verificationData');
+        // Mark last payment timestamp so other tabs/components can refresh data
+        try { localStorage.setItem('lastPaymentAt', String(Date.now())); } catch (e) { /* ignore */ }
         router.push(`/transaction/success?transactionId=${transactionData.id}`);
       }
     } catch (error) {
@@ -758,7 +779,21 @@ function PaymentContent() {
                       </div>
 
                       {/* AVAILABILITY STATUS */}
-                      {availabilityMessage && (
+                      {(selectedItem && typeof selectedItem.stok !== 'undefined') ? (
+                        <div style={{
+                          marginTop: '12px',
+                          padding: '10px 12px',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          fontWeight: '500',
+                          background: '#dcfce7',
+                          color: '#15803d',
+                          border: `1px solid #86efac`
+                        }}>
+                          ✅ Stok tersedia: {selectedItem.stok} {quantityLabel}
+                        </div>
+                      ) : (
+                        availabilityMessage && (
                         <div style={{
                           marginTop: '12px',
                           padding: '10px 12px',
@@ -772,7 +807,9 @@ function PaymentContent() {
                           {availabilityCheck === 'checking' && '⏳ Memeriksa ketersediaan...'}
                           {availabilityMessage}
                         </div>
+                        )
                       )}
+                      
                     </div>
 
                     {/* Durasi Hari */}
