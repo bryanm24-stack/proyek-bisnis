@@ -12,6 +12,10 @@ export default function VendorInvoicesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState('pending'); // pending, paid, all
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [activeRatingInvoiceId, setActiveRatingInvoiceId] = useState(null);
+  const [ratingValue, setRatingValue] = useState(5);
+  const [ratingReview, setRatingReview] = useState('');
+  const [isRatingSubmitting, setIsRatingSubmitting] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -34,16 +38,14 @@ export default function VendorInvoicesPage() {
     try {
       setIsLoading(true);
       const query = status === 'all' ? '' : `&status=${status}`;
-      const response = await fetch(`/api/invoices?vendorId=${vendorId}${query}`);
+      const response = await fetch(`/api/invoices?customerId=${vendorId}${query}`);
       const data = await response.json();
-      
-      if (Array.isArray(data)) {
-        setInvoices(data);
-      } else if (data.data && Array.isArray(data.data)) {
-        setInvoices(data.data);
-      } else {
-        setInvoices([]);
-      }
+
+      const ownInvoices = Array.isArray(data)
+        ? data
+        : (data?.data && Array.isArray(data.data) ? data.data : []);
+
+      setInvoices(ownInvoices);
     } catch (error) {
       console.error('Error fetching invoices:', error);
       setInvoices([]);
@@ -65,6 +67,47 @@ export default function VendorInvoicesPage() {
       currency: 'IDR',
       minimumFractionDigits: 0
     }).format(num);
+  };
+
+  const handleSubmitRating = async (invoice) => {
+    if (!invoice?.serviceId || !invoice?.vendorId || !user?.id) {
+      alert('Data layanan untuk rating belum lengkap.');
+      return;
+    }
+
+    setIsRatingSubmitting(true);
+    try {
+      const response = await fetch('/api/ratings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dealId: invoice.dealId,
+          serviceId: invoice.serviceId,
+          customerId: user.id,
+          vendorId: invoice.vendorId,
+          rating: ratingValue,
+          review: ratingReview
+        })
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Gagal menyimpan rating');
+      }
+
+      alert('✅ Rating berhasil disimpan.');
+      setInvoices((prev) => prev.map((item) => (
+        item.id === invoice.id ? { ...item, hasCustomerRating: true } : item
+      )));
+      setActiveRatingInvoiceId(null);
+      setRatingValue(5);
+      setRatingReview('');
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+      alert(error.message || 'Gagal menyimpan rating');
+    } finally {
+      setIsRatingSubmitting(false);
+    }
   };
 
   if (isLoading) {
@@ -90,10 +133,10 @@ export default function VendorInvoicesPage() {
         {/* Header */}
         <div style={{ marginBottom: '32px' }}>
           <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>
-            📋 Invoice Penjualan
+            📋 Invoice Transaksi
           </h1>
           <p style={{ color: '#666', fontSize: '16px' }}>
-            Kelola invoice dari customer yang menyewa barang kamu
+            Riwayat invoice akun kamu saat menyewa barang/jasa.
           </p>
         </div>
 
@@ -137,12 +180,18 @@ export default function VendorInvoicesPage() {
               📭 Tidak ada invoice
             </p>
             <p style={{ fontSize: '14px', color: '#999' }}>
-              Invoice akan muncul saat customer membuat pemesanan dan konfirmasi deal
+              Invoice akan muncul saat ada deal yang disepakati dan menunggu pembayaran
             </p>
           </div>
         ) : (
           <div style={{ display: 'grid', gap: '20px' }}>
             {invoices.map((invoice) => (
+              (() => {
+                const isBuyingInvoice = true;
+                const counterpartyLabel = 'Vendor';
+                const counterpartyName = invoice.vendorName || 'Unknown';
+
+                return (
               <div
                 key={invoice.id}
                 style={{
@@ -163,7 +212,7 @@ export default function VendorInvoicesPage() {
                       Invoice #{invoice.id?.substring(0, 8) || 'N/A'}
                     </h3>
                     <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>
-                      Customer: <strong>{invoice.customerName || 'Unknown'}</strong>
+                      {counterpartyLabel}: <strong>{counterpartyName}</strong>
                     </p>
                   </div>
                   <div style={{ textAlign: 'right' }}>
@@ -245,10 +294,108 @@ export default function VendorInvoicesPage() {
                           </div>
                         )}
                       </div>
+
+                      {invoice.status === 'paid' && isBuyingInvoice && (
+                        <div style={{ marginTop: '16px', borderTop: '1px solid #e5e7eb', paddingTop: '14px' }}>
+                          <div style={{ padding: '10px 12px', borderRadius: '8px', background: '#ecfdf5', border: '1px solid #a7f3d0', marginBottom: '12px' }}>
+                            <p style={{ margin: 0, fontSize: '13px', color: '#065f46', fontWeight: '700' }}>
+                              Transaksi selesai. Kamu bisa memberi rating untuk vendor.
+                            </p>
+                          </div>
+
+                          {invoice.hasCustomerRating ? (
+                            <button
+                              type="button"
+                              disabled
+                              style={{ padding: '10px 12px', border: 'none', borderRadius: '8px', background: '#9ca3af', color: 'white', fontWeight: '600', cursor: 'not-allowed' }}
+                            >
+                              Rating Sudah Diberikan
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveRatingInvoiceId(invoice.id);
+                                setRatingValue(5);
+                                setRatingReview('');
+                              }}
+                              style={{ padding: '10px 12px', border: 'none', borderRadius: '8px', background: '#7c3aed', color: 'white', fontWeight: '700', cursor: 'pointer' }}
+                            >
+                              Beri Rating
+                            </button>
+                          )}
+
+                          {activeRatingInvoiceId === invoice.id && !invoice.hasCustomerRating && (
+                            <div style={{ marginTop: '12px' }}>
+                              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <button
+                                    key={star}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setRatingValue(star);
+                                    }}
+                                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '24px', lineHeight: 1 }}
+                                  >
+                                    {star <= ratingValue ? '⭐' : '☆'}
+                                  </button>
+                                ))}
+                              </div>
+
+                              <textarea
+                                value={ratingReview}
+                                onChange={(e) => setRatingReview(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                placeholder="Tulis ulasan singkat (opsional)..."
+                                rows={3}
+                                style={{ width: '100%', border: '1px solid #ddd', borderRadius: '8px', padding: '10px', fontSize: '13px', resize: 'vertical', boxSizing: 'border-box' }}
+                              />
+
+                              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSubmitRating(invoice);
+                                  }}
+                                  disabled={isRatingSubmitting}
+                                  style={{ padding: '10px 12px', border: 'none', borderRadius: '8px', background: isRatingSubmitting ? '#a78bfa' : '#7c3aed', color: 'white', fontWeight: '700', cursor: isRatingSubmitting ? 'not-allowed' : 'pointer' }}
+                                >
+                                  {isRatingSubmitting ? 'Menyimpan...' : 'Kirim Rating'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveRatingInvoiceId(null);
+                                  }}
+                                  style={{ padding: '10px 12px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', color: '#374151', fontWeight: '600', cursor: 'pointer' }}
+                                >
+                                  Batal
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {invoice.status === 'paid' && !isBuyingInvoice && (
+                        <div style={{ marginTop: '16px', borderTop: '1px solid #e5e7eb', paddingTop: '14px' }}>
+                          <div style={{ padding: '10px 12px', borderRadius: '8px', background: invoice.hasCustomerRating ? '#ecfdf5' : '#fff7ed', border: `1px solid ${invoice.hasCustomerRating ? '#a7f3d0' : '#fdba74'}` }}>
+                            <p style={{ margin: 0, fontSize: '13px', color: invoice.hasCustomerRating ? '#065f46' : '#9a3412', fontWeight: '700' }}>
+                              {invoice.hasCustomerRating ? 'Penyewa sudah memberikan rating untuk transaksi ini.' : 'Penyewa belum memberikan rating untuk transaksi ini.'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
+                );
+              })()
             ))}
           </div>
         )}

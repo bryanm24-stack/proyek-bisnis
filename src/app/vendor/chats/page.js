@@ -64,8 +64,8 @@ export default function VendorChatsPage() {
   };
 
   // Kategorisasi chats
-  const vendorChats = chats.filter(c => c.vendorId === user?.id); // Dia sebagai vendor
-  const customerChats = chats.filter(c => c.customerId === user?.id && c.vendorId !== user?.id); // Dia sebagai customer ke vendor lain
+  const vendorChats = chats.filter(c => String(c.vendorId) === String(user?.id)); // Dia sebagai vendor
+  const customerChats = chats.filter(c => String(c.customerId) === String(user?.id) && String(c.vendorId) !== String(user?.id)); // Dia sebagai customer ke vendor lain
 
   // Debug logging
   useEffect(() => {
@@ -86,7 +86,8 @@ export default function VendorChatsPage() {
     return vendorChats.filter(chat => {
       const customerName = (chat.customerName || '').toLowerCase();
       const serviceTitle = (chat.serviceTitle || '').toLowerCase();
-      return customerName.includes(searchLower) || serviceTitle.includes(searchLower);
+      const itemName = (chat.itemName || '').toLowerCase();
+      return customerName.includes(searchLower) || serviceTitle.includes(searchLower) || itemName.includes(searchLower);
     });
   }, [vendorChats, searchQuery]);
 
@@ -99,7 +100,8 @@ export default function VendorChatsPage() {
     return customerChats.filter(chat => {
       const vendorName = (chat.vendorName || '').toLowerCase();
       const serviceTitle = (chat.serviceTitle || '').toLowerCase();
-      return vendorName.includes(searchLower) || serviceTitle.includes(searchLower);
+      const itemName = (chat.itemName || '').toLowerCase();
+      return vendorName.includes(searchLower) || serviceTitle.includes(searchLower) || itemName.includes(searchLower);
     });
   }, [customerChats, searchQuery]);
 
@@ -133,12 +135,26 @@ export default function VendorChatsPage() {
     setDealData(null);
   };
 
+  const getChatTopicLabel = (chat) => {
+    if (!chat) return '';
+    if (chat.itemName) {
+      return `${chat.serviceTitle} • ${chat.itemName}`;
+    }
+
+    return chat.serviceTitle || '';
+  };
+
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
     if (selectedChat?.dealStatus === 'closed') {
       alert('Chat sudah ditutup setelah pembayaran selesai.');
       return;
     }
+
+    const vendorId = selectedChat.vendorId;
+    const customerId = selectedChat.customerId;
+    const vendorName = selectedChat.vendorName;
+    const customerName = selectedChat.customerName;
 
     try {
       const response = await fetch('/api/chat', {
@@ -147,10 +163,12 @@ export default function VendorChatsPage() {
         body: JSON.stringify({
           serviceId: selectedChat.serviceId,
           serviceTitle: selectedChat.serviceTitle,
-          vendorId: user.id,
-          vendorName: user.vendorName || user.name,
-          customerId: selectedChat.customerId,
-          customerName: selectedChat.customerName,
+          itemId: selectedChat.itemId || null,
+          itemName: selectedChat.itemName || null,
+          vendorId,
+          vendorName,
+          customerId,
+          customerName,
           message: newMessage,
           senderId: user.id,
           senderName: user.vendorName || user.name
@@ -175,6 +193,13 @@ export default function VendorChatsPage() {
   };
 
   const handleDealAction = async (action) => {
+    if (!selectedChat) return;
+
+    if (String(user?.id) !== String(selectedChat.vendorId)) {
+      alert('Hanya vendor pemilik chat yang bisa menerima atau menolak deal.');
+      return;
+    }
+
     try {
       const response = await fetch('/api/deals', {
         method: 'POST',
@@ -183,7 +208,7 @@ export default function VendorChatsPage() {
           action,
           chatId: selectedChat.id,
           customerId: selectedChat.customerId,
-          vendorId: user.id,
+          vendorId: selectedChat.vendorId,
           serviceId: selectedChat.serviceId
         })
       });
@@ -201,6 +226,36 @@ export default function VendorChatsPage() {
     } catch (error) {
       console.error('Error processing deal:', error);
       alert('Gagal memproses deal');
+    }
+  };
+
+  const handleCustomerDealRequest = async () => {
+    if (!selectedChat) return;
+
+    try {
+      const response = await fetch('/api/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'accept',
+          chatId: selectedChat.id,
+          customerId: selectedChat.customerId,
+          vendorId: selectedChat.vendorId,
+          serviceId: selectedChat.serviceId
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setDealData(data.data.deal);
+        setSelectedChat(data.data.chat);
+        alert(data.message || 'Penawaran deal berhasil dikirim.');
+      } else {
+        alert(data.message || 'Gagal mengirim penawaran deal.');
+      }
+    } catch (error) {
+      console.error('Error requesting deal:', error);
+      alert('Gagal mengirim penawaran deal');
     }
   };
 
@@ -298,7 +353,7 @@ export default function VendorChatsPage() {
               }}>
                 <button
                   onClick={() => setChatTab('vendor')}
-                  disabled={customerChats.length === 0}
+                  disabled={vendorChats.length === 0}
                   style={{
                     flex: 1,
                     padding: '10px 8px',
@@ -307,18 +362,18 @@ export default function VendorChatsPage() {
                     fontSize: '13px',
                     fontWeight: chatTab === 'vendor' ? '700' : '500',
                     color: chatTab === 'vendor' ? '#5A45D1' : '#999',
-                    cursor: customerChats.length === 0 ? 'not-allowed' : 'pointer',
+                    cursor: vendorChats.length === 0 ? 'not-allowed' : 'pointer',
                     borderBottom: chatTab === 'vendor' ? '2px solid #5A45D1' : 'none',
                     transition: 'all 0.2s',
-                    opacity: customerChats.length === 0 ? 0.5 : 1,
+                    opacity: vendorChats.length === 0 ? 0.5 : 1,
                     marginBottom: '-2px'
                   }}
                 >
-                  🏪 Vendor {customerChats.length > 0 && `(${customerChats.length})`}
+                  🏪 Penjualan {vendorChats.length > 0 && `(${vendorChats.length})`}
                 </button>
                 <button
                   onClick={() => setChatTab('customer')}
-                  disabled={vendorChats.length === 0}
+                  disabled={customerChats.length === 0}
                   style={{
                     flex: 1,
                     padding: '10px 8px',
@@ -327,14 +382,14 @@ export default function VendorChatsPage() {
                     fontSize: '13px',
                     fontWeight: chatTab === 'customer' ? '700' : '500',
                     color: chatTab === 'customer' ? '#5A45D1' : '#999',
-                    cursor: vendorChats.length === 0 ? 'not-allowed' : 'pointer',
+                    cursor: customerChats.length === 0 ? 'not-allowed' : 'pointer',
                     borderBottom: chatTab === 'customer' ? '2px solid #5A45D1' : 'none',
                     transition: 'all 0.2s',
-                    opacity: vendorChats.length === 0 ? 0.5 : 1,
+                    opacity: customerChats.length === 0 ? 0.5 : 1,
                     marginBottom: '-2px'
                   }}
                 >
-                  👤 Customer {vendorChats.length > 0 && `(${vendorChats.length})`}
+                  👤 Pembelian {customerChats.length > 0 && `(${customerChats.length})`}
                 </button>
               </div>
             ) : null}
@@ -402,50 +457,8 @@ export default function VendorChatsPage() {
               <p style={{ color: '#999', textAlign: 'center' }}>Memuat pesan...</p>
             ) : (
               <div>
-                {/* VENDOR TAB - Chat saat user berperan sebagai customer */}
+                {/* VENDOR TAB - Chat saat user berperan sebagai vendor */}
                 {chatTab === 'vendor' ? (
-                  customerChats.length === 0 ? (
-                    <p style={{ color: '#999', textAlign: 'center', fontSize: '13px', marginTop: '20px' }}>
-                      Belum ada chat dengan vendor
-                    </p>
-                  ) : (
-                    <>
-                      {filteredCustomerChats.length === 0 && searchQuery ? (
-                        <p style={{ fontSize: '12px', color: '#999', padding: '8px', textAlign: 'center' }}>
-                          Tidak ada hasil
-                        </p>
-                      ) : (
-                        filteredCustomerChats.map((chat) => (
-                          <div
-                            key={chat.id}
-                            onClick={() => openChat(chat)}
-                            style={{
-                              padding: '12px',
-                              marginBottom: '8px',
-                              borderRadius: '8px',
-                              cursor: 'pointer',
-                              background: selectedChat?.id === chat.id ? '#5A45D1' : '#fff',
-                              color: selectedChat?.id === chat.id ? '#fff' : '#333',
-                              border: selectedChat?.id === chat.id ? '2px solid #5A45D1' : '1px solid #eee',
-                              transition: 'all 0.3s'
-                            }}
-                          >
-                            <div style={{ fontWeight: '600', fontSize: '14px' }}>
-                              {chat.vendorName}
-                            </div>
-                            <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '4px' }}>
-                              {chat.serviceTitle}
-                            </div>
-                            <div style={{ fontSize: '12px', opacity: 0.6, marginTop: '4px' }}>
-                              {chat.messages?.length || 0} pesan
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </>
-                  )
-                ) : (
-                  /* CUSTOMER TAB - Chat saat user berperan sebagai vendor */
                   vendorChats.length === 0 ? (
                     <p style={{ color: '#999', textAlign: 'center', fontSize: '13px', marginTop: '20px' }}>
                       Belum ada chat dengan customer
@@ -457,9 +470,9 @@ export default function VendorChatsPage() {
                           Tidak ada hasil
                         </p>
                       ) : (
-                        filteredVendorChats.map((chat) => (
+                        filteredVendorChats.map((chat, index) => (
                           <div
-                            key={chat.id}
+                            key={`${chat.id || chat.createdAt}-${index}`}
                             onClick={() => openChat(chat)}
                             style={{
                               padding: '12px',
@@ -476,7 +489,49 @@ export default function VendorChatsPage() {
                               {chat.customerName}
                             </div>
                             <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '4px' }}>
-                              {chat.serviceTitle}
+                              {getChatTopicLabel(chat)}
+                            </div>
+                            <div style={{ fontSize: '12px', opacity: 0.6, marginTop: '4px' }}>
+                              {chat.messages?.length || 0} pesan
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </>
+                  )
+                ) : (
+                  /* CUSTOMER TAB - Chat saat user berperan sebagai customer */
+                  customerChats.length === 0 ? (
+                    <p style={{ color: '#999', textAlign: 'center', fontSize: '13px', marginTop: '20px' }}>
+                      Belum ada chat dengan vendor
+                    </p>
+                  ) : (
+                    <>
+                      {filteredCustomerChats.length === 0 && searchQuery ? (
+                        <p style={{ fontSize: '12px', color: '#999', padding: '8px', textAlign: 'center' }}>
+                          Tidak ada hasil
+                        </p>
+                      ) : (
+                        filteredCustomerChats.map((chat, index) => (
+                          <div
+                            key={`${chat.id || chat.createdAt}-${index}`}
+                            onClick={() => openChat(chat)}
+                            style={{
+                              padding: '12px',
+                              marginBottom: '8px',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              background: selectedChat?.id === chat.id ? '#5A45D1' : '#fff',
+                              color: selectedChat?.id === chat.id ? '#fff' : '#333',
+                              border: selectedChat?.id === chat.id ? '2px solid #5A45D1' : '1px solid #eee',
+                              transition: 'all 0.3s'
+                            }}
+                          >
+                            <div style={{ fontWeight: '600', fontSize: '14px' }}>
+                              {chat.vendorName}
+                            </div>
+                            <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '4px' }}>
+                              {getChatTopicLabel(chat)}
                             </div>
                             <div style={{ fontSize: '12px', opacity: 0.6, marginTop: '4px' }}>
                               {chat.messages?.length || 0} pesan
@@ -521,7 +576,7 @@ export default function VendorChatsPage() {
                     {user.id === selectedChat.customerId ? selectedChat.customerName : selectedChat.vendorName}
                   </h2>
                   <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#666' }}>
-                    {selectedChat.serviceTitle}
+                    {getChatTopicLabel(selectedChat)}
                   </p>
                 </div>
                 <button
@@ -624,12 +679,12 @@ export default function VendorChatsPage() {
                     Mulai percakapan
                   </div>
                 ) : (
-                  messages.map((msg) => {
+                  messages.map((msg, index) => {
                     const isVendorMessage = msg.senderId === user?.id;
                     
                     return (
                       <div
-                        key={msg.id}
+                        key={`${msg.id || msg.timestamp}-${index}`}
                         style={{
                           display: 'flex',
                           justifyContent: isVendorMessage ? 'flex-end' : 'flex-start',
@@ -788,15 +843,15 @@ export default function VendorChatsPage() {
             {/* Profile Info */}
             <div style={{ textAlign: 'center', marginBottom: '20px' }}>
               <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>
-                {user.id === selectedChat.customerId ? selectedChat.customerName : selectedChat.vendorName}
+                {String(user?.id) === String(selectedChat.customerId) ? selectedChat.vendorName : selectedChat.customerName}
               </h2>
               <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#666' }}>
-                {selectedChat.serviceTitle}
+                {getChatTopicLabel(selectedChat)}
               </p>
             </div>
 
-              {/* Deal Buttons - VENDOR TAB: HANYA UNTUK VENDOR CHATS, CUSTOMER TAB: UNTUK VENDOR CUSTOMER */}
-              {(user.id === selectedChat.vendorId || (user.id === selectedChat.customerId && chatTab === 'vendor')) && (
+              {/* Deal Buttons - hanya vendor pemilik chat yang boleh accept/reject */}
+              {String(user?.id) === String(selectedChat.vendorId) && (
               <div style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -874,30 +929,21 @@ export default function VendorChatsPage() {
                         💰 Aplikasikan Diskon
                       </button>
                     )}
-                    {user.id === selectedChat.customerId && (
-                      <button
-                        onClick={() => {
-                          if (!dealData?.id) {
-                            alert('Deal belum siap untuk pembayaran.');
-                            return;
-                          }
-                          router.push(`/transaction/payment?dealId=${dealData.id}`);
-                        }}
-                        style={{
-                          padding: '12px 16px',
-                          border: 'none',
-                          borderRadius: '8px',
-                          background: '#7c3aed',
-                          color: 'white',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          fontSize: '14px'
-                        }}
-                      >
-                        💳 Lanjut ke Pembayaran
-                      </button>
-                    )}
                   </>
+                )}
+
+                {selectedChat?.dealStatus === 'closed' && (
+                  <div style={{
+                    padding: '12px',
+                    background: '#ecfdf5',
+                    color: '#065f46',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    textAlign: 'center'
+                  }}>
+                    Pembayaran sudah selesai dan chat telah ditutup.
+                  </div>
                 )}
 
                 {dealData?.status === 'cancelled' && (
@@ -911,6 +957,100 @@ export default function VendorChatsPage() {
                     textAlign: 'center'
                   }}>
                     ✗ Deal Ditolak
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Customer action - lanjut pembayaran hanya setelah vendor accept */}
+            {String(user?.id) === String(selectedChat.customerId) && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+                {dealData?.status === 'agreed' && dealData?.vendorAccepted && !selectedChat?.closedAt && selectedChat?.dealStatus !== 'closed' && (
+                  <button
+                    onClick={() => {
+                      if (selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt || dealData?.status === 'completed') {
+                        alert('Pembayaran sudah selesai. Chat ini sudah ditutup.');
+                        return;
+                      }
+                      if (!dealData?.id) {
+                        alert('Deal belum siap untuk pembayaran.');
+                        return;
+                      }
+                      router.push(`/transaction/payment?dealId=${dealData.id}`);
+                    }}
+                    disabled={selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt || dealData?.status === 'completed'}
+                    style={{
+                      padding: '12px 16px',
+                      border: 'none',
+                      borderRadius: '8px',
+                      background: selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt || dealData?.status === 'completed' ? '#9ca3af' : '#7c3aed',
+                      color: 'white',
+                      fontWeight: '600',
+                      cursor: selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt || dealData?.status === 'completed' ? 'not-allowed' : 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    💳 Lanjut ke Pembayaran
+                  </button>
+                )}
+
+                {(!dealData || dealData?.status === 'cancelled' || dealData?.status === 'completed') && (
+                  <button
+                    onClick={handleCustomerDealRequest}
+                    style={{
+                      padding: '12px 16px',
+                      border: 'none',
+                      borderRadius: '8px',
+                      background: '#5b21b6',
+                      color: 'white',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    📝 Ajukan Deal Ulang
+                  </button>
+                )}
+
+                {dealData?.status === 'pending' && (
+                  <div style={{
+                    padding: '12px',
+                    background: '#fff7ed',
+                    color: '#c2410c',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    textAlign: 'center'
+                  }}>
+                    Menunggu vendor menerima deal sebelum lanjut pembayaran.
+                  </div>
+                )}
+
+                {dealData?.status === 'cancelled' && (
+                  <div style={{
+                    padding: '12px',
+                    background: '#fee2e2',
+                    color: '#dc2626',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    textAlign: 'center'
+                  }}>
+                    Deal ditolak vendor. Lakukan negosiasi ulang dulu.
+                  </div>
+                )}
+
+                {(selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt) && (
+                  <div style={{
+                    padding: '12px',
+                    background: '#ecfdf5',
+                    color: '#065f46',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    textAlign: 'center'
+                  }}>
+                    Pembayaran sudah selesai dan chat telah ditutup.
                   </div>
                 )}
               </div>

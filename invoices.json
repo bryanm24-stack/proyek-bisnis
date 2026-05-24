@@ -49,5 +49,22 @@
     "paidAt": "2026-05-06T05:49:22.756Z",
     "paymentTransactionId": "TRX-1778046562756",
     "notes": ""
+  },
+  {
+    "id": "INV-1779035853307-722",
+    "dealId": "1776954691440",
+    "customerId": "1775589203562",
+    "vendorId": "2",
+    "serviceId": "s2",
+    "transactionId": null,
+    "remainingPayment": 0,
+    "paymentDeadline": "2026-04-25T14:31:39.581Z",
+    "paymentMethod": null,
+    "paymentType": "deal_pending",
+    "status": "pending",
+    "createdAt": "2026-04-23T14:31:39.581Z",
+    "paidAt": null,
+    "paymentTransactionId": null,
+    "notes": "Menunggu pembayaran setelah deal disepakati."
   }
 ]

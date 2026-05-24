@@ -2020,8 +2020,8 @@ export default function VendorProductForm({
             type="text"
             name="location"
             placeholder={isJasaSelected 
-              ? 'Contoh: Studio Citra Jl. Gajah Mada No.123, Jakarta Pusat' 
-              : 'Contoh: Gudang Jl. Panjang Utama No.456, Medan'}
+              ? 'Contoh: Studio Citra Jl. Gubernur Suryo No.123, Surabaya' 
+              : 'Contoh: Gudang Jl. Raya Juanda No.456, Surabaya'}
             value={formData.location || ''}
             onChange={handleInputChange}
             style={{

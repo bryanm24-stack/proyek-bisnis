@@ -1,4 +1,5 @@
 import fs from 'fs/promises';
+import { randomUUID } from 'crypto';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
@@ -26,12 +27,25 @@ async function writeChatsFile(chats) {
   }
 }
 
+function findChatByContext(chats, serviceId, customerId, itemId) {
+  return chats.find(c => {
+    const sameService = String(c.serviceId) === String(serviceId);
+    const sameCustomer = String(c.customerId) === String(customerId);
+    const sameItem = itemId
+      ? String(c.itemId || '') === String(itemId)
+      : !c.itemId;
+
+    return sameService && sameCustomer && sameItem;
+  });
+}
+
 // GET - Load existing chat or return null if not found
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const serviceId = searchParams.get('serviceId');
     const customerId = searchParams.get('customerId');
+    const itemId = searchParams.get('itemId');
 
     if (!serviceId || !customerId) {
       return NextResponse.json(
@@ -41,7 +55,7 @@ export async function GET(request) {
     }
 
     const chats = await readChatsFile();
-    const chat = chats.find(c => c.serviceId === serviceId && c.customerId === customerId);
+    const chat = findChatByContext(chats, serviceId, customerId, itemId);
 
     return NextResponse.json({
       success: true,
@@ -71,7 +85,7 @@ export async function POST(request) {
     }
 
     // 2. Extract fields
-    const { serviceId, serviceTitle, vendorId, vendorName, customerId, customerName, message, senderId, senderName } = body;
+    const { serviceId, serviceTitle, vendorId, vendorName, customerId, customerName, itemId, itemName, message, senderId, senderName } = body;
 
     // 3. Validate required fields
     if (!serviceId || !vendorId || !customerId || !message || !senderId) {
@@ -85,13 +99,15 @@ export async function POST(request) {
     const chats = await readChatsFile();
 
     // 5. Find or create chat room
-    let chatRoom = chats.find(c => c.serviceId === serviceId && c.customerId === customerId);
+    let chatRoom = findChatByContext(chats, serviceId, customerId, itemId);
 
     if (!chatRoom) {
       chatRoom = {
-        id: Date.now().toString(),
+        id: randomUUID(),
         serviceId,
         serviceTitle: serviceTitle || 'Unknown',
+        itemId: itemId || null,
+        itemName: itemName || null,
         vendorId,
         vendorName: vendorName || 'Unknown',
         customerId,
@@ -105,7 +121,7 @@ export async function POST(request) {
 
     // 6. Add message
     chatRoom.messages.push({
-      id: Date.now().toString(),
+      id: randomUUID(),
       senderId: senderId,
       senderName: senderName || 'Unknown',
       message,

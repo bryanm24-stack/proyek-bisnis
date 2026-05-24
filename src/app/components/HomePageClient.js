@@ -14,6 +14,7 @@ export default function HomePageClient() {
   const [loading, setLoading] = useState(true);
   const [selectedService, setSelectedService] = useState(null);
   const [selectedItemDetail, setSelectedItemDetail] = useState(null);
+  const [selectedChatItem, setSelectedChatItem] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [detailTab, setDetailTab] = useState('packages');
   const [modalImageIndex, setModalImageIndex] = useState(0);
@@ -41,10 +42,13 @@ export default function HomePageClient() {
     priceRange: 'all',
     sortBy: 'recommended'
   });
+  const [activePromoIndex, setActivePromoIndex] = useState(0);
+  const [promoNow, setPromoNow] = useState(Date.now());
   const [userFavorites, setUserFavorites] = useState([]);
   const [favoriteLoading, setFavoriteLoading] = useState({});
   const [vendorReplyDrafts, setVendorReplyDrafts] = useState({});
   const [vendorReplySubmittingId, setVendorReplySubmittingId] = useState(null);
+  const activeChatItem = selectedChatItem || selectedItemDetail;
 
   const fetchFavorites = useCallback(async (currentUser) => {
     if (!currentUser) return;
@@ -132,7 +136,11 @@ export default function HomePageClient() {
 
     const fetchPromos = async () => {
       try {
-        const response = await fetch('/api/promos?active=true', { cache: 'no-store' });
+        const cachedUser = JSON.parse(localStorage.getItem('user') || 'null');
+        const promoQuery = cachedUser?.id
+          ? `/api/promos?active=true&userId=${encodeURIComponent(cachedUser.id)}`
+          : '/api/promos?active=true';
+        const response = await fetch(promoQuery, { cache: 'no-store' });
         const data = await response.json();
         if (data.success) {
           setPromos(Array.isArray(data.data) ? data.data : []);
@@ -152,6 +160,11 @@ export default function HomePageClient() {
       clearInterval(serviceInterval);
       clearInterval(promoInterval);
     };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setPromoNow(Date.now()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   // Fetch notifications for current user
@@ -301,48 +314,12 @@ export default function HomePageClient() {
     (Array.isArray(item?.images) && item.images.length > 0 ? item.images[0] : null) ||
     'https://via.placeholder.com/120x120?text=Paket';
 
-  const getPromoOffers = (service) => {
-    if (!service) return [];
-
-    const promoMatches = promos.filter((promo) =>
-      promo.active !== false &&
-      (promo.productId === service.id || promo.vendorId === service.vendorId)
-    );
-
-    const fallbackMatches = services.filter((item) =>
-      item.id !== service.id &&
-      (item.vendorId === service.vendorId || item.mainCategory === service.mainCategory || item.category === service.category)
-    );
-
-    const mappedPromos = promoMatches.map((promo) => ({
-      id: promo.id,
-      title: promo.productName,
-      image: promo.productImage || service.image || service.images?.[0],
-      originalPrice: promo.originalPrice || service.price || 0,
-      promoPrice: promo.promoPrice ?? null,
-      description: promo.description || 'Promo spesial dari vendor',
-      code: promo.code
-    }));
-
-    const mappedFallbacks = fallbackMatches.map((item) => ({
-      id: item.id,
-      title: item.title || item.namaBarang || item.namaJasa,
-      image: item.images?.[0],
-      originalPrice: item.price || 0,
-      promoPrice: item.price ? Math.max(0, Math.round(item.price * 0.85)) : null,
-      description: 'Rekomendasi produk serupa dengan penawaran menarik',
-      code: null
-    }));
-
-    const pool = mappedPromos.length > 0 ? mappedPromos : mappedFallbacks;
-    return pool.sort(() => Math.random() - 0.5).slice(0, 3);
-  };
-
   const openModal = (service) => {
     setSelectedService(service);
     setDetailTab('packages');
     setSelectedItemDetail(null);
     setModalImageIndex(0);
+    setActivePromoIndex(0);
     setServiceReviews([]);
     setReviewsLoading(true);
     setReviewFilter('all');
@@ -381,6 +358,7 @@ export default function HomePageClient() {
     setSelectedService(null);
     setSelectedItemDetail(null);
     setModalImageIndex(0);
+    setActivePromoIndex(0);
     setServiceReviews([]);
     setReviewsLoading(false);
     setReviewFilter('all');
@@ -406,13 +384,14 @@ export default function HomePageClient() {
     }
   };
 
-  const openChatModal = async (service) => {
+  const openChatModal = async (service, itemDetail = null) => {
     if (!user) {
       alert('Silakan login terlebih dahulu');
       return;
     }
 
     setSelectedService(service);
+    setSelectedChatItem(itemDetail);
     setMessages([]);
     setNewMessage('');
     setShowRatingForm(false);
@@ -426,7 +405,16 @@ export default function HomePageClient() {
       console.log('[openChatModal] Loading chat for service:', service.id);
 
       // Load existing chat if any
-      const response = await fetch(`/api/chat?serviceId=${service.id}&customerId=${user.id}`);
+      const chatQuery = new URLSearchParams({
+        serviceId: service.id,
+        customerId: user.id
+      });
+
+      if (itemDetail?.id) {
+        chatQuery.set('itemId', itemDetail.id);
+      }
+
+      const response = await fetch(`/api/chat?${chatQuery.toString()}`);
       const data = await response.json();
 
       if (data.success && data.data) {
@@ -449,6 +437,7 @@ export default function HomePageClient() {
         setChatData(null);
         setMessages([]);
         setDealData(null);
+        setSelectedChatItem(null);
       }
     } catch (error) {
       console.error('[openChatModal] Error:', error);
@@ -472,7 +461,7 @@ export default function HomePageClient() {
     if (!newMessage.trim()) return;
     if (!selectedService) return;
     if (!user) return;
-    if (chatData?.dealStatus === 'closed') {
+    if (chatData?.dealStatus === 'closed' || chatData?.closedAt) {
       alert('Chat sudah ditutup setelah pembayaran selesai.');
       return;
     }
@@ -490,6 +479,8 @@ export default function HomePageClient() {
           vendorName: selectedService.vendorName,
           customerId: user.id,
           customerName: user.name,
+          itemId: activeChatItem?.id || null,
+          itemName: activeChatItem?.namaBarang || activeChatItem?.namaJasa || null,
           message: newMessage,
           senderId: user.id,
           senderName: user.name
@@ -797,7 +788,103 @@ export default function HomePageClient() {
     return filtered;
   };
 
+  const getServiceAvailability = (service) => Number(
+    service?.availableQuantity ?? service?.availability ?? service?.quantity ?? 0
+  );
+
   const filteredServices = getFilteredServices();
+  const visiblePromos = Array.isArray(promos)
+    ? promos.filter((promo) => Number(promo?.promoPrice) > 0)
+    : [];
+
+  const handlePromoCheckout = (promoId) => {
+    if (!promoId) return;
+    if (!user) {
+      alert('Silakan login terlebih dahulu untuk mengambil promo.');
+      return;
+    }
+
+    const promo = selectedServicePromos.find((item) => String(item.id) === String(promoId));
+    if (promo?.userHasClaimed) {
+      alert('Promo ini hanya bisa dipakai 1 kali per user.');
+      return;
+    }
+
+    const remainingApplicants = getPromoRemainingApplicants(promo);
+    if (Number.isFinite(remainingApplicants) && remainingApplicants <= 0) {
+      alert('Kuota promo sudah habis.');
+      return;
+    }
+
+    if (promo?.endAt && new Date(promo.endAt).getTime() <= promoNow) {
+      alert('Promo sudah berakhir.');
+      return;
+    }
+
+    router.push(`/transaction/payment?promoId=${encodeURIComponent(promoId)}`);
+  };
+
+  const getPromosForService = (service) => {
+    if (!service) return [];
+    const serviceVendorId = service.vendorId ?? service.vendor?.id;
+    return visiblePromos
+      .filter((promo) => String(promo.vendorId) === String(serviceVendorId))
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  };
+
+  const getPromoCountdownLabel = (promo) => {
+    if (!promo?.endAt) return 'Tanpa batas waktu';
+
+    const endTime = new Date(promo.endAt).getTime();
+    if (Number.isNaN(endTime)) return 'Tanpa batas waktu';
+
+    const diff = endTime - promoNow;
+    if (diff <= 0) return 'Berakhir';
+
+    const totalSeconds = Math.floor(diff / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${days > 0 ? `${days}d ` : ''}${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`.trim();
+  };
+
+  const getPromoRemainingApplicants = (promo) => {
+    if (Number.isFinite(Number(promo?.remainingApplicants))) {
+      return Number(promo.remainingApplicants);
+    }
+
+    if (Number.isFinite(Number(promo?.maxApplicants)) && Number.isFinite(Number(promo?.claimedCount))) {
+      return Math.max(0, Number(promo.maxApplicants) - Number(promo.claimedCount));
+    }
+
+    return null;
+  };
+
+  const selectedServicePromos = getPromosForService(selectedService);
+  const normalizedPromoIndex = selectedServicePromos.length > 0
+    ? ((activePromoIndex % selectedServicePromos.length) + selectedServicePromos.length) % selectedServicePromos.length
+    : 0;
+  const activeServicePromo = selectedServicePromos[normalizedPromoIndex] || null;
+  const activeServicePromoRemainingApplicants = getPromoRemainingApplicants(activeServicePromo);
+  const activeServicePromoIsExpired = Boolean(activeServicePromo?.endAt && new Date(activeServicePromo.endAt).getTime() <= promoNow);
+  const activeServicePromoIsClaimed = Boolean(activeServicePromo?.userHasClaimed);
+  const activeServicePromoCanCheckout = Boolean(activeServicePromo)
+    && !activeServicePromoIsExpired
+    && !activeServicePromoIsClaimed
+    && (activeServicePromoRemainingApplicants === null || activeServicePromoRemainingApplicants > 0);
+
+  const showNextPromo = () => {
+    if (selectedServicePromos.length <= 1) return;
+    setActivePromoIndex((prev) => (prev + 1) % selectedServicePromos.length);
+  };
+
+  const showPrevPromo = () => {
+    if (selectedServicePromos.length <= 1) return;
+    setActivePromoIndex((prev) => (prev - 1 + selectedServicePromos.length) % selectedServicePromos.length);
+  };
+
   const specificationEntries = getNonEmptyObjectEntries(selectedService?.specifications);
   const descriptionTableEntries = getNonEmptyObjectEntries(selectedService?.descriptionTable);
   const variationEntries = getNonEmptyObjectEntries(selectedService?.variations);
@@ -911,7 +998,7 @@ export default function HomePageClient() {
               const isPopular = rentCountNum >= 100;
               const mainCategoryText = String(service.mainCategory || service.category || '').toLowerCase();
               const isJasaService = service.type === 'jasa' || mainCategoryText.includes('jasa');
-              const serviceAvailability = Number(service.availability ?? service.quantity ?? 0);
+              const serviceAvailability = getServiceAvailability(service);
               const shortDesc = service.detailDescription || service.shortDescription || (service.description ? service.description.substring(0, 80) + '...' : '');
               const imageUrl = service.image || (service.images && service.images.length > 0 ? service.images[0] : 'https://via.placeholder.com/300x200?text=' + encodeURIComponent(service.title || 'Service'));
               
@@ -1340,14 +1427,14 @@ export default function HomePageClient() {
                                         margin: '0',
                                         fontSize: '10px',
                                         fontWeight: '600',
-                                        color: (Number(selectedService.availability || selectedService.quantity || 0) > 0) ? '#10b981' : '#dc2626',
-                                        backgroundColor: (Number(selectedService.availability || selectedService.quantity || 0) > 0) ? '#d1fae5' : '#fee2e2',
+                                        color: (getServiceAvailability(selectedService) > 0) ? '#10b981' : '#dc2626',
+                                        backgroundColor: (getServiceAvailability(selectedService) > 0) ? '#d1fae5' : '#fee2e2',
                                         padding: '2px 8px',
                                         borderRadius: '4px',
                                         whiteSpace: 'nowrap'
                                       }}>
-                                        {Number(selectedService.availability || selectedService.quantity || 0) > 0
-                                          ? `Availability: ${Number(selectedService.availability || selectedService.quantity || 0)}`
+                                        {getServiceAvailability(selectedService) > 0
+                                          ? `Availability: ${getServiceAvailability(selectedService)}`
                                           : 'Penuh'}
                                       </p>
                                     )}
@@ -1366,7 +1453,7 @@ export default function HomePageClient() {
                               marginTop: '16px'
                             }}>
                               {(() => {
-                                const jasaAvailability = Number(selectedService?.availability || selectedService?.quantity || 0);
+                                const jasaAvailability = getServiceAvailability(selectedService);
                                 const isJasaItem = selectedService?.type === 'jasa' && selectedItemDetail.stok === undefined;
                                 const isUnavailable = isJasaItem ? jasaAvailability <= 0 : selectedItemDetail.stok === 0;
 
@@ -1433,7 +1520,7 @@ export default function HomePageClient() {
                               </div>
                               <button
                                 className="btn-primary-modal"
-                                onClick={() => openChatModal(selectedService)}
+                                onClick={() => openChatModal(selectedService, selectedItemDetail)}
                                 disabled={user && user.id === selectedService.vendorId || isUnavailable}
                                 style={{
                                   width: '100%',
@@ -1461,6 +1548,174 @@ export default function HomePageClient() {
                           <p style={{ color: '#999', textAlign: 'center', padding: '40px 0' }}>
                             Belum ada paket tersedia
                           </p>
+                        </div>
+                      )}
+
+                      {selectedServicePromos.length > 0 && (
+                        <div
+                          style={{
+                            marginTop: '20px',
+                            padding: '14px',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '14px',
+                            background: 'linear-gradient(135deg, #eff6ff, #f8fafc)'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#1d4ed8' }}>
+                              Promo Vendor
+                            </h4>
+                            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
+                              {selectedServicePromos.length} promo tersedia
+                            </span>
+                          </div>
+
+                          {activeServicePromo && (
+                            <div
+                              onWheel={(event) => {
+                                if (Math.abs(event.deltaX) < 8 && Math.abs(event.deltaY) < 8) return;
+                                if (event.deltaX > 0 || event.deltaY > 0) {
+                                  showNextPromo();
+                                } else {
+                                  showPrevPromo();
+                                }
+                              }}
+                              style={{
+                                border: '1px solid #dbeafe',
+                                borderRadius: '14px',
+                                background: 'white',
+                                overflow: 'hidden'
+                              }}
+                            >
+                              <div style={{ position: 'relative', height: '190px', background: '#e5e7eb' }}>
+                                <img
+                                  src={activeServicePromo.image || 'https://via.placeholder.com/800x500?text=Promo'}
+                                  alt={activeServicePromo.title || 'Promo'}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  onError={(event) => {
+                                    event.currentTarget.src = 'https://via.placeholder.com/800x500?text=Promo';
+                                  }}
+                                />
+
+                                {selectedServicePromos.length > 1 && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={showPrevPromo}
+                                      style={{
+                                        position: 'absolute',
+                                        left: '10px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        width: '34px',
+                                        height: '34px',
+                                        borderRadius: '999px',
+                                        border: 'none',
+                                        background: 'rgba(15, 23, 42, 0.55)',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontWeight: '800'
+                                      }}
+                                      aria-label="Promo sebelumnya"
+                                    >
+                                      ◀
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={showNextPromo}
+                                      style={{
+                                        position: 'absolute',
+                                        right: '10px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        width: '34px',
+                                        height: '34px',
+                                        borderRadius: '999px',
+                                        border: 'none',
+                                        background: 'rgba(15, 23, 42, 0.55)',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontWeight: '800'
+                                      }}
+                                      aria-label="Promo berikutnya"
+                                    >
+                                      ▶
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+
+                              <div style={{ padding: '14px' }}>
+                                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#64748b', fontWeight: '700' }}>
+                                  Promo {normalizedPromoIndex + 1} dari {selectedServicePromos.length}
+                                </p>
+                                <h4 style={{ margin: '0 0 6px 0', fontSize: '27px', lineHeight: '1.2', color: '#1f2937' }}>
+                                  {activeServicePromo.title || 'Promo Spesial'}
+                                </h4>
+                                <p style={{ margin: '0 0 10px 0', color: '#475569', fontSize: '14px', lineHeight: '1.45' }}>
+                                  {activeServicePromo.description || 'Promo vendor dengan harga spesial. Geser kiri atau kanan untuk melihat promo lain.'}
+                                </p>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                                  <div>
+                                    <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Harga Promo</p>
+                                    <p style={{ margin: 0, fontSize: '32px', fontWeight: '900', color: '#dc2626', lineHeight: '1.1' }}>
+                                      Rp {Number(activeServicePromo.promoPrice || 0).toLocaleString('id-ID')}
+                                    </p>
+                                    <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '12px', color: '#475569' }}>
+                                      <span>⏳ {getPromoCountdownLabel(activeServicePromo)}</span>
+                                      <span>
+                                        👤 {activeServicePromoRemainingApplicants === null
+                                          ? 'Kuota tidak dibatasi'
+                                          : `${activeServicePromoRemainingApplicants} kuota tersisa`}
+                                      </span>
+                                      {activeServicePromoIsClaimed && <span>1x/user</span>}
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePromoCheckout(activeServicePromo.id)}
+                                    disabled={!activeServicePromoCanCheckout}
+                                    style={{
+                                      border: 'none',
+                                      borderRadius: '10px',
+                                      background: activeServicePromoCanCheckout ? '#2563eb' : '#cbd5e1',
+                                      color: activeServicePromoCanCheckout ? '#fff' : '#64748b',
+                                      padding: '11px 14px',
+                                      fontSize: '13px',
+                                      fontWeight: '700',
+                                      cursor: activeServicePromoCanCheckout ? 'pointer' : 'not-allowed',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    {activeServicePromoCanCheckout ? 'Ambil Promo' : 'Promo Tidak Tersedia'}
+                                  </button>
+                                </div>
+
+                                {selectedServicePromos.length > 1 && (
+                                  <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
+                                    {selectedServicePromos.map((promo, index) => (
+                                      <button
+                                        key={promo.id}
+                                        type="button"
+                                        onClick={() => setActivePromoIndex(index)}
+                                        style={{
+                                          width: '8px',
+                                          height: '8px',
+                                          borderRadius: '999px',
+                                          border: 'none',
+                                          cursor: 'pointer',
+                                          background: index === normalizedPromoIndex ? '#2563eb' : '#cbd5e1',
+                                          padding: 0
+                                        }}
+                                        aria-label={`Lihat promo ${index + 1}`}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </>
@@ -1736,34 +1991,6 @@ export default function HomePageClient() {
 
                 </div>
 
-                <div className="info-section" style={{ marginTop: '24px', background: 'linear-gradient(135deg, #f8f7ff, #eef6ff)', border: '1px solid #dbeafe' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <div>
-                      <h4 style={{ margin: 0 }}>🎁 Offer Promo Random</h4>
-                      <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#6b7280' }}>Rekomendasi menarik dari produk lain yang sedang tampil di katalog.</p>
-                    </div>
-                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#5A45D1', background: '#ede9fe', padding: '6px 10px', borderRadius: '999px' }}>Limited deal</span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
-                    {getPromoOffers(selectedService).map((offer) => (
-                      <div key={offer.id} style={{ background: 'white', borderRadius: '14px', overflow: 'hidden', border: '1px solid #e5e7eb', boxShadow: '0 8px 20px rgba(91, 69, 209, 0.08)' }}>
-                        <div style={{ height: '120px', background: '#f3f4f6' }}>
-                          <img src={offer.image || 'https://via.placeholder.com/400x240?text=Promo'} alt={offer.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        </div>
-                        <div style={{ padding: '14px' }}>
-                          <div style={{ fontSize: '12px', color: '#7c3aed', fontWeight: '700', marginBottom: '6px' }}>Promo {offer.code ? `• ${offer.code}` : 'spesial'}</div>
-                          <div style={{ fontSize: '15px', fontWeight: '800', color: '#111827', marginBottom: '8px' }}>{offer.title}</div>
-                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '18px', fontWeight: '900', color: '#dc2626' }}>Rp {Number(offer.promoPrice ?? offer.originalPrice).toLocaleString('id-ID')}</span>
-                            <span style={{ fontSize: '12px', color: '#6b7280', textDecoration: 'line-through' }}>Rp {Number(offer.originalPrice || 0).toLocaleString('id-ID')}</span>
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#4b5563', minHeight: '36px' }}>{offer.description}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
                 <div className="modal-actions">
                   <button 
                     className="btn-primary-modal"
@@ -1792,6 +2019,11 @@ export default function HomePageClient() {
                 <p style={{ margin: '4px 0 0 0', color: '#666', fontSize: '13px' }}>
                   {selectedService.title}
                 </p>
+                {activeChatItem && (
+                  <p style={{ margin: '2px 0 0 0', color: '#5A45D1', fontSize: '12px', fontWeight: 600 }}>
+                    Paket: {activeChatItem.namaBarang || activeChatItem.namaJasa}
+                  </p>
+                )}
               </div>
               <button className="modal-close" onClick={closeChatModal}>✕</button>
             </div>
@@ -1807,9 +2039,9 @@ export default function HomePageClient() {
                   <p>Mulai percakapan dengan vendor ini</p>
                 </div>
               ) : (
-                messages.map((msg) => (
+                messages.map((msg, index) => (
                   <div
-                    key={msg.id}
+                    key={`${msg.id || msg.timestamp}-${index}`}
                     className={`chat-message ${msg.senderId === user.id ? 'customer' : 'vendor'}`}
                   >
                     <div className="message-content">
@@ -1833,7 +2065,7 @@ export default function HomePageClient() {
                   const statusConfig = getDealStatusConfig();
                   const finalPrice = dealData?.finalPrice || dealData?.originalPrice || 0;
                   // Buttons disabled jika: agreed, cancelled, closed, atau completed tapi belum rating
-                  const dealDisabled = dealData?.status === 'agreed' || dealData?.status === 'cancelled' || chatData?.dealStatus === 'closed';
+                  const dealDisabled = dealData?.status === 'agreed' || dealData?.status === 'cancelled' || chatData?.dealStatus === 'closed' || chatData?.closedAt;
 
                   return (
                     <div
@@ -1850,7 +2082,7 @@ export default function HomePageClient() {
                       <div style={{ fontSize: '12px', color: '#4b5563', marginTop: '3px' }}>
                         {statusConfig.description}
                       </div>
-                      {chatData?.dealStatus === 'closed' && (
+                      {(chatData?.dealStatus === 'closed' || chatData?.closedAt) && (
                         <div style={{ marginTop: '6px', fontSize: '12px', fontWeight: '700', color: '#92400e' }}>
                           Chat sudah ditutup setelah pembayaran selesai.
                         </div>
@@ -1903,7 +2135,7 @@ export default function HomePageClient() {
                         </button>
                       </div>
 
-                      {dealData?.status === 'agreed' && (
+                      {dealData?.status === 'agreed' && chatData?.dealStatus !== 'closed' && !chatData?.closedAt && (
                         <div style={{ marginTop: '8px', fontSize: '12px', color: '#1e40af' }}>
                           <div style={{ fontWeight: '700' }}>
                             Harga akhir: Rp {Number(finalPrice).toLocaleString('id-ID')}
@@ -1945,7 +2177,7 @@ export default function HomePageClient() {
                     placeholder="Ketik pesan..."
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    disabled={chatData?.dealStatus === 'closed'}
+                    disabled={chatData?.dealStatus === 'closed' || chatData?.closedAt}
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         sendMessage();

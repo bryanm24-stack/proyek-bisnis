@@ -4,8 +4,8 @@
     "vendorId": "1",
     "vendorName": "Apple Vendor",
     "mainCategory": "Jasa Kreatif & Media",
-    "subCategory": "Fotografi & Videografi",
-    "superSubCategory": "Fotografer",
+    "subCategory": "Videografi",
+    "superSubCategory": "Video Documentation",
     "category": "Jasa Kreatif & Media",
     "type": "jasa",
     "title": "Paket Fotografi Profesional",
@@ -16,12 +16,11 @@
     "minimumDays": 4,
     "quantity": 3,
     "rentalPolicy": "Pembayaran 50% di awal, 50% di hari acara. Biaya tambahan untuk venue di luar Jakarta Rp 500.000 per jam perjalanan.",
-    "location": "Jakarta Selatan, Indonesia",
+    "location": "Surabaya, Indonesia",
     "rating": 4.8,
     "rentCount": 24,
     "images": [
-      "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=400&q=80",
-      "https://images.unsplash.com/photo-1492691519957-e9f31c987c06?w=400&q=80"
+      "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=400&q=80"
     ],
     "specifications": {
       "sensorResolution": "45MP Full Frame",
@@ -33,14 +32,26 @@
     "specificationOptions": {
       "sensorResolution": {
         "options": [
-          { "id": "opt-45mp", "label": "45MP Full Frame" },
-          { "id": "opt-61mp", "label": "61MP High Resolution" }
+          {
+            "id": "opt-45mp",
+            "label": "45MP Full Frame"
+          },
+          {
+            "id": "opt-61mp",
+            "label": "61MP High Resolution"
+          }
         ]
       },
       "lensMount": {
         "options": [
-          { "id": "opt-sony", "label": "Sony E-Mount" },
-          { "id": "opt-canon", "label": "Canon RF Mount" }
+          {
+            "id": "opt-sony",
+            "label": "Sony E-Mount"
+          },
+          {
+            "id": "opt-canon",
+            "label": "Canon RF Mount"
+          }
         ]
       }
     },
@@ -49,7 +60,7 @@
       "descWorkflow": "Konsultasi awal → Pre-shoot planning → Dokumentasi hari H → Editing & Color grading → Delivery soft copy",
       "descDeliverable": "Minimal 500 foto terseleksi dalam resolusi tinggi, 2-3 video cinematic, soft copy dalam drive cloud",
       "descRevision": "Unlimited editing revision untuk kepuasan klien",
-      "descOperationalArea": "Jakarta, Bogor, Depok, Tangerang. Tersedia jasa ke luar kota dengan biaya tambahan."
+      "descOperationalArea": "Surabaya dan sekitarnya. Tersedia jasa ke luar kota dengan biaya tambahan."
     },
     "checklist": {
       "Portofolio/riwayat kerja tersedia": true,
@@ -66,62 +77,54 @@
           "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=300&q=80"
         ],
         "variationValues": {},
-        "specOptionValues": {
-          "sensorResolution": "opt-45mp",
-          "lensMount": "opt-sony"
-        }
+        "specOptionValues": {}
       },
       {
         "id": "item-foto-fullday",
         "namaJasa": "Full Day (12 jam)",
         "hargaSesi": 2000000,
         "images": [
-          "https://images.unsplash.com/photo-1491381823360-5d1e81980b87?w=300&q=80"
+          "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=300&q=80"
         ],
         "variationValues": {},
-        "specOptionValues": {
-          "sensorResolution": "opt-61mp",
-          "lensMount": "opt-sony"
-        }
+        "specOptionValues": {}
       },
       {
         "id": "item-foto-pre-wed",
         "namaJasa": "Paket Pre-Wedding (2 lokasi, 8 jam)",
         "hargaSesi": 1500000,
         "images": [
-          "https://images.unsplash.com/photo-1606216174052-c5a31ccf2879?w=300&q=80"
+          "https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=300&q=80"
         ],
         "variationValues": {},
-        "specOptionValues": {
-          "sensorResolution": "opt-45mp",
-          "lensMount": "opt-canon"
-        }
+        "specOptionValues": {}
       }
     ],
-    "variations": {}
+    "variations": {},
+    "availableQuantity": 3,
+    "availability": 3
   },
   {
     "id": "1704067201000",
     "vendorId": "2",
     "vendorName": "Banana Vendor",
     "mainCategory": "Jasa Kreatif & Media",
-    "subCategory": "Event Planning & Dekorasi",
-    "superSubCategory": "Dekorasi Acara",
+    "subCategory": "Fotografi",
+    "superSubCategory": "Fotografer Wedding",
     "category": "Jasa Kreatif & Media",
     "type": "jasa",
     "title": "Paket Dekorasi Acara Premium",
     "shortDescription": "Layanan dekorasi profesional untuk semua jenis acara",
     "description": "Tim dekorator berpengalaman kami siap mewujudkan konsep dekorasi impian Anda dengan material berkualitas tinggi dan desain yang menarik.",
     "detailDescription": "Kami menyediakan paket dekorasi lengkap mulai dari konsep, setup hingga takedown dengan hasil yang memukau dan sesuai budget.",
-    "price": 800000,
+    "price": 1500000,
     "minimumDays": 1,
     "quantity": 5,
     "rentalPolicy": "Konsultasi gratis. Pembayaran 40% untuk booking, 60% sebelum hari H. Biaya dibatalkan jika klien membatalkan 7 hari sebelumnya.",
-    "location": "Bintaro, Jakarta Selatan",
+    "location": "Surabaya, Indonesia",
     "rating": 4.6,
     "rentCount": 18,
     "images": [
-      "https://images.unsplash.com/photo-1519167758481-dc8997617291?w=400&q=80",
       "https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=400&q=80"
     ],
     "specifications": {
@@ -133,15 +136,30 @@
     "specificationOptions": {
       "materialType": {
         "options": [
-          { "id": "opt-kain-premium", "label": "Kain Premium + Bunga Artificial" },
-          { "id": "opt-kain-standar", "label": "Kain Standar + Bunga Kertas" }
+          {
+            "id": "opt-kain-premium",
+            "label": "Kain Premium + Bunga Artificial"
+          },
+          {
+            "id": "opt-kain-standar",
+            "label": "Kain Standar + Bunga Kertas"
+          }
         ]
       },
       "productColor": {
         "options": [
-          { "id": "opt-putih-gold", "label": "Putih & Gold" },
-          { "id": "opt-merah-maroon", "label": "Merah & Maroon" },
-          { "id": "opt-pastel", "label": "Pastel Mix" }
+          {
+            "id": "opt-putih-gold",
+            "label": "Putih & Gold"
+          },
+          {
+            "id": "opt-merah-maroon",
+            "label": "Merah & Maroon"
+          },
+          {
+            "id": "opt-pastel",
+            "label": "Pastel Mix"
+          }
         ]
       }
     },
@@ -150,7 +168,7 @@
       "descWorkflow": "Konsultasi tema → Design preview → Persiapan material → Setup hari H → Dokumentasi → Takedown",
       "descDeliverable": "Dekorasi lengkap, dokumentasi foto setup, konsultasi tema gratis",
       "descRevision": "Revisi konsep hingga klien puas sebelum eksekusi",
-      "descOperationalArea": "Jakarta, Tangerang, Bogor untuk jangkauan maksimal"
+      "descOperationalArea": "Surabaya dan sekitarnya untuk jangkauan maksimal"
     },
     "checklist": {
       "Portofolio/riwayat kerja tersedia": true,
@@ -160,19 +178,6 @@
     },
     "items": [
       {
-        "id": "item-dekor-intimate",
-        "namaJasa": "Dekorasi Intimate (40-50 tamu)",
-        "hargaSesi": 800000,
-        "images": [
-          "https://images.unsplash.com/photo-1519167758481-dc8997617291?w=300&q=80"
-        ],
-        "variationValues": {},
-        "specOptionValues": {
-          "materialType": "opt-kain-premium",
-          "productColor": "opt-putih-gold"
-        }
-      },
-      {
         "id": "item-dekor-medium",
         "namaJasa": "Dekorasi Medium (100-150 tamu)",
         "hargaSesi": 1500000,
@@ -180,10 +185,7 @@
           "https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=300&q=80"
         ],
         "variationValues": {},
-        "specOptionValues": {
-          "materialType": "opt-kain-premium",
-          "productColor": "opt-merah-maroon"
-        }
+        "specOptionValues": {}
       },
       {
         "id": "item-dekor-grand",
@@ -193,13 +195,12 @@
           "https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=300&q=80"
         ],
         "variationValues": {},
-        "specOptionValues": {
-          "materialType": "opt-kain-premium",
-          "productColor": "opt-pastel"
-        }
+        "specOptionValues": {}
       }
     ],
-    "variations": {}
+    "variations": {},
+    "availableQuantity": 5,
+    "availability": 5
   },
   {
     "id": "1704067202000",
@@ -217,7 +218,7 @@
     "price": 50000,
     "minimumDays": 1,
     "rentalPolicy": "Biaya sewa per unit per hari. Garansi uang kembali jika ada kerusakan pabrik. Denda Rp 50.000 untuk kerusakan akibat penyewaan.",
-    "location": "Kebayoran Baru, Jakarta Selatan",
+    "location": "Surabaya, Indonesia",
     "rating": 4.7,
     "rentCount": 45,
     "images": [
@@ -233,16 +234,34 @@
     "specificationOptions": {
       "materialType": {
         "options": [
-          { "id": "opt-jati", "label": "Kayu Jati Solid" },
-          { "id": "opt-iron", "label": "Besi Berkualitas" }
+          {
+            "id": "opt-jati",
+            "label": "Kayu Jati Solid"
+          },
+          {
+            "id": "opt-iron",
+            "label": "Besi Berkualitas"
+          }
         ]
       },
       "productColor": {
         "options": [
-          { "id": "opt-hitam", "label": "Hitam" },
-          { "id": "opt-putih", "label": "Putih" },
-          { "id": "opt-cokelat", "label": "Cokelat" },
-          { "id": "opt-krem", "label": "Krem" }
+          {
+            "id": "opt-hitam",
+            "label": "Hitam"
+          },
+          {
+            "id": "opt-putih",
+            "label": "Putih"
+          },
+          {
+            "id": "opt-cokelat",
+            "label": "Cokelat"
+          },
+          {
+            "id": "opt-krem",
+            "label": "Krem"
+          }
         ]
       }
     },
@@ -250,7 +269,7 @@
       "descCondition": "Semua kursi dan meja dalam kondisi prima, bersih, dan terawat",
       "descCompleteness": "Kursi dengan bantalan empuk, meja dengan permukaan rata dan stabil",
       "descUsageRules": "Hanya untuk acara indoor maupun outdoor. Hindari beban lebih dari kapasitas maksimal. Pembersih yang lembut saja.",
-      "descDelivery": "Pengiriman dan pemasangan gratis untuk area Jakarta. Pickup juga tersedia.",
+      "descDelivery": "Pengiriman dan pemasangan gratis untuk area Surabaya. Pickup juga tersedia.",
       "descDamagePolicy": "Kerusakan parah dihitung 30-50% dari harga sewa. Kehilangan barang diperhitungkan 100%."
     },
     "checklist": {

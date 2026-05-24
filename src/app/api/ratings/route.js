@@ -25,6 +25,8 @@ export async function POST(request) {
     const ratingsPath = path.join(process.cwd(), 'ratings.json');
     const servicesPath = path.join(process.cwd(), 'services.json');
     const dealsPath = path.join(process.cwd(), 'deals.json');
+    const chatsPath = path.join(process.cwd(), 'chats.json');
+    const usersPath = path.join(process.cwd(), 'users.json');
 
     const ratingsData = await fs.readFile(ratingsPath, 'utf-8');
     const ratings = JSON.parse(ratingsData.trim());
@@ -39,6 +41,8 @@ export async function POST(request) {
         message: 'Layanan tidak ditemukan'
       }, { status: 404 });
     }
+
+    const serviceType = String(service.type || 'barang').toLowerCase();
 
     // Check duplikasi rating per siklus deal; fallback ke service untuk data lama tanpa dealId.
     const existingRating = dealId
@@ -87,6 +91,8 @@ export async function POST(request) {
 
     // Update deal ratingCompleted if dealId provided
     let updatedDeal = null;
+    let updatedChat = null;
+    let chatResetAfterRating = false;
     if (dealId) {
       try {
         const dealsData = await fs.readFile(dealsPath, 'utf-8');
@@ -94,8 +100,33 @@ export async function POST(request) {
         const deal = deals.find(d => d.id === dealId);
         if (deal) {
           deal.ratingCompleted = true;
-          await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
           updatedDeal = deal;
+
+          const shouldResetForNewCycle = serviceType === 'barang';
+
+          // Barang: setelah rating, buka kembali deal/chat agar siap siklus beli berikutnya.
+          const usersData = await fs.readFile(usersPath, 'utf-8');
+          const users = JSON.parse(usersData.trim());
+          const customerUser = users.find((u) => String(u.id) === String(deal.customerId));
+          const vendorUser = users.find((u) => String(u.id) === String(deal.vendorId));
+          const isVendorToVendor = customerUser?.role === 'vendor' && vendorUser?.role === 'vendor';
+
+          if ((shouldResetForNewCycle || isVendorToVendor) && deal.chatId) {
+            const chatsData = await fs.readFile(chatsPath, 'utf-8');
+            const chats = JSON.parse(chatsData.trim());
+            const chat = chats.find((c) => String(c.id) === String(deal.chatId));
+
+            if (chat) {
+              chat.dealStatus = 'pending';
+              chat.closedAt = null;
+              chat.closedReason = null;
+              await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
+              updatedChat = chat;
+              chatResetAfterRating = true;
+            }
+          }
+
+          await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
         }
       } catch (e) {
         console.warn('Could not update deal ratingCompleted:', e);
@@ -112,7 +143,9 @@ export async function POST(request) {
       data: {
         rating: newRating,
         updatedService: service,
-        updatedDeal
+        updatedDeal,
+        updatedChat,
+        chatResetAfterRating
       }
     }, { status: 201 });
   } catch (error) {
