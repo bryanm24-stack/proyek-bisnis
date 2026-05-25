@@ -411,6 +411,42 @@ export async function PUT(request) {
                 services[svcIndex] = svc;
                 fs.writeFileSync(servicesFile, JSON.stringify(services, null, 2));
               }
+                else {
+                  // Fallback: booking not found or already reserved. Try to derive quantity from transactions.
+                  try {
+                    const transactionsRaw = fs.readFileSync(transactionsFile, 'utf-8');
+                    const transactions = transactionsRaw ? JSON.parse(transactionsRaw.replace(/^\uFEFF/, '').trim() || '[]') : [];
+                    const trx = transactions.find(t => String(t.id) === String(updatedInvoice.paymentTransactionId) || String(t.dealId) === String(existing.id));
+                    const qtyFromTrx = trx ? Number(trx.quantity || trx.requestedQuantity || 1) : 0;
+                    const qtyUse = qtyFromTrx > 0 ? qtyFromTrx : 0;
+                    if (qtyUse > 0) {
+                      // decrease availableQuantity by qtyUse if not already reserved
+                      svc.availableQuantity = Math.max(0, Number(svc.availableQuantity || 0) - qtyUse);
+
+                      // Try to decrement item stok using deal/chat mapping as before
+                      try {
+                        const chatsFile = path.join(process.cwd(), 'chats.json');
+                        const chatsRaw = fs.readFileSync(chatsFile, 'utf-8');
+                        const chats = chatsRaw ? JSON.parse(chatsRaw.replace(/^\uFEFF/, '').trim() || '[]') : [];
+                        const chat = chats.find(c => String(c.id) === String(existing.chatId));
+                        const itemId = chat?.itemId || existing.itemId || null;
+                        if (itemId && Array.isArray(svc.items)) {
+                          const itemIndex = svc.items.findIndex(it => String(it.id) === String(itemId));
+                          if (itemIndex !== -1 && typeof svc.items[itemIndex].stok === 'number') {
+                            svc.items[itemIndex].stok = Math.max(0, Number(svc.items[itemIndex].stok || 0) - qtyUse);
+                          }
+                        }
+                      } catch (e) {
+                        console.warn('Could not decrement item stok (fallback):', e?.message || e);
+                      }
+
+                      services[svcIndex] = svc;
+                      fs.writeFileSync(servicesFile, JSON.stringify(services, null, 2));
+                    }
+                  } catch (e) {
+                    // ignore
+                  }
+                }
             }
           } catch (e) {
             console.warn('Could not update service stock on payment:', e?.message || e);
