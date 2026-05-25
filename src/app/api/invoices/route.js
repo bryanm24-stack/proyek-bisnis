@@ -8,6 +8,36 @@ const servicesFile = path.join(process.cwd(), 'services.json');
 const ratingsFile = path.join(process.cwd(), 'ratings.json');
 const usersFile = path.join(process.cwd(), 'users.json');
 
+// Global invoice counter file (simple persistent counter)
+const invoiceCounterFile = path.join(process.cwd(), 'invoice_counter.json');
+
+function ensureInvoiceCounter() {
+  try {
+    if (!fs.existsSync(invoiceCounterFile)) {
+      fs.writeFileSync(invoiceCounterFile, JSON.stringify({ next: 1 }, null, 2), 'utf-8');
+    }
+  } catch (e) {
+    console.warn('Could not ensure invoice counter file:', e?.message || e);
+  }
+}
+
+function getNextInvoiceId() {
+  try {
+    ensureInvoiceCounter();
+    const raw = fs.readFileSync(invoiceCounterFile, 'utf-8');
+    const obj = raw ? JSON.parse(raw.replace(/^\uFEFF/, '').trim() || '{}') : {};
+    let next = Number(obj.next || 1);
+    const id = 'INV-' + String(next).padStart(6, '0');
+    // increment and persist
+    obj.next = next + 1;
+    fs.writeFileSync(invoiceCounterFile, JSON.stringify(obj, null, 2), 'utf-8');
+    return id;
+  } catch (e) {
+    console.warn('Could not read/write invoice counter, falling back to timestamp id:', e?.message || e);
+    return `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  }
+}
+
 // Helper: Normalize ID for consistent comparison
 const normalizeId = (id) => String(id || '').trim();
 
@@ -86,7 +116,7 @@ export async function GET(request) {
         deadlineDate.setDate(deadlineDate.getDate() + 2);
 
         invoices.push({
-          id: `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          id: getNextInvoiceId(),
           dealId: transaction.dealId,
           customerId: transaction.userId || relatedDeal?.customerId || null,
           vendorId: relatedDeal?.vendorId || transaction.vendorId || null,
@@ -139,7 +169,7 @@ export async function GET(request) {
         );
 
         invoices.push({
-          id: `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          id: getNextInvoiceId(),
           dealId: deal.id,
           customerId: deal.customerId || null,
           vendorId: deal.vendorId || null,
@@ -264,7 +294,7 @@ export async function POST(request) {
 
     // Create new invoice
     const newInvoice = {
-      id: `INV-${Date.now()}`,
+      id: getNextInvoiceId(),
       dealId: body.dealId,
       customerId: body.customerId,
       vendorId: body.vendorId,
@@ -324,12 +354,103 @@ export async function PUT(request) {
         const dealIndex = deals.findIndex(d => d.id === updatedInvoice.dealId);
         if (dealIndex !== -1) {
           // Only update invoice status and record payment timestamp.
-          deals[dealIndex] = {
-            ...deals[dealIndex],
+          const existing = deals[dealIndex];
+          const updated = {
+            ...existing,
             invoiceStatus: 'paid',
             paymentConfirmedAt: new Date().toISOString()
           };
+
+          // If the deal was in 'agreed' state (waiting payment), move it to 'active'
+          // but do NOT mark as 'completed' here. Also set borrowDate if missing.
+          if (String(existing.status) === 'agreed') {
+            updated.status = 'active';
+            if (!existing.borrowDate) {
+              updated.borrowDate = new Date().toISOString();
+            }
+          }
+
+          deals[dealIndex] = updated;
           fs.writeFileSync(dealsFile, JSON.stringify(deals, null, 2));
+
+          // Also reserve/decrease stock in services.json if there is a matching booking
+          try {
+            const servicesRaw = fs.readFileSync(servicesFile, 'utf-8');
+            const services = servicesRaw ? JSON.parse(servicesRaw.replace(/^\uFEFF/, '').trim() || '[]') : [];
+            const svcIndex = services.findIndex(s => String(s.id) === String(existing.serviceId));
+            if (svcIndex !== -1) {
+              const svc = services[svcIndex];
+              // Find booking by dealId / transactionId / bookingId
+              const booking = (svc.bookings || []).find(b => String(b.dealId) === String(existing.id) || String(b.transactionId || '') === String(updatedInvoice.paymentTransactionId || '') || String(b.id || '') === String(existing.bookingId || ''));
+              if (booking && !booking.stockReserved) {
+                const qty = Number(booking.quantity || 1);
+                // Decrease availableQuantity safely
+                svc.availableQuantity = Math.max(0, Number(svc.availableQuantity || 0) - qty);
+                // Mark booking reserved
+                booking.stockReserved = true;
+
+                // Try to also decrement specific item stock if chat->itemId exists and service.items contains it
+                try {
+                  const chatsFile = path.join(process.cwd(), 'chats.json');
+                  const chatsRaw = fs.readFileSync(chatsFile, 'utf-8');
+                  const chats = chatsRaw ? JSON.parse(chatsRaw.replace(/^\uFEFF/, '').trim() || '[]') : [];
+                  const chat = chats.find(c => String(c.id) === String(existing.chatId));
+                  const itemId = chat?.itemId || existing.itemId || null;
+                  if (itemId && Array.isArray(svc.items)) {
+                    const itemIndex = svc.items.findIndex(it => String(it.id) === String(itemId));
+                    if (itemIndex !== -1 && typeof svc.items[itemIndex].stok === 'number') {
+                      svc.items[itemIndex].stok = Math.max(0, Number(svc.items[itemIndex].stok || 0) - qty);
+                    }
+                  }
+                } catch (e) {
+                  console.warn('Could not decrement item stok:', e?.message || e);
+                }
+                // Optionally decrease individual item stok if service has items and a mapping is clear
+                // (Not implemented here - we update overall availableQuantity)
+                // persist
+                services[svcIndex] = svc;
+                fs.writeFileSync(servicesFile, JSON.stringify(services, null, 2));
+              }
+                else {
+                  // Fallback: booking not found or already reserved. Try to derive quantity from transactions.
+                  try {
+                    const transactionsRaw = fs.readFileSync(transactionsFile, 'utf-8');
+                    const transactions = transactionsRaw ? JSON.parse(transactionsRaw.replace(/^\uFEFF/, '').trim() || '[]') : [];
+                    const trx = transactions.find(t => String(t.id) === String(updatedInvoice.paymentTransactionId) || String(t.dealId) === String(existing.id));
+                    const qtyFromTrx = trx ? Number(trx.quantity || trx.requestedQuantity || 1) : 0;
+                    const qtyUse = qtyFromTrx > 0 ? qtyFromTrx : 0;
+                    if (qtyUse > 0) {
+                      // decrease availableQuantity by qtyUse if not already reserved
+                      svc.availableQuantity = Math.max(0, Number(svc.availableQuantity || 0) - qtyUse);
+
+                      // Try to decrement item stok using deal/chat mapping as before
+                      try {
+                        const chatsFile = path.join(process.cwd(), 'chats.json');
+                        const chatsRaw = fs.readFileSync(chatsFile, 'utf-8');
+                        const chats = chatsRaw ? JSON.parse(chatsRaw.replace(/^\uFEFF/, '').trim() || '[]') : [];
+                        const chat = chats.find(c => String(c.id) === String(existing.chatId));
+                        const itemId = chat?.itemId || existing.itemId || null;
+                        if (itemId && Array.isArray(svc.items)) {
+                          const itemIndex = svc.items.findIndex(it => String(it.id) === String(itemId));
+                          if (itemIndex !== -1 && typeof svc.items[itemIndex].stok === 'number') {
+                            svc.items[itemIndex].stok = Math.max(0, Number(svc.items[itemIndex].stok || 0) - qtyUse);
+                          }
+                        }
+                      } catch (e) {
+                        console.warn('Could not decrement item stok (fallback):', e?.message || e);
+                      }
+
+                      services[svcIndex] = svc;
+                      fs.writeFileSync(servicesFile, JSON.stringify(services, null, 2));
+                    }
+                  } catch (e) {
+                    // ignore
+                  }
+                }
+            }
+          } catch (e) {
+            console.warn('Could not update service stock on payment:', e?.message || e);
+          }
         }
       } catch (dealError) {
         console.warn('Could not update deal:', dealError);
