@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import SharedNavbar from '../components/SharedNavbar';
+import styles from './returns.module.css';
 
 export default function ReturnsPage() {
   const [user, setUser] = useState(null);
@@ -11,10 +12,16 @@ export default function ReturnsPage() {
 
   // Form state for customer submit
   const [dealId, setDealId] = useState('');
+  const [invoicePreview, setInvoicePreview] = useState(null);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [invoiceError, setInvoiceError] = useState('');
+  const [invoiceConfirmed, setInvoiceConfirmed] = useState(false);
   const [itemCondition, setItemCondition] = useState('good');
+  const [invoiceDetailOpen, setInvoiceDetailOpen] = useState(false);
   const [damageDescription, setDamageDescription] = useState('');
   const [photos, setPhotos] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+    const [mode, setMode] = useState('end');
 
   // Inspector state for vendor
   const [inspecting, setInspecting] = useState(null);
@@ -29,6 +36,56 @@ export default function ReturnsPage() {
     } catch {}
   }, []);
 
+  // Debounced invoice lookup when user types an Invoice ID
+  useEffect(() => {
+    setInvoicePreview(null);
+    setInvoiceError('');
+    setInvoiceConfirmed(false);
+    const v = (dealId || '').trim();
+    if (!v) return;
+
+    const normalized = v.replace(/^#/, '').trim();
+    const looksLikeInvoice = /inv/i.test(normalized);
+    if (!looksLikeInvoice) return;
+
+    let cancelled = false;
+    setInvoiceLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const resp = await fetch('/api/invoices');
+        if (!resp.ok) throw new Error('Gagal mengambil daftar invoice');
+        const list = await resp.json();
+        const searchKey = normalized.toLowerCase();
+        const found = list.find((inv) => {
+          if (!inv || !inv.id) return false;
+          const idLower = String(inv.id).toLowerCase();
+          if (idLower === searchKey) return true;
+          if (idLower.includes(searchKey.replace(/^#/, ''))) return true;
+          const digits = searchKey.replace(/[^0-9]/g, '');
+          if (digits && idLower.includes(digits)) return true;
+          return false;
+        });
+        if (cancelled) return;
+        if (!found) {
+          setInvoicePreview(null);
+          setInvoiceError('Invoice tidak ditemukan');
+        } else {
+          setInvoicePreview(found);
+          setInvoiceError('');
+        }
+      } catch (err) {
+        if (!cancelled) setInvoiceError(err.message || 'Gagal mencari invoice');
+      } finally {
+        if (!cancelled) setInvoiceLoading(false);
+      }
+    }, 450);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [dealId]);
+
   useEffect(() => {
     if (!user) return;
     loadReturns();
@@ -40,10 +97,10 @@ export default function ReturnsPage() {
     try {
       const resp = await fetch(`/api/returns?userId=${user.id}&userRole=${user.role}`);
       const json = await resp.json();
-      if (!resp.ok || json.success === false) throw new Error(json.message || 'Gagal memuat retur');
+      if (!resp.ok || json.success === false) throw new Error(json.message || 'Gagal memuat return');
       setReturnsList(Array.isArray(json.data) ? json.data : []);
     } catch (e) {
-      setError(e.message || 'Gagal memuat retur');
+      setError(e.message || 'Gagal memuat return');
     } finally {
       setLoading(false);
     }
@@ -56,11 +113,42 @@ export default function ReturnsPage() {
   async function submitReturn(e) {
     e.preventDefault();
     if (!user) return alert('Login terlebih dahulu');
-    if (!dealId) return alert('Masukkan dealId');
+    if (!dealId) return alert('Masukkan Deal ID atau Invoice ID (contoh: #INV-1778)');
     setSubmitting(true);
     try {
+      // Resolve if user entered an Invoice ID like INV-... or #INV-...
+      let targetDealId = dealId.trim();
+      // If user already confirmed an invoice preview, prefer it
+      if (invoiceConfirmed && invoicePreview) {
+        targetDealId = invoicePreview.dealId || invoicePreview.id || targetDealId;
+      }
+      const normalized = targetDealId.replace(/^#/, '').trim();
+      const looksLikeInvoice = /inv/i.test(normalized);
+      if (looksLikeInvoice && !invoiceConfirmed) {
+        // If input looks like invoice but user didn't confirm preview, try to resolve now
+        const respInv = await fetch('/api/invoices');
+        if (!respInv.ok) throw new Error('Gagal mengambil data invoice');
+        const invList = await respInv.json();
+        const searchKey = normalized.toLowerCase();
+        const found = invList.find((inv) => {
+          if (!inv || !inv.id) return false;
+          const idLower = String(inv.id).toLowerCase();
+          if (idLower === searchKey) return true;
+          if (idLower.includes(searchKey.replace(/^#/, ''))) return true;
+          const digits = searchKey.replace(/[^0-9]/g, '');
+          if (digits && idLower.includes(digits)) return true;
+          return false;
+        });
+
+        if (!found) {
+          throw new Error('Invoice tidak ditemukan. Pastikan ID benar.');
+        }
+        targetDealId = found.dealId || targetDealId;
+      }
+
       const form = new FormData();
-      form.append('dealId', dealId);
+      form.append('dealId', targetDealId);
+      form.append('type', mode === 'issue' ? 'issue' : 'end_of_use');
       form.append('customerId', user.id);
       form.append('itemCondition', itemCondition);
       form.append('damageDescription', damageDescription || '');
@@ -68,14 +156,14 @@ export default function ReturnsPage() {
 
       const r = await fetch('/api/returns', { method: 'POST', body: form });
       const j = await r.json();
-      if (!r.ok || j.success === false) throw new Error(j.message || 'Gagal mengajukan retur');
-      alert('Retur diajukan');
+      if (!r.ok || j.success === false) throw new Error(j.message || 'Gagal mengajukan return');
+      alert('Return diajukan');
       setDealId('');
       setDamageDescription('');
       setPhotos([]);
       loadReturns();
     } catch (err) {
-      alert(err.message || 'Gagal mengajukan retur');
+      alert(err.message || 'Gagal mengajukan return');
     } finally {
       setSubmitting(false);
     }
@@ -112,76 +200,108 @@ export default function ReturnsPage() {
   return (
     <div>
       <SharedNavbar />
-      <div style={{ padding: 24 }}>
-      <h2>Returns</h2>
+      <div className={styles.container}>
+      <h2>{mode === 'end' ? 'Retur (Pengembalian Akhir)' : 'Pengembalian (Lapor Masalah)'}</h2>
+      <div style={{ margin: '12px 0 18px', display: 'flex', gap: 8 }}>
+        <button type="button" onClick={() => setMode('end')} className={mode === 'end' ? styles.btn : styles.btn + ' ' + styles.secondary}>Retur</button>
+        <button type="button" onClick={() => setMode('issue')} className={mode === 'issue' ? styles.btn : styles.btn + ' ' + styles.secondary}>Pengembalian</button>
+      </div>
       {!user && (
         <div style={{ color: '#6b7280' }}>Silakan login untuk melihat atau mengajukan pengembalian barang.</div>
       )}
 
       {user && (
-        <div style={{ display: 'grid', gap: 18 }}>
-          <div style={{ display: 'flex', gap: 18 }}>
-            <div style={{ flex: 1 }}>
-              <h3>Buat Permintaan Pengembalian Barang (Customer)</h3>
+        <div className={styles.grid}>
+          <div className={styles.columns}>
+            <div className={styles.column}>
+              <h3>Buat Permintaan Return Barang (Customer)</h3>
               <form onSubmit={submitReturn}>
-                <div style={{ marginBottom: 8 }}>
-                  <label>Deal ID</label>
-                  <input value={dealId} onChange={(e) => setDealId(e.target.value)} style={{ width: '100%', padding: 8 }} />
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Invoice / Deal ID</label>
+                  <input placeholder="Contoh: #INV-1778 atau DEAL-123" className={styles.input} value={dealId} onChange={(e) => setDealId(e.target.value)} />
+                  {invoiceLoading && <div className={styles.small} style={{ color: '#6b7280', marginTop: 6 }}>Mencari invoice...</div>}
+                  {invoiceError && <div className={styles.small} style={{ color: 'crimson', marginTop: 6 }}>{invoiceError}</div>}
+                  {invoicePreview && (
+                    <div className={styles.invoicePreview} style={{ marginTop: 10, padding: 10, borderRadius: 8, background: '#fff', border: '1px solid #e6e6e6' }}>
+                      <div style={{ display: 'flex', gap: 12 }}>
+                        {invoicePreview.serviceImage && <img src={invoicePreview.serviceImage} alt="img" style={{ width: 80, height: 60, objectFit: 'cover', borderRadius: 6 }} />}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600 }}>{invoicePreview.serviceTitle}</div>
+                          <div className={styles.small}>{invoicePreview.vendorName} • {invoicePreview.customerName}</div>
+                          <div className={styles.small}>Invoice: {invoicePreview.id} — Deal: {invoicePreview.dealId || '-'}</div>
+                          <div className={styles.small}>Total: Rp {(Number(invoicePreview.totalAmount || invoicePreview.remainingPayment || 0)).toLocaleString('id-ID')}</div>
+                        </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+                            <button type="button" className={styles.btn} onClick={() => setInvoiceDetailOpen(true)}>Lihat detail</button>
+                            <button type="button" className={styles.btn} onClick={() => { setDealId(invoicePreview.dealId || invoicePreview.id); setInvoiceConfirmed(true); }}>Gunakan invoice ini</button>
+                            <button type="button" className={styles.secondary} onClick={() => { setInvoicePreview(null); setDealId(''); }}>Batal</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div style={{ marginBottom: 8 }}>
-                  <label>Kondisi Barang</label>
-                  <select value={itemCondition} onChange={(e) => setItemCondition(e.target.value)} style={{ width: '100%', padding: 8 }}>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Kondisi Barang</label>
+                  <select className={styles.select} value={itemCondition} onChange={(e) => setItemCondition(e.target.value)}>
                     <option value="good">Baik</option>
                     <option value="minor_damage">Rusak ringan</option>
                     <option value="major_damage">Rusak berat</option>
                     <option value="lost">Hilang</option>
                   </select>
                 </div>
-                <div style={{ marginBottom: 8 }}>
-                  <label>Deskripsi Kerusakan (opsional)</label>
-                  <textarea value={damageDescription} onChange={(e) => setDamageDescription(e.target.value)} style={{ width: '100%', padding: 8 }} rows={3} />
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Deskripsi Kerusakan (opsional)</label>
+                  <textarea className={styles.textarea} value={damageDescription} onChange={(e) => setDamageDescription(e.target.value)} rows={3} />
                 </div>
-                <div style={{ marginBottom: 8 }}>
-                  <label>Foto Bukti (opsional)</label>
-                  <input type="file" multiple accept="image/*" onChange={handlePhotosChange} />
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Foto Bukti (opsional)</label>
+                  <input className={styles.fileInput} type="file" multiple accept="image/*" onChange={handlePhotosChange} />
                 </div>
-                <div>
-                  <button type="submit" disabled={submitting} style={{ padding: '8px 12px' }}>{submitting ? 'Mengirim...' : 'Ajukan Pengembalian'}</button>
+                <div className={styles.actions}>
+                  <button className={styles.btn} type="submit" disabled={submitting}>{submitting ? 'Mengirim...' : 'Ajukan Pengembalian'}</button>
                 </div>
               </form>
             </div>
 
-            <div style={{ flex: 1 }}>
-              <h3>Daftar Returns Anda / Vendor</h3>
+            <div className={styles.column}>
+              <h3>Daftar Return Anda / Vendor</h3>
               {loading ? (
                 <div>Memuat...</div>
               ) : error ? (
                 <div style={{ color: 'red' }}>{error}</div>
               ) : returnsList.length === 0 ? (
-                <div style={{ color: '#6b7280' }}>Tidak ada barang yang direturkan</div>
+                <div style={{ color: '#6b7280' }}>Tidak ada return yang tercatat</div>
               ) : (
-                <div style={{ display: 'grid', gap: 12 }}>
-                  {returnsList.map((d) => (
-                    <div key={d.id} style={{ border: '1px solid #e5e7eb', padding: 12, borderRadius: 8 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div className={styles.listGrid}>
+                  {returnsList
+                    .filter((d) => {
+                      const t = d.returnType || 'end_of_use';
+                      return mode === 'end' ? t === 'end_of_use' : t === 'issue';
+                    })
+                    .map((d) => (
+                    <div key={d.id} className={styles.card}>
+                      <div className={styles.cardHeader}>
                         <div>
-                          <div style={{ fontWeight: 700 }}>{d.service?.title || d.itemName || 'Item'}</div>
-                          <div style={{ fontSize: 13, color: '#6b7280' }}>{d.vendorName || d.customerName || ''}</div>
-                          <div style={{ fontSize: 13, color: '#6b7280' }}>Tanggal retur: {d.actualReturnDate || '-'}</div>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <div className={styles.cardTitle}>{d.service?.title || d.itemName || 'Item'}</div>
+                            <div className={styles.small} style={{ padding: '4px 8px', borderRadius: 6, background: '#f3f4f6' }}>{(d.returnType === 'issue' ? 'Pengembalian' : 'Retur')}</div>
+                          </div>
+                          <div className={`${styles.small} ${styles.muted}`}>{d.vendorName || d.customerName || ''}</div>
+                          <div className={`${styles.small} ${styles.muted}`}>Tanggal return: {d.actualReturnDate || '-'}</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontWeight: 700 }}>{d.returnStatus}</div>
+                          <div className={styles.statusBadge}>{d.returnStatus}</div>
                           <div>Refund: Rp {(d.totalRefund || 0).toLocaleString('id-ID')}</div>
                         </div>
                       </div>
                       {Array.isArray(d.returnPhotos) && d.returnPhotos.length > 0 && (
-                        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                        <div className={styles.photos}>
                           {d.returnPhotos.map((p, idx) => (
                             <a key={idx} href={p.url} target="_blank" rel="noreferrer">
                               <img
                                 src={p.url}
                                 alt={`foto-${idx}`}
-                                style={{ width: 120, height: 80, objectFit: 'cover', borderRadius: 6 }}
+                                className={styles.photoImg}
                               />
                             </a>
                           ))}
@@ -190,10 +310,10 @@ export default function ReturnsPage() {
 
                       <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
                         {user.role === 'vendor' && (
-                          <button onClick={() => openInspectModal(d)} style={{ padding: '6px 10px' }}>Inspeksi</button>
+                          <button onClick={() => openInspectModal(d)} className={`${styles.btn} ${styles.secondary}`}>Inspeksi</button>
                         )}
                         {user.role === 'customer' && (
-                          <div style={{ color: '#6b7280', fontSize: 13 }}>Status: {d.returnStatus}</div>
+                          <div className={`${styles.muted} ${styles.small}`}>Status: {d.returnStatus}</div>
                         )}
                       </div>
                     </div>
@@ -204,9 +324,9 @@ export default function ReturnsPage() {
           </div>
 
           {inspecting && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ background: 'white', padding: 18, borderRadius: 12, width: 'min(720px, 96%)' }}>
-                <h3>Inspeksi Returns - {inspecting.service?.title || inspecting.itemName}</h3>
+            <div className={styles.modalOverlay}>
+              <div className={styles.modal}>
+                <h3>Inspeksi Return - {inspecting.service?.title || inspecting.itemName}</h3>
                 {Array.isArray(inspecting.returnPhotos) && inspecting.returnPhotos.length > 0 && (
                   <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                     {inspecting.returnPhotos.map((p, idx) => (
@@ -216,25 +336,53 @@ export default function ReturnsPage() {
                 )}
 
                 <div style={{ marginBottom: 8 }}>
-                  <label>Damage Status</label>
-                  <select value={damageStatus} onChange={(e) => setDamageStatus(e.target.value)} style={{ width: '100%', padding: 8 }}>
+                  <label className={styles.label}>Damage Status</label>
+                  <select className={styles.select} value={damageStatus} onChange={(e) => setDamageStatus(e.target.value)}>
                     <option value="none">Tidak ada kerusakan</option>
                     <option value="minor">Kerusakan ringan</option>
                     <option value="major">Kerusakan berat</option>
                     <option value="lost">Hilang</option>
                   </select>
                 </div>
-                <div style={{ marginBottom: 8 }}>
-                  <label>Damage Charge (Rp)</label>
-                  <input value={damageCharge} onChange={(e) => setDamageCharge(e.target.value)} style={{ width: '100%', padding: 8 }} />
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Damage Charge (Rp)</label>
+                  <input className={styles.input} value={damageCharge} onChange={(e) => setDamageCharge(e.target.value)} />
                 </div>
-                <div style={{ marginBottom: 8 }}>
-                  <label>Catatan</label>
-                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ width: '100%', padding: 8 }} rows={3} />
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Catatan</label>
+                  <textarea className={styles.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
                 </div>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <button onClick={() => setInspecting(null)} style={{ padding: '8px 10px' }}>Batal</button>
-                  <button onClick={submitInspection} style={{ padding: '8px 12px' }}>Simpan Inspeksi</button>
+                <div className={styles.modalFooter}>
+                  <button onClick={() => setInspecting(null)} className={`${styles.btn} ${styles.secondary}`}>Batal</button>
+                  <button onClick={submitInspection} className={styles.btn}>Simpan Inspeksi</button>
+                </div>
+              </div>
+            </div>
+          )}
+          {invoiceDetailOpen && invoicePreview && (
+            <div className={styles.modalOverlay}>
+              <div className={styles.modal}>
+                <h3>Detail Invoice - {invoicePreview.id}</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div className={styles.small}><strong>Invoice ID:</strong> {invoicePreview.id}</div>
+                  <div className={styles.small}><strong>Deal ID:</strong> {invoicePreview.dealId || '-'}</div>
+                  <div className={styles.small}><strong>Layanan:</strong> {invoicePreview.serviceTitle}</div>
+                  <div className={styles.small}><strong>Vendor:</strong> {invoicePreview.vendorName}</div>
+                  <div className={styles.small}><strong>Customer:</strong> {invoicePreview.customerName}</div>
+                  <div className={styles.small}><strong>Jumlah:</strong> {invoicePreview.quantity || 1}</div>
+                  <div className={styles.small}><strong>Durasi (hari):</strong> {invoicePreview.durationDays || 1}</div>
+                  <div className={styles.small}><strong>Base Price:</strong> Rp {(Number(invoicePreview.basePrice || 0)).toLocaleString('id-ID')}</div>
+                  <div className={styles.small}><strong>Diskon:</strong> Rp {(Number(invoicePreview.discountAmount || 0)).toLocaleString('id-ID')}</div>
+                  <div className={styles.small}><strong>Total:</strong> Rp {(Number(invoicePreview.totalAmount || invoicePreview.remainingPayment || 0)).toLocaleString('id-ID')}</div>
+                  <div className={styles.small}><strong>Tipe Pembayaran:</strong> {invoicePreview.paymentType}</div>
+                  <div className={styles.small}><strong>Status:</strong> {invoicePreview.status}</div>
+                  <div className={styles.small}><strong>Batas Bayar:</strong> {invoicePreview.dueDateLabel || invoicePreview.paymentDeadline || '-'}</div>
+                  <div className={styles.small}><strong>Dibuat:</strong> {invoicePreview.createdAt ? new Date(invoicePreview.createdAt).toLocaleString('id-ID') : '-'}</div>
+                  <div className={styles.small} style={{ gridColumn: '1 / -1' }}><strong>Catatan:</strong> {invoicePreview.notes || '-'}</div>
+                </div>
+                <div className={styles.modalFooter} style={{ marginTop: 12 }}>
+                  <button className={`${styles.btn} ${styles.secondary}`} onClick={() => setInvoiceDetailOpen(false)}>Tutup</button>
+                  <button className={styles.btn} onClick={() => { setDealId(invoicePreview.dealId || invoicePreview.id); setInvoiceConfirmed(true); setInvoiceDetailOpen(false); }}>Gunakan invoice ini</button>
                 </div>
               </div>
             </div>

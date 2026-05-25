@@ -83,12 +83,12 @@ export async function GET(request) {
             service,
             otherUser,
             returnSummary: deal.returnStatus === 'completed'
-              ? 'Retur selesai'
+              ? 'Return selesai'
               : deal.returnStatus === 'inspected'
-                ? 'Retur sudah diinspeksi'
+                ? 'Return sudah diinspeksi'
                 : deal.returnStatus === 'pending_inspection'
                   ? 'Menunggu inspeksi vendor'
-                  : 'Proses retur berjalan'
+                  : 'Proses return berjalan'
           };
         })
         .sort((a, b) => new Date(b.actualReturnDate || b.agreedAt || b.createdAt || 0) - new Date(a.actualReturnDate || a.agreedAt || a.createdAt || 0));
@@ -96,7 +96,7 @@ export async function GET(request) {
       return NextResponse.json({
         success: true,
         data: enrichedReturns,
-        message: enrichedReturns.length === 0 ? 'Tidak ada barang yang direturkan' : 'Data retur ditemukan'
+        message: enrichedReturns.length === 0 ? 'Tidak ada return yang tercatat' : 'Data return ditemukan'
       }, { status: 200 });
     }
 
@@ -147,7 +147,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Support both JSON body (existing clients) and multipart/form-data (file uploads)
-    let dealId, customerId, itemCondition, damageDescription, returnPhotos = [];
+    let dealId, customerId, itemCondition, damageDescription, returnPhotos = [], type = null;
     const contentType = request.headers.get('content-type') || '';
 
     if (contentType.includes('multipart/form-data')) {
@@ -155,7 +155,8 @@ export async function POST(request) {
       dealId = form.get('dealId');
       customerId = form.get('customerId');
       itemCondition = form.get('itemCondition');
-      damageDescription = form.get('damageDescription') || '';
+    damageDescription = form.get('damageDescription') || '';
+    type = form.get('type') || null;
 
       // Handle uploaded files under field name 'photos' (multiple)
       const files = form.getAll('photos') || [];
@@ -181,7 +182,7 @@ export async function POST(request) {
       }
     } else {
       const body = await request.json();
-      ({ dealId, customerId, itemCondition, damageDescription, returnPhotos = [] } = body || {});
+      ({ dealId, customerId, itemCondition, damageDescription, returnPhotos = [], type = null } = body || {});
     }
 
     if (!dealId || !customerId || !itemCondition) {
@@ -230,46 +231,64 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    // Set return date to today (date-only) and calculate days late using UTC date-only math
-    const actualReturnDate = todayDateString();
-    deal.actualReturnDate = actualReturnDate;
-    const daysLate = daysBetweenDates(actualReturnDate, deal.expectedReturnDate);
-    deal.daysLate = daysLate;
+    // Determine flow type: 'issue' (report problem during rental) or 'end_of_use' (retur akhir)
+    const returnType = (type || '').toString().toLowerCase() === 'issue' ? 'issue' : 'end_of_use';
 
-    // Store item condition and damage info
-    deal.itemCondition = itemCondition; // 'good', 'minor_damage', 'major_damage', 'lost'
-    // Merge any newly uploaded photos with existing array
-    deal.returnPhotos = Array.isArray(deal.returnPhotos) ? deal.returnPhotos.concat(returnPhotos || []) : (returnPhotos || []);
-    deal.returnStatus = 'pending_inspection'; // Waiting for vendor inspection
-    deal.damageDescription = damageDescription || '';
-    
-    // Set initial damage status based on condition
-    if (itemCondition === 'good') {
-      deal.damageStatus = 'none';
-      deal.damageCharge = 0;
-    } else if (itemCondition === 'minor_damage') {
-      deal.damageStatus = 'minor';
-      deal.damageCharge = 0; // Will be set by vendor
-    } else if (itemCondition === 'major_damage') {
-      deal.damageStatus = 'major';
-      deal.damageCharge = 0; // Will be set by vendor
-    } else if (itemCondition === 'lost') {
-      deal.damageStatus = 'lost';
-      deal.damageCharge = deal.totalPrice || 0; // Full price as damage charge
+    if (returnType === 'issue') {
+      // Issue report flow: do not finalize actual return date, just mark as reported for vendor inspection
+      deal.returnType = 'issue';
+      deal.reportedAt = new Date().toISOString();
+      // Store basic reported info
+      deal.itemCondition = itemCondition; // reported condition
+      deal.damageDescription = damageDescription || '';
+      deal.returnPhotos = Array.isArray(deal.returnPhotos) ? deal.returnPhotos.concat(returnPhotos || []) : (returnPhotos || []);
+      deal.returnStatus = 'reported';
+      // Keep deal.status as-is (likely 'active') so rental continues until resolved
+      deal.issueReported = true;
+    } else {
+      // End-of-use retur flow: set actual return date and calculate late/deductions (existing logic)
+      deal.returnType = 'end_of_use';
+      // Set return date to today (date-only) and calculate days late using UTC date-only math
+      const actualReturnDate = todayDateString();
+      deal.actualReturnDate = actualReturnDate;
+      const daysLate = daysBetweenDates(actualReturnDate, deal.expectedReturnDate);
+      deal.daysLate = daysLate;
+
+      // Store item condition and damage info
+      deal.itemCondition = itemCondition; // 'good', 'minor_damage', 'major_damage', 'lost'
+      // Merge any newly uploaded photos with existing array
+      deal.returnPhotos = Array.isArray(deal.returnPhotos) ? deal.returnPhotos.concat(returnPhotos || []) : (returnPhotos || []);
+      deal.returnStatus = 'pending_inspection'; // Waiting for vendor inspection
+      deal.damageDescription = damageDescription || '';
+      
+      // Set initial damage status based on condition
+      if (itemCondition === 'good') {
+        deal.damageStatus = 'none';
+        deal.damageCharge = 0;
+      } else if (itemCondition === 'minor_damage') {
+        deal.damageStatus = 'minor';
+        deal.damageCharge = 0; // Will be set by vendor
+      } else if (itemCondition === 'major_damage') {
+        deal.damageStatus = 'major';
+        deal.damageCharge = 0; // Will be set by vendor
+      } else if (itemCondition === 'lost') {
+        deal.damageStatus = 'lost';
+        deal.damageCharge = deal.totalPrice || 0; // Full price as damage charge
+      }
+
+      // Calculate late charge: daily_rate × daysLate
+      // daily_rate = totalPrice / rentalDays (using actual rental duration)
+      let rentalDays = deal.rentalDays || deal.durationDays || 0;
+      if (!rentalDays && deal.borrowDate && deal.expectedReturnDate) {
+        rentalDays = daysBetweenDates(deal.expectedReturnDate, deal.borrowDate) || 1;
+      }
+      rentalDays = Math.max(1, rentalDays);
+      const dailyRate = (deal.totalPrice || 0) / rentalDays;
+      deal.lateCharge = Math.round(daysLate * dailyRate);
+
+      // Status for inspection
+      deal.status = 'returning'; // Differentiate from 'agreed' or 'completed'
     }
-
-    // Calculate late charge: daily_rate × daysLate
-    // daily_rate = totalPrice / rentalDays (using actual rental duration)
-    let rentalDays = deal.rentalDays || deal.durationDays || 0;
-    if (!rentalDays && deal.borrowDate && deal.expectedReturnDate) {
-      rentalDays = daysBetweenDates(deal.expectedReturnDate, deal.borrowDate) || 1;
-    }
-    rentalDays = Math.max(1, rentalDays);
-    const dailyRate = (deal.totalPrice || 0) / rentalDays;
-    deal.lateCharge = Math.round(daysLate * dailyRate);
-
-    // Status for inspection
-    deal.status = 'returning'; // Differentiate from 'agreed' or 'completed'
 
     await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
 
@@ -340,8 +359,8 @@ export async function PUT(request) {
       }, { status: 403 });
     }
 
-    // ✅ FIX #5: Validate return has been initiated by customer
-    if (deal.returnStatus !== 'pending_inspection' && deal.returnStatus !== 'inspected') {
+    // ✅ FIX #5: Validate return has been initiated by customer (allow 'reported' for issue flow)
+    if (!['pending_inspection', 'inspected', 'reported'].includes(deal.returnStatus)) {
       return NextResponse.json({
         success: false,
         message: `Peminjaman belum siap untuk inspeksi. Return status: '${deal.returnStatus}'. Tunggu customer mengajukan return terlebih dahulu.`
@@ -370,7 +389,7 @@ export async function PUT(request) {
     deal.inspectionNotes = notes || '';
     deal.vendorConfirmed = true;
 
-    // Calculate total refund
+    // Calculate total refund (same formula applies)
     const basePrice = deal.totalPrice || 0;
     const totalDeductions = (deal.damageCharge || 0) + (deal.lateCharge || 0);
     deal.totalRefund = Math.max(0, basePrice - totalDeductions);
@@ -379,8 +398,8 @@ export async function PUT(request) {
     // Set return status to inspected
     deal.returnStatus = 'inspected';
 
-    // ✅ FIX #2: Update booking status to 'pending_return' (awaiting return confirmation)
-    if (deal.bookingId) {
+    // ✅ FIX #2: Update booking status to 'pending_return' (awaiting return confirmation) only for end_of_use flow
+    if (deal.returnType === 'end_of_use' && deal.bookingId) {
       try {
         const servicesPath = path.join(process.cwd(), 'services.json');
         let servicesData = await fs.readFile(servicesPath, 'utf-8');
@@ -403,7 +422,8 @@ export async function PUT(request) {
     }
 
     // If no issues and on-time, auto-complete. Ensure we mark refund processed and settlement date.
-    if (damageStatus === 'none' && deal.daysLate === 0 && deal.customerConfirmed) {
+    if (deal.returnType === 'end_of_use') {
+      if (damageStatus === 'none' && deal.daysLate === 0 && deal.customerConfirmed) {
       deal.status = 'completed';
       deal.returnStatus = 'completed';
       deal.refundStatus = 'processed';
@@ -414,8 +434,9 @@ export async function PUT(request) {
         deal.totalRefund = Math.max(0, basePrice - totalDeductions);
       }
     }
+    }
 
-    // If vendor confirms now and customer has already confirmed earlier, finalize the return
+    // If vendor confirms now and customer has already confirmed earlier, finalize the return (both flows)
     if (deal.vendorConfirmed && deal.customerConfirmed) {
       deal.status = 'completed';
       deal.returnStatus = 'completed';
