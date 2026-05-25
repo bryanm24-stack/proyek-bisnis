@@ -83,12 +83,12 @@ export async function GET(request) {
             service,
             otherUser,
             returnSummary: deal.returnStatus === 'completed'
-              ? 'Retur selesai'
+              ? 'Return selesai'
               : deal.returnStatus === 'inspected'
-                ? 'Retur sudah diinspeksi'
+                ? 'Return sudah diinspeksi'
                 : deal.returnStatus === 'pending_inspection'
                   ? 'Menunggu inspeksi vendor'
-                  : 'Proses retur berjalan'
+                  : 'Proses return berjalan'
           };
         })
         .sort((a, b) => new Date(b.actualReturnDate || b.agreedAt || b.createdAt || 0) - new Date(a.actualReturnDate || a.agreedAt || a.createdAt || 0));
@@ -96,7 +96,7 @@ export async function GET(request) {
       return NextResponse.json({
         success: true,
         data: enrichedReturns,
-        message: enrichedReturns.length === 0 ? 'Tidak ada barang yang direturkan' : 'Data retur ditemukan'
+        message: enrichedReturns.length === 0 ? 'Tidak ada return yang tercatat' : 'Data return ditemukan'
       }, { status: 200 });
     }
 

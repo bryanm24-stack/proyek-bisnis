@@ -40,10 +40,10 @@ export default function ReturnsPage() {
     try {
       const resp = await fetch(`/api/returns?userId=${user.id}&userRole=${user.role}`);
       const json = await resp.json();
-      if (!resp.ok || json.success === false) throw new Error(json.message || 'Gagal memuat retur');
+      if (!resp.ok || json.success === false) throw new Error(json.message || 'Gagal memuat return');
       setReturnsList(Array.isArray(json.data) ? json.data : []);
     } catch (e) {
-      setError(e.message || 'Gagal memuat retur');
+      setError(e.message || 'Gagal memuat return');
     } finally {
       setLoading(false);
     }
@@ -68,14 +68,14 @@ export default function ReturnsPage() {
 
       const r = await fetch('/api/returns', { method: 'POST', body: form });
       const j = await r.json();
-      if (!r.ok || j.success === false) throw new Error(j.message || 'Gagal mengajukan retur');
-      alert('Retur diajukan');
+      if (!r.ok || j.success === false) throw new Error(j.message || 'Gagal mengajukan return');
+      alert('Return diajukan');
       setDealId('');
       setDamageDescription('');
       setPhotos([]);
       loadReturns();
     } catch (err) {
-      alert(err.message || 'Gagal mengajukan retur');
+      alert(err.message || 'Gagal mengajukan return');
     } finally {
       setSubmitting(false);
     }
@@ -113,7 +113,7 @@ export default function ReturnsPage() {
     <div>
       <SharedNavbar />
       <div style={{ padding: 24 }}>
-      <h2>Returns</h2>
+      <h2>Return</h2>
       {!user && (
         <div style={{ color: '#6b7280' }}>Silakan login untuk melihat atau mengajukan pengembalian barang.</div>
       )}
@@ -122,7 +122,7 @@ export default function ReturnsPage() {
         <div style={{ display: 'grid', gap: 18 }}>
           <div style={{ display: 'flex', gap: 18 }}>
             <div style={{ flex: 1 }}>
-              <h3>Buat Permintaan Pengembalian Barang (Customer)</h3>
+              <h3>Buat Permintaan Return Barang (Customer)</h3>
               <form onSubmit={submitReturn}>
                 <div style={{ marginBottom: 8 }}>
                   <label>Deal ID</label>
@@ -152,13 +152,13 @@ export default function ReturnsPage() {
             </div>
 
             <div style={{ flex: 1 }}>
-              <h3>Daftar Returns Anda / Vendor</h3>
+              <h3>Daftar Return Anda / Vendor</h3>
               {loading ? (
                 <div>Memuat...</div>
               ) : error ? (
                 <div style={{ color: 'red' }}>{error}</div>
               ) : returnsList.length === 0 ? (
-                <div style={{ color: '#6b7280' }}>Tidak ada barang yang direturkan</div>
+                <div style={{ color: '#6b7280' }}>Tidak ada return yang tercatat</div>
               ) : (
                 <div style={{ display: 'grid', gap: 12 }}>
                   {returnsList.map((d) => (
@@ -167,7 +167,7 @@ export default function ReturnsPage() {
                         <div>
                           <div style={{ fontWeight: 700 }}>{d.service?.title || d.itemName || 'Item'}</div>
                           <div style={{ fontSize: 13, color: '#6b7280' }}>{d.vendorName || d.customerName || ''}</div>
-                          <div style={{ fontSize: 13, color: '#6b7280' }}>Tanggal retur: {d.actualReturnDate || '-'}</div>
+                          <div style={{ fontSize: 13, color: '#6b7280' }}>Tanggal return: {d.actualReturnDate || '-'}</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ fontWeight: 700 }}>{d.returnStatus}</div>
@@ -206,7 +206,7 @@ export default function ReturnsPage() {
           {inspecting && (
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ background: 'white', padding: 18, borderRadius: 12, width: 'min(720px, 96%)' }}>
-                <h3>Inspeksi Returns - {inspecting.service?.title || inspecting.itemName}</h3>
+                <h3>Inspeksi Return - {inspecting.service?.title || inspecting.itemName}</h3>
                 {Array.isArray(inspecting.returnPhotos) && inspecting.returnPhotos.length > 0 && (
                   <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                     {inspecting.returnPhotos.map((p, idx) => (
