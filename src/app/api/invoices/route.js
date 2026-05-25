@@ -314,7 +314,8 @@ export async function PUT(request) {
     invoices[invoiceIndex] = updatedInvoice;
     fs.writeFileSync(invoicesFile, JSON.stringify(invoices, null, 2));
 
-    // Update deal status if invoice is paid
+    // Update deal to mark invoice as paid, but do NOT mark the whole deal as completed here.
+    // Completion should only occur after the return/inspection flow completes.
     if (status === 'paid') {
       try {
         const dealsData = fs.readFileSync(dealsFile, 'utf-8');
@@ -322,11 +323,11 @@ export async function PUT(request) {
 
         const dealIndex = deals.findIndex(d => d.id === updatedInvoice.dealId);
         if (dealIndex !== -1) {
+          // Only update invoice status and record payment timestamp.
           deals[dealIndex] = {
             ...deals[dealIndex],
             invoiceStatus: 'paid',
-            status: 'completed',
-            completedAt: new Date().toISOString()
+            paymentConfirmedAt: new Date().toISOString()
           };
           fs.writeFileSync(dealsFile, JSON.stringify(deals, null, 2));
         }
