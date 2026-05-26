@@ -6,6 +6,17 @@
 
 ---
 
+## ✅ UPDATE STATUS TERBARU
+
+Beberapa issue yang sebelumnya tercatat di laporan bug sudah tidak muncul lagi di snapshot repo saat ini:
+
+- `SharedNavbar.js` tidak lagi memunculkan error ESLint `setState` di dalam `useEffect`.
+- `SharedFooter.js` tidak lagi memunculkan error ESLint `setState` di dalam `useEffect`.
+
+Artinya, bagian dokumentasi yang menyebut dua error ESLint tersebut sebaiknya dibaca sebagai riwayat masalah lama, bukan kondisi aktif saat ini.
+
+---
+
 ## 🎯 MASALAH YANG DITEMUKAN & DIPERBAIKI
 
 ### ❌ **BUG #1: Logic Error - customerAccepted Always TRUE**

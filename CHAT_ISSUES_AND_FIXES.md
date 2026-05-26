@@ -1,5 +1,9 @@
 # Chat System - Code Issues & Fixes
 
+## ✅ CURRENT SNAPSHOT NOTE
+
+Dokumen ini berisi issue historis beserta bentuk fix yang disarankan. Beberapa item di sini sudah tidak muncul lagi sebagai error aktif di repo saat ini, jadi bacanya perlu dibedakan antara temuan lama dan status sekarang.
+
 ## Issue 1: Missing Discount Application Handler
 
 **Severity**: 🔴 CRITICAL
