@@ -2,6 +2,10 @@
 
 **Status**: ✅ FIXED - All critical bugs resolved
 
+## ✅ VERIFICATION NOTE
+
+Dokumen ini merekam alur chat setelah perbaikan. Issue utama yang pernah dilaporkan di flow vendor/customer sudah ditangani di snapshot repo saat ini.
+
 ---
 
 ## 📊 FLOW LENGKAP: Strawberry Chat dengan Apple (Step-by-Step)

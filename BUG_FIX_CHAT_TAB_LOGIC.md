@@ -3,6 +3,10 @@
 **Date:** May 18, 2026  
 **Status:** ✅ FIXED & TESTED
 
+## ✅ VERIFICATION NOTE
+
+Fix ini masih konsisten dengan snapshot repo saat ini: mapping tab vendor/customer sudah sesuai, dan label tab tidak lagi terbalik.
+
 ---
 
 ## 📋 RINGKASAN MASALAH

@@ -6,6 +6,15 @@
 - 🟡 Medium: 10
 - 🔵 Low: 5
 
+## ✅ CURRENT SNAPSHOT NOTE
+
+Beberapa item di bawah ini adalah temuan historis dari audit lama. Di snapshot repo saat ini, issue berikut sudah tidak muncul lagi sebagai error aktif:
+
+- `SharedNavbar.js` tidak lagi memunculkan error ESLint `setState` in effect.
+- `SharedFooter.js` tidak lagi memunculkan error ESLint `setState` in effect.
+
+Gunakan daftar ini sebagai referensi bug report lama, bukan status real-time seluruh repository.
+
 ---
 
 ## 🔴 CRITICAL SEVERITY BUGS (Must Fix)
