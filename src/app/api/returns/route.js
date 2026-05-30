@@ -367,8 +367,8 @@ export async function PUT(request) {
       }, { status: 400 });
     }
 
-    // ✅ FIX #5: Validate rental dates are set (should be set when customer submits return)
-    if (!deal.borrowDate || !deal.expectedReturnDate || !deal.actualReturnDate) {
+    // ✅ FIX #5: Validate rental dates are set (issue reports do not need actualReturnDate yet)
+    if (!deal.borrowDate || !deal.expectedReturnDate || (deal.returnStatus !== 'reported' && !deal.actualReturnDate)) {
       return NextResponse.json({
         success: false,
         message: 'Data peminjaman tidak lengkap. Hubungi support jika masalah berlanjut.'

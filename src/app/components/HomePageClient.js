@@ -808,6 +808,8 @@ export default function HomePageClient() {
   );
 
   const filteredServices = getFilteredServices();
+  // Derive a featured services list for the hero carousel (safe fallback)
+  const featuredServices = Array.isArray(filteredServices) ? filteredServices.slice(0, 5) : [];
   const visiblePromos = Array.isArray(promos)
     ? promos.filter((promo) => Number(promo?.promoPrice) > 0)
     : [];

@@ -444,7 +444,7 @@ export async function POST(request) {
             downPayment: isPayAfter ? body.downPayment : null,
             remainingPayment: isPayAfter ? body.remainingPayment : 0,
             invoiceStatus: isPayAfter ? 'pending' : 'paid',
-            status: isPayAfter ? (deals[dealIndex].status || 'agreed') : 'completed',
+            status: isPayAfter ? (deals[dealIndex].status || 'agreed') : 'active',
             completedAt: isPayAfter ? (deals[dealIndex].completedAt || null) : paymentCompletedAt,
             paymentDeadline: isPayAfter ? paymentDeadlineDate.toISOString() : null,
             invoiceId: upsertedInvoiceId || deals[dealIndex].invoiceId || null,
@@ -478,7 +478,7 @@ export async function POST(request) {
             if (chatIndex !== -1) {
               chats[chatIndex] = {
                 ...chats[chatIndex],
-                dealStatus: isPayAfter ? 'agreed' : 'completed',
+                dealStatus: isPayAfter ? 'agreed' : 'active',
                 closedAt: null,
                 closedReason: null
               };
