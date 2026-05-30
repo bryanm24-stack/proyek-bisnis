@@ -313,7 +313,21 @@ export default function ReturnsPage() {
                           <button onClick={() => openInspectModal(d)} className={`${styles.btn} ${styles.secondary}`}>Inspeksi</button>
                         )}
                         {user.role === 'customer' && (
-                          <div className={`${styles.muted} ${styles.small}`}>Status: {d.returnStatus}</div>
+                          <div style={{ width: '100%' }}>
+                            <div className={`${styles.muted} ${styles.small}`}>Status: {d.returnStatus}</div>
+                            <div style={{ marginTop: 6, padding: '10px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#f8fafc' }}>
+                              <div className={styles.small}><strong>Hasil inspeksi vendor:</strong></div>
+                              <div className={styles.small}>Damage status: {d.damageStatus || '-'}</div>
+                              <div className={styles.small}>Biaya kerusakan: Rp {Number(d.damageCharge || 0).toLocaleString('id-ID')}</div>
+                              <div className={styles.small}>Biaya keterlambatan: Rp {Number(d.lateCharge || 0).toLocaleString('id-ID')}</div>
+                              <div className={styles.small}>Refund akhir: Rp {Number(d.totalRefund || 0).toLocaleString('id-ID')}</div>
+                              {d.inspectionNotes && (
+                                <div className={styles.small} style={{ marginTop: 6 }}>
+                                  Catatan vendor: {d.inspectionNotes}
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>

@@ -25,6 +25,9 @@ export default function VendorProdukPage() {
     endAt: '',
     maxApplicants: ''
   });
+  const [vendorPromos, setVendorPromos] = useState([]);
+  const [promosLoading, setPromosLoading] = useState(false);
+  const [promoNow, setPromoNow] = useState(Date.now());
   const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
@@ -42,7 +45,13 @@ export default function VendorProdukPage() {
 
     setUser(parsedUser);
     fetchVendorItems(parsedUser.id);
+    fetchVendorPromos(parsedUser.id);
   }, [router]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setPromoNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const fetchVendorItems = async (vendorId) => {
     try {
@@ -60,6 +69,64 @@ export default function VendorProdukPage() {
 
   const handleEdit = (itemId) => {
     router.push(`/vendor/edit-produk?id=${itemId}`);
+  };
+
+  const fetchVendorPromos = async (vendorId) => {
+    if (!vendorId) return;
+    setPromosLoading(true);
+    try {
+      const response = await fetch(`/api/promos?vendorId=${vendorId}`);
+      const data = await response.json();
+      if (data.success) {
+        setVendorPromos(Array.isArray(data.data) ? data.data : []);
+      } else {
+        setVendorPromos([]);
+      }
+    } catch (error) {
+      console.error('Error fetching vendor promos:', error);
+      setVendorPromos([]);
+    } finally {
+      setPromosLoading(false);
+    }
+  };
+
+  const handleDeletePromo = async (promoId) => {
+    if (!user?.id || !promoId) return;
+    if (!confirm('Hapus promo ini?')) return;
+
+    try {
+      const response = await fetch(`/api/promos?promoId=${promoId}&vendorId=${user.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ promoId, vendorId: user.id })
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Gagal menghapus promo.');
+      }
+
+      setVendorPromos((prev) => prev.filter((promo) => String(promo.id) !== String(promoId)));
+      alert('✅ Promo berhasil dihapus');
+    } catch (error) {
+      console.error('Error deleting promo:', error);
+      alert(error.message || '❌ Gagal menghapus promo');
+    }
+  };
+
+  const formatPromoCountdown = (endAt) => {
+    if (!endAt) return 'Tanpa batas waktu';
+    const diff = new Date(endAt).getTime() - promoNow;
+    if (diff <= 0) return 'Berakhir';
+
+    const totalSeconds = Math.floor(diff / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (days > 0) return `${days}h ${hours}j ${minutes}m`;
+    return `${hours}j ${minutes}m ${seconds}d`;
   };
 
   const handleDelete = async (itemId) => {
@@ -193,6 +260,7 @@ export default function VendorProdukPage() {
       }
 
       setPromoMessage('✅ Promo berhasil dibuat dan siap tampil di home customer.');
+      fetchVendorPromos(user.id);
       setTimeout(() => closePromoModal(), 1500);
     } catch (error) {
       console.error('Error creating promo:', error);
@@ -262,6 +330,59 @@ export default function VendorProdukPage() {
               }}
             />
           </div>
+        </div>
+
+        {/* Promo List */}
+        <div style={{ marginBottom: '32px' }}>
+          <h2 style={{ margin: '0 0 14px 0', fontSize: '22px' }}>🎁 Promo Vendor</h2>
+          {promosLoading ? (
+            <div style={{ color: '#666' }}>Memuat promo...</div>
+          ) : vendorPromos.length === 0 ? (
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px', color: '#64748b' }}>
+              Belum ada promo yang dibuat.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '14px' }}>
+              {vendorPromos.map((promo) => {
+                const maxApplicants = Number.isFinite(Number(promo.maxApplicants)) ? Number(promo.maxApplicants) : null;
+                const claimedCount = Number(promo.claimedCount || 0);
+                const remaining = maxApplicants === null ? null : Math.max(0, maxApplicants - claimedCount);
+                const isExpired = Boolean(promo.endAt && new Date(promo.endAt).getTime() <= promoNow);
+                const isUpcoming = Boolean(promo.startAt && new Date(promo.startAt).getTime() > promoNow);
+
+                return (
+                  <div key={promo.id} style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '12px', background: 'white' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                      <div style={{ fontWeight: '700', color: '#111827' }}>{promo.title}</div>
+                      <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '999px', background: promo.active === false ? '#e5e7eb' : '#dcfce7', color: promo.active === false ? '#374151' : '#166534' }}>
+                        {promo.active === false ? 'Nonaktif' : 'Aktif'}
+                      </span>
+                    </div>
+                    <div style={{ marginTop: '6px', fontSize: '13px', color: '#334155' }}>Harga promo: Rp {Number(promo.promoPrice || 0).toLocaleString('id-ID')}</div>
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: '#64748b' }}>
+                      Countdown: {formatPromoCountdown(promo.endAt)}
+                    </div>
+                    <div style={{ marginTop: '4px', fontSize: '12px', color: '#64748b' }}>
+                      Kuota: {remaining === null ? 'Tak terbatas' : `${remaining} tersisa dari ${maxApplicants}`}
+                    </div>
+                    {(isExpired || isUpcoming) && (
+                      <div style={{ marginTop: '6px', fontSize: '12px', color: isExpired ? '#b91c1c' : '#92400e', fontWeight: '600' }}>
+                        {isExpired ? 'Promo sudah berakhir' : 'Promo belum dimulai'}
+                      </div>
+                    )}
+                    <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => handleDeletePromo(promo.id)}
+                        style={{ padding: '7px 10px', border: '1px solid #fecaca', borderRadius: '8px', background: '#fef2f2', color: '#b91c1c', fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}
+                      >
+                        🗑 Hapus Promo
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Items Grid */}

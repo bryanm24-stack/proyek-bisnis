@@ -22,6 +22,8 @@ export default function VendorChatsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [chatTab, setChatTab] = useState('vendor'); // 'vendor' | 'customer'
+  const [vendorPromos, setVendorPromos] = useState([]);
+  const [promoNow, setPromoNow] = useState(Date.now());
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -34,6 +36,11 @@ export default function VendorChatsPage() {
     } else {
       window.location.href = '/login';
     }
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setPromoNow(Date.now()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   const fetchVendorChats = async (vendorId) => {
@@ -124,6 +131,19 @@ export default function VendorChatsPage() {
     } catch (error) {
       console.error('Error loading deal:', error);
     }
+
+    try {
+      const promosResponse = await fetch(`/api/promos?vendorId=${chat.vendorId}&active=true`);
+      const promosData = await promosResponse.json();
+      if (promosData.success) {
+        setVendorPromos(Array.isArray(promosData.data) ? promosData.data : []);
+      } else {
+        setVendorPromos([]);
+      }
+    } catch (promoError) {
+      console.error('Error loading vendor promos:', promoError);
+      setVendorPromos([]);
+    }
     
     setChatModalOpen(true);
   };
@@ -133,6 +153,7 @@ export default function VendorChatsPage() {
     setSelectedChat(null);
     setMessages([]);
     setDealData(null);
+    setVendorPromos([]);
   };
 
   const getChatTopicLabel = (chat) => {
@@ -142,6 +163,21 @@ export default function VendorChatsPage() {
     }
 
     return chat.serviceTitle || '';
+  };
+
+  const formatPromoCountdown = (endAt) => {
+    if (!endAt) return 'Tanpa batas waktu';
+    const diff = new Date(endAt).getTime() - promoNow;
+    if (diff <= 0) return 'Berakhir';
+
+    const totalSeconds = Math.floor(diff / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (days > 0) return `${days}h ${hours}j ${minutes}m`;
+    return `${hours}j ${minutes}m ${seconds}d`;
   };
 
   const sendMessage = async () => {
@@ -573,7 +609,7 @@ export default function VendorChatsPage() {
                     onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
                     onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
                   >
-                    {user.id === selectedChat.customerId ? selectedChat.customerName : selectedChat.vendorName}
+                    {String(user.id) === String(selectedChat.vendorId) ? selectedChat.customerName : selectedChat.vendorName}
                   </h2>
                   <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#666' }}>
                     {getChatTopicLabel(selectedChat)}
@@ -594,6 +630,80 @@ export default function VendorChatsPage() {
                 >
                   👤 Profil
                 </button>
+              </div>
+
+              {/* Quick info and actions, visible without opening profile modal */}
+              <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', background: '#fff' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                  <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '10px', background: '#f8fafc' }}>
+                    <div style={{ fontSize: '12px', color: '#475569', marginBottom: '6px' }}>
+                      Profil lawan chat
+                    </div>
+                    <div style={{ fontWeight: '700', color: '#0f172a' }}>
+                      {String(user.id) === String(selectedChat.vendorId) ? selectedChat.customerName : selectedChat.vendorName}
+                    </div>
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: '#64748b' }}>
+                      Topik: {getChatTopicLabel(selectedChat)}
+                    </div>
+
+                    {String(user?.id) === String(selectedChat.vendorId) && (
+                      <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => handleDealAction('accept')}
+                          disabled={dealData?.status === 'agreed' || dealData?.status === 'cancelled' || dealData?.status === 'completed'}
+                          style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: '#10b981', color: 'white', fontWeight: '700', cursor: dealData?.status === 'agreed' || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? 'not-allowed' : 'pointer', opacity: dealData?.status === 'agreed' || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? 0.6 : 1 }}
+                        >
+                          ✅ Terima Deal
+                        </button>
+                        <button
+                          onClick={() => handleDealAction('cancel')}
+                          disabled={dealData?.status === 'cancelled'}
+                          style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: '#ef4444', color: 'white', fontWeight: '700', cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer', opacity: dealData?.status === 'cancelled' ? 0.6 : 1 }}
+                        >
+                          ❌ Tolak
+                        </button>
+                        {dealData?.status === 'agreed' && (
+                          <button
+                            onClick={() => setDiscountMode('yes')}
+                            style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: '#f59e0b', color: 'white', fontWeight: '700', cursor: 'pointer' }}
+                          >
+                            💰 Kasih Promo
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '10px', background: '#fff7ed' }}>
+                    <div style={{ fontSize: '12px', color: '#9a3412', marginBottom: '6px' }}>Promo aktif vendor</div>
+                    {vendorPromos.length === 0 ? (
+                      <div style={{ fontSize: '12px', color: '#78716c' }}>Belum ada promo aktif.</div>
+                    ) : (
+                      <div style={{ display: 'grid', gap: '8px' }}>
+                        {vendorPromos.slice(0, 2).map((promo) => {
+                          const maxApplicants = Number.isFinite(Number(promo.maxApplicants)) ? Number(promo.maxApplicants) : null;
+                          const claimedCount = Number(promo.claimedCount || 0);
+                          const remaining = maxApplicants === null ? null : Math.max(0, maxApplicants - claimedCount);
+
+                          return (
+                            <div key={promo.id} style={{ border: '1px solid #fed7aa', borderRadius: '8px', padding: '8px', background: 'white' }}>
+                              <div style={{ fontSize: '12px', fontWeight: '700', color: '#7c2d12' }}>{promo.title}</div>
+                              <div style={{ fontSize: '11px', color: '#9a3412', marginTop: '2px' }}>
+                                Harga: Rp {Number(promo.promoPrice || 0).toLocaleString('id-ID')}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#9a3412' }}>
+                                Hitung mundur: {formatPromoCountdown(promo.endAt)}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#9a3412' }}>
+                                Kuota: {remaining === null ? 'Tak terbatas' : `${remaining} tersisa`}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Discount prompt modal (small) */}
