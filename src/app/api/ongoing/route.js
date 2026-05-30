@@ -204,9 +204,15 @@ export async function PUT(request) {
           }, { status: 400 });
         }
         deal.vendorConfirmed = true;
-        deal.status = 'completed';
       }
     } else if (action === 'complete') {
+      if (deal.returnStatus !== 'completed') {
+        return NextResponse.json({
+          success: false,
+          message: 'Deal hanya bisa diselesaikan setelah proses retur selesai'
+        }, { status: 400 });
+      }
+
       deal.status = 'completed';
     }
 
