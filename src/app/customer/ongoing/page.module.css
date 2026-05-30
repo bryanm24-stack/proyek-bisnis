@@ -30,12 +30,12 @@
 
 .navbar a:hover {
   background-color: #f0f0f0;
-  color: #7c3aed;
+  color: #B28A67;
 }
 
 .navbar a.active {
   background-color: #f0e6ff;
-  color: #7c3aed;
+  color: #B28A67;
   font-weight: 600;
 }
 
@@ -344,11 +344,11 @@
   padding: 20px;
   text-align: center;
   background-color: #f0f7ff;
-}
+  color: #B28A67;
 
 .photoLabel {
   cursor: pointer;
-  display: block;
+  color: #B28A67;
   color: #3498db;
   font-weight: bold;
 }

@@ -253,8 +253,8 @@ export default function VendorProdukPage() {
                 outline: 'none'
               }}
               onFocus={(e) => {
-                e.target.style.borderColor = '#7c3aed';
-                e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.1)';
+                e.target.style.borderColor = '#B28A67';
+                e.target.style.boxShadow = '0 0 0 3px rgba(178, 138, 103, 0.1)';
               }}
               onBlur={(e) => {
                 e.target.style.borderColor = '#e5e7eb';
@@ -280,7 +280,7 @@ export default function VendorProdukPage() {
                   onClick={() => router.push('/vendor/tambah-produk')}
                   style={{
                     padding: '12px 24px',
-                    background: '#7c3aed',
+                    background: '#B28A67',
                     color: 'white',
                     border: 'none',
                     borderRadius: '8px',
@@ -500,7 +500,7 @@ export default function VendorProdukPage() {
                       style={{
                         flex: 1,
                         padding: '10px 12px',
-                        background: '#7c3aed',
+                        background: '#B28A67',
                         color: 'white',
                         border: 'none',
                         borderRadius: '6px',
@@ -509,8 +509,8 @@ export default function VendorProdukPage() {
                         cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}
-                      onMouseEnter={(e) => e.target.style.background = '#6d28d9'}
-                      onMouseLeave={(e) => e.target.style.background = '#7c3aed'}
+                      onMouseEnter={(e) => e.target.style.background = '#8F6B4A'}
+                      onMouseLeave={(e) => e.target.style.background = '#B28A67'}
                     >
                       ✏️ Edit
                     </button>
@@ -575,7 +575,7 @@ export default function VendorProdukPage() {
             style={{ width: '100%', maxWidth: '620px', maxHeight: 'calc(100vh - 48px)', background: 'white', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 25px 60px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ padding: '24px 28px', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', color: 'white', flexShrink: 0 }}>
+            <div style={{ padding: '24px 28px', background: 'linear-gradient(135deg, #C8A587, #B28A67)', color: 'white', flexShrink: 0 }}>
               <div style={{ fontSize: '14px', opacity: 0.9 }}>Buat promosi menarik tanpa kode promo</div>
               <h3 style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: '800' }}>✨ Add Promo</h3>
             </div>
@@ -672,7 +672,7 @@ export default function VendorProdukPage() {
                   style={{
                     width: '100%',
                     padding: '20px',
-                    border: dragOver ? '3px dashed #7c3aed' : '2px dashed #d1d5db',
+                    border: dragOver ? '3px dashed #B28A67' : '2px dashed #d1d5db',
                     borderRadius: '12px',
                     background: dragOver ? '#ede9fe' : '#fafafa',
                     textAlign: 'center',
@@ -789,7 +789,7 @@ export default function VendorProdukPage() {
               {/* Buttons */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '4px' }}>
                 <button type="button" onClick={closePromoModal} style={{ padding: '12px 18px', borderRadius: '10px', border: '1px solid #d1d5db', background: 'white', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s' }}>Batal</button>
-                <button type="submit" disabled={promoSubmitting} style={{ padding: '12px 18px', borderRadius: '10px', border: 'none', background: promoSubmitting ? '#a78bfa' : '#7c3aed', color: 'white', fontWeight: '800', cursor: promoSubmitting ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}>
+                <button type="submit" disabled={promoSubmitting} style={{ padding: '12px 18px', borderRadius: '10px', border: 'none', background: promoSubmitting ? '#C8A587' : '#B28A67', color: 'white', fontWeight: '800', cursor: promoSubmitting ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}>
                   {promoSubmitting ? '⏳ Menyimpan...' : '✨ Simpan Promo'}
                 </button>
               </div>

@@ -577,12 +577,12 @@ export default function HomePageClient() {
       };
     }
 
-    if (dealData.status === 'agreed') {
+      if (dealData.status === 'agreed') {
       return {
         label: 'Deal disetujui',
         description: 'Deal sudah disepakati. Kamu bisa lanjut ke pembayaran.',
         background: '#dbeafe',
-        color: '#1d4ed8'
+          color: '#B28A67'
       };
     }
 
@@ -1445,7 +1445,7 @@ export default function HomePageClient() {
                                   cursor: 'pointer',
                                   borderRadius: '14px',
                                   overflow: 'hidden',
-                                  border: selectedItemDetail?.id === item.id ? '3px solid #5A45D1' : '1px solid #ddd',
+                                  border: selectedItemDetail?.id === item.id ? '3px solid #B28A67' : '1px solid #ddd',
                                   transition: 'all 0.3s ease',
                                   transform: selectedItemDetail?.id === item.id ? 'scale(1.05)' : 'scale(1)',
                                   backgroundColor: '#fff'
@@ -1496,7 +1496,7 @@ export default function HomePageClient() {
                                       margin: '0', 
                                       fontSize: '11px', 
                                       fontWeight: '600',
-                                      color: '#5A45D1'
+                                      color: '#B28A67'
                                     }}>
                                       Rp {item.hargaPcs ? Number(item.hargaPcs).toLocaleString('id-ID') : Number(item.hargaSesi).toLocaleString('id-ID')}
                                     </p>
@@ -1578,7 +1578,7 @@ export default function HomePageClient() {
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                                 <div>
                                   <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Harga</p>
-                                  <p style={{ margin: '0', fontSize: '16px', fontWeight: 'bold', color: '#5A45D1' }}>
+                                  <p style={{ margin: '0', fontSize: '16px', fontWeight: 'bold', color: '#B28A67' }}>
                                     Rp {selectedItemDetail.hargaPcs ? Number(selectedItemDetail.hargaPcs).toLocaleString('id-ID') : Number(selectedItemDetail.hargaSesi).toLocaleString('id-ID')}
                                     {selectedItemDetail.hargaSesi ? ' / Hari' : ' / Pcs'}
                                   </p>
@@ -1617,7 +1617,7 @@ export default function HomePageClient() {
                                 style={{
                                   width: '100%',
                                   padding: '10px',
-                                  backgroundColor: isUnavailable ? '#d1d5db' : '#5A45D1',
+                                  backgroundColor: isUnavailable ? '#d1d5db' : '#B28A67',
                                   color: 'white',
                                   border: 'none',
                                   borderRadius: '6px',
@@ -1650,11 +1650,11 @@ export default function HomePageClient() {
                             padding: '14px',
                             border: '1px solid #bfdbfe',
                             borderRadius: '14px',
-                            background: 'linear-gradient(135deg, #eff6ff, #f8fafc)'
+                            background: 'linear-gradient(135deg, #fff8f2, #fff3ea)'
                           }}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                            <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#1d4ed8' }}>
+                            <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#B28A67' }}>
                               Promo Vendor
                             </h4>
                             <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
@@ -1771,7 +1771,7 @@ export default function HomePageClient() {
                                     style={{
                                       border: 'none',
                                       borderRadius: '10px',
-                                      background: activeServicePromoCanCheckout ? '#2563eb' : '#cbd5e1',
+                                      background: activeServicePromoCanCheckout ? '#B28A67' : '#cbd5e1',
                                       color: activeServicePromoCanCheckout ? '#fff' : '#64748b',
                                       padding: '11px 14px',
                                       fontSize: '13px',
@@ -1797,7 +1797,7 @@ export default function HomePageClient() {
                                           borderRadius: '999px',
                                           border: 'none',
                                           cursor: 'pointer',
-                                          background: index === normalizedPromoIndex ? '#2563eb' : '#cbd5e1',
+                                          background: index === normalizedPromoIndex ? '#B28A67' : '#cbd5e1',
                                           padding: 0
                                         }}
                                         aria-label={`Lihat promo ${index + 1}`}
@@ -1983,7 +1983,7 @@ export default function HomePageClient() {
                       <div className="info-section">
                         <h4>⭐ Rating & Review</h4>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#5A45D1' }}>
+                          <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#B28A67' }}>
                             {selectedService.rating?.toFixed?.(1) ?? selectedService.rating}
                           </span>
                           <span style={{ color: '#666' }}>{selectedService.rentCount} orang telah menyewa</span>
@@ -2112,7 +2112,7 @@ export default function HomePageClient() {
                   {selectedService.title}
                 </p>
                 {activeChatItem && (
-                  <p style={{ margin: '2px 0 0 0', color: '#5A45D1', fontSize: '12px', fontWeight: 600 }}>
+                  <p style={{ margin: '2px 0 0 0', color: '#B28A67', fontSize: '12px', fontWeight: 600 }}>
                     Paket: {activeChatItem.namaBarang || activeChatItem.namaJasa}
                   </p>
                 )}
@@ -2189,9 +2189,9 @@ export default function HomePageClient() {
                             flex: 1,
                             padding: '8px 10px',
                             borderRadius: '8px',
-                            border: messages.length === 0 ? '1px solid #7c3aed' : '1px solid #10b981',
-                            background: messages.length === 0 ? 'rgba(124, 58, 237, 0.15)' : 'rgba(16, 185, 129, 0.08)',
-                            color: messages.length === 0 ? '#5b21b6' : '#047857',
+                            border: messages.length === 0 ? '1px solid #B28A67' : '1px solid #10b981',
+                            background: messages.length === 0 ? 'rgba(178, 138, 103, 0.15)' : 'rgba(16, 185, 129, 0.08)',
+                            color: messages.length === 0 ? '#8F6B4A' : '#047857',
                             fontWeight: '700',
                             cursor: dealDisabled ? 'not-allowed' : 'pointer',
                             opacity: dealDisabled ? 0.55 : 1,
@@ -2214,9 +2214,9 @@ export default function HomePageClient() {
                             flex: 1,
                             padding: '8px 10px',
                             borderRadius: '8px',
-                            border: dealData?.status === 'cancelled' ? '1px solid #7c3aed' : '1px solid #ef4444',
-                            background: dealData?.status === 'cancelled' ? 'rgba(124, 58, 237, 0.15)' : 'rgba(239, 68, 68, 0.08)',
-                            color: dealData?.status === 'cancelled' ? '#5b21b6' : '#b91c1c',
+                            border: dealData?.status === 'cancelled' ? '1px solid #B28A67' : '1px solid #ef4444',
+                            background: dealData?.status === 'cancelled' ? 'rgba(178, 138, 103, 0.15)' : 'rgba(239, 68, 68, 0.08)',
+                            color: dealData?.status === 'cancelled' ? '#8F6B4A' : '#b91c1c',
                             fontWeight: '700',
                             cursor: 'pointer',
                             opacity: 1,
@@ -2244,10 +2244,10 @@ export default function HomePageClient() {
                               style={{
                                 marginTop: '7px',
                                 padding: '7px 10px',
-                                border: '1px solid #1d4ed8',
+                                border: '1px solid #B28A67',
                                 borderRadius: '8px',
-                                background: 'rgba(29, 78, 216, 0.09)',
-                                color: '#1d4ed8',
+                                background: 'rgba(178, 138, 103, 0.09)',
+                                color: '#B28A67',
                                 fontWeight: '700',
                                 fontSize: '12px',
                                 cursor: 'pointer'
@@ -2304,7 +2304,7 @@ export default function HomePageClient() {
 
         .hero-section {
           padding: 80px 40px 40px;
-          background: linear-gradient(135deg, #4338ca 0%, #2e60ff 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
           color: white;
         }
 
@@ -2356,8 +2356,8 @@ export default function HomePageClient() {
           position: relative;
           overflow: hidden;
           border-radius: 26px;
-          box-shadow: 0 28px 80px rgba(15, 23, 42, 0.22);
-          background: #000;
+          box-shadow: 0 28px 80px rgba(17, 12, 8, 0.22);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
         }
 
         .hero-carousel-frame img {
@@ -2378,7 +2378,7 @@ export default function HomePageClient() {
           left: 0;
           right: 0;
           padding: 18px 20px;
-          background: linear-gradient(180deg, transparent 0%, rgba(15, 23, 42, 0.82) 100%);
+          background: linear-gradient(180deg, transparent 0%, rgba(17, 12, 8, 0.82) 100%);
           display: flex;
           align-items: flex-end;
           color: white;
@@ -2473,7 +2473,7 @@ export default function HomePageClient() {
 
         .featured-vendor {
           font-size: 14px;
-          color: #7c3aed;
+          color: #B28A67;
           margin: 0 0 10px 0;
           font-weight: 600;
         }
@@ -2501,11 +2501,11 @@ export default function HomePageClient() {
         .featured-price strong {
           font-size: 18px;
           font-weight: 700;
-          color: #7c3aed;
+          color: #B28A67;
         }
 
         .btn-featured-detail {
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
           color: white;
           border: none;
           padding: 10px 16px;
@@ -2519,7 +2519,7 @@ export default function HomePageClient() {
 
         .btn-featured-detail:hover {
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 4px 12px rgba(178, 138, 103, 0.3);
         }
 
         .hero-carousel-dots {
@@ -2602,7 +2602,7 @@ export default function HomePageClient() {
         .nav-logo {
           font-size: 20px;
           font-weight: 700;
-          color: #7c3aed;
+          color: #B28A67;
           text-decoration: none;
           display: flex;
           align-items: center;
@@ -2688,8 +2688,8 @@ export default function HomePageClient() {
         }
 
         .notification-item.unread {
-          background: #f0f4ff;
-          border-left: 4px solid #7c3aed;
+          background: rgba(178, 138, 103, 0.06);
+          border-left: 4px solid #B28A67;
           padding-left: 12px;
         }
 
@@ -2825,14 +2825,14 @@ export default function HomePageClient() {
           margin-top: 10px;
           padding: 10px 12px;
           border-radius: 8px;
-          background: #eff6ff;
+          background: rgba(178, 138, 103, 0.06);
           border: 1px solid #bfdbfe;
         }
 
         .vendor-reply-label {
           font-size: 12px;
           font-weight: 700;
-          color: #1d4ed8;
+          color: #B28A67;
           margin-bottom: 4px;
         }
 
@@ -2861,15 +2861,15 @@ export default function HomePageClient() {
 
         .vendor-reply-input:focus {
           outline: none;
-          border-color: #5A45D1;
-          box-shadow: 0 0 0 3px rgba(90, 69, 209, 0.12);
+          border-color: #B28A67;
+          box-shadow: 0 0 0 3px rgba(178, 138, 103, 0.12);
         }
 
         .vendor-reply-btn {
           justify-self: start;
           border: none;
           border-radius: 8px;
-          background: #5A45D1;
+          background: #B28A67;
           color: #fff;
           padding: 8px 12px;
           font-size: 12px;
@@ -2898,7 +2898,7 @@ export default function HomePageClient() {
 
         .review-page-btn {
           border: none;
-          background: #1d4ed8;
+          background: #B28A67;
           color: #fff;
           border-radius: 6px;
           padding: 6px 10px;
@@ -2920,7 +2920,7 @@ export default function HomePageClient() {
 
         .btn-nav-vendor {
           padding: 8px 14px;
-          background: linear-gradient(135deg, #7c3aed, #a855f7);
+          background: linear-gradient(135deg, #C8A587, #B28A67);
           color: white;
           border: none;
           border-radius: 8px;
@@ -2936,7 +2936,7 @@ export default function HomePageClient() {
         }
 
         .btn-nav-vendor:hover {
-          background: linear-gradient(135deg, #6d28d9, #9333ea);
+          background: linear-gradient(135deg, #B28A67, #8F6B4A);
           transform: scale(1.05);
         }
 
@@ -2999,7 +2999,7 @@ export default function HomePageClient() {
         .user-avatar {
           width: 32px;
           height: 32px;
-          background: linear-gradient(135deg, #7c3aed, #a855f7);
+          background: linear-gradient(135deg, #C8A587, #B28A67);
           color: white;
           border-radius: 50%;
           display: flex;
@@ -3054,7 +3054,7 @@ export default function HomePageClient() {
 
         .btn-login {
           padding: 8px 16px;
-          background: linear-gradient(135deg, #7c3aed, #a855f7);
+          background: linear-gradient(135deg, #C8A587, #B28A67);
           color: white;
           border: none;
           border-radius: 8px;
@@ -3068,7 +3068,7 @@ export default function HomePageClient() {
 
         .btn-login:hover {
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 4px 12px rgba(178, 138, 103, 0.3);
         }
 
         @media (max-width: 1024px) {
@@ -3088,7 +3088,7 @@ export default function HomePageClient() {
         }
 
         .jadi-vendor-btn {
-          background-color: #5A45D1;
+          background-color: #B28A67;
           color: white;
           padding: 8px 14px;
           border-radius: 6px;
@@ -3102,7 +3102,7 @@ export default function HomePageClient() {
         }
 
         .jadi-vendor-btn:hover {
-          background-color: #3B2B85;
+          background-color: #8F6B4A;
         }
 
         .jadi-vendor-btn.admin-btn {
@@ -3151,9 +3151,9 @@ export default function HomePageClient() {
         }
 
         .home-card:hover {
-          box-shadow: 0 16px 32px rgba(124, 58, 237, 0.15);
+          box-shadow: 0 16px 32px rgba(178, 138, 103, 0.15);
           transform: translateY(-8px);
-          border-color: #7c3aed;
+          border-color: #B28A67;
         }
 
         .home-card-image {
@@ -3220,7 +3220,7 @@ export default function HomePageClient() {
 
         .home-card-vendor {
           font-size: 13px;
-          color: #7c3aed;
+          color: #B28A67;
           margin: 0 0 12px 0;
           font-weight: 600;
         }
@@ -3275,12 +3275,12 @@ export default function HomePageClient() {
         .price-amount {
           font-size: 15px;
           font-weight: 700;
-          color: #7c3aed;
+          color: #B28A67;
           line-height: 1.2;
         }
 
         .btn-home-detail {
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
           color: white;
           border: none;
           padding: 8px 14px;
@@ -3295,7 +3295,7 @@ export default function HomePageClient() {
 
         .btn-home-detail:hover {
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 4px 12px rgba(178, 138, 103, 0.3);
         }
 
         .btn-home-detail:active {
@@ -3338,7 +3338,7 @@ export default function HomePageClient() {
         .vendor-card:hover {
           box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
           transform: translateY(-4px);
-          border-color: #7c3aed;
+          border-color: #B28A67;
         }
 
         .popular-badge {
@@ -3403,7 +3403,7 @@ export default function HomePageClient() {
 
         .vendor-vendor-name {
           font-size: 14px;
-          color: #7c3aed;
+          color: #B28A67;
           margin: 0 0 12px 0;
           font-weight: 600;
         }
@@ -3461,7 +3461,7 @@ export default function HomePageClient() {
         .vendor-price {
           font-size: 16px;
           font-weight: 700;
-          color: #7c3aed;
+          color: #B28A67;
           margin-bottom: 12px;
           display: flex;
           align-items: baseline;
@@ -3470,14 +3470,14 @@ export default function HomePageClient() {
 
         .price-label {
           font-size: 12px;
-          color: #7c3aed;
+          color: #B28A67;
           font-weight: 600;
         }
 
         .price-amount {
           font-size: 18px;
           font-weight: 700;
-          color: #7c3aed;
+          color: #B28A67;
         }
 
         .price-period {
@@ -3493,7 +3493,7 @@ export default function HomePageClient() {
         }
 
         .btn-detail {
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
           color: white;
           border: none;
           padding: 10px 16px;
@@ -3508,7 +3508,7 @@ export default function HomePageClient() {
 
         .btn-detail:hover {
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 4px 12px rgba(178, 138, 103, 0.3);
         }
 
         .btn-detail:active {
@@ -3722,7 +3722,7 @@ export default function HomePageClient() {
         .modal-image-dot.active {
           width: 22px;
           border-radius: 999px;
-          background: #5A45D1;
+          background: #B28A67;
         }
 
         .modal-info {
@@ -3736,7 +3736,7 @@ export default function HomePageClient() {
           flex-direction: column;
           gap: 8px;
           padding: 16px;
-          background: #f8f5ff;
+          background: rgba(178, 138, 103, 0.04);
           border: 1px solid #e5e7eb;
           border-radius: 16px;
           margin-bottom: 20px;
@@ -3757,7 +3757,7 @@ export default function HomePageClient() {
         .modal-price-label {
           font-size: 14px;
           font-weight: 700;
-          color: #7c3aed;
+          color: #B28A67;
         }
 
         .modal-price-amount {
@@ -3806,7 +3806,7 @@ export default function HomePageClient() {
 
         .btn-primary-modal {
           flex: 1;
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
           color: white;
           border: none;
           padding: 12px;
@@ -3819,7 +3819,7 @@ export default function HomePageClient() {
 
         .btn-primary-modal:hover {
           transform: translateY(-2px);
-          box-shadow: 0 8px 20px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 8px 20px rgba(178, 138, 103, 0.3);
         }
 
         .btn-primary-modal:active {
@@ -3981,9 +3981,9 @@ export default function HomePageClient() {
           max-width: 70%;
           padding: 12px 16px;
           border-radius: 12px;
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
           color: white;
-          box-shadow: 0 2px 8px rgba(124, 58, 237, 0.2);
+          box-shadow: 0 2px 8px rgba(178, 138, 103, 0.2);
         }
 
         .chat-message.vendor .message-content {
@@ -4027,15 +4027,15 @@ export default function HomePageClient() {
 
         .chat-input:focus {
           outline: none;
-          border-color: #7c3aed;
-          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+          border-color: #B28A67;
+          box-shadow: 0 0 0 3px rgba(178, 138, 103, 0.1);
         }
 
         .btn-send {
           padding: 10px 16px;
           border: none;
           border-radius: 8px;
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
           color: white;
           font-weight: 600;
           cursor: pointer;
@@ -4044,7 +4044,7 @@ export default function HomePageClient() {
 
         .btn-send:hover {
           transform: translateY(-2px);
-          box-shadow: 0 8px 16px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 8px 16px rgba(178, 138, 103, 0.3);
         }
 
         .btn-send:active {
@@ -4107,8 +4107,8 @@ export default function HomePageClient() {
 
         .rating-textarea:focus {
           outline: none;
-          border-color: #7c3aed;
-          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+          border-color: #B28A67;
+          box-shadow: 0 0 0 3px rgba(178, 138, 103, 0.1);
         }
 
         .btn-submit-rating {
@@ -4116,7 +4116,7 @@ export default function HomePageClient() {
           padding: 12px;
           border: none;
           border-radius: 8px;
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
           color: white;
           font-weight: 600;
           font-size: 16px;
@@ -4126,7 +4126,7 @@ export default function HomePageClient() {
 
         .btn-submit-rating:hover {
           transform: translateY(-2px);
-          box-shadow: 0 8px 16px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 8px 16px rgba(178, 138, 103, 0.3);
         }
 
         .btn-submit-rating:active {
@@ -4161,7 +4161,7 @@ export default function HomePageClient() {
         .tab.active {
           background: white;
           color: #1f2937;
-          box-shadow: inset 0 -2px 0 #7c3aed;
+          box-shadow: inset 0 -2px 0 #B28A67;
         }
 
         .tab-panel {

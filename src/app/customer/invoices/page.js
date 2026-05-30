@@ -285,9 +285,9 @@ export default function CustomerInvoicesPage() {
             <button
               key={btn.value}
               onClick={() => handleFilterChange(btn.value)}
-              style={{
+                style={{
                 padding: '10px 20px',
-                background: filter === btn.value ? '#7c3aed' : '#f3f4f6',
+                background: filter === btn.value ? '#B28A67' : '#f3f4f6',
                 color: filter === btn.value ? 'white' : '#374151',
                 border: 'none',
                 borderRadius: '8px',
@@ -319,7 +319,7 @@ export default function CustomerInvoicesPage() {
                   background: 'white',
                   cursor: 'pointer',
                   transition: 'all 0.2s',
-                  boxShadow: selectedInvoice?.id === invoice.id ? '0 4px 12px rgba(124, 58, 237, 0.15)' : 'none'
+                  boxShadow: selectedInvoice?.id === invoice.id ? '0 4px 12px rgba(178, 138, 103, 0.15)' : 'none'
                 }}
                 onClick={() => setSelectedInvoice(selectedInvoice?.id === invoice.id ? null : invoice)}
               >
@@ -333,7 +333,7 @@ export default function CustomerInvoicesPage() {
                     </p>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '20px', fontWeight: '700', color: '#B28A67', marginBottom: '4px' }}>
                       {formatCurrency(invoice.totalAmount || invoice.remainingPayment || 0)}
                     </div>
                     <div
@@ -373,7 +373,7 @@ export default function CustomerInvoicesPage() {
                   </div>
 
                   {selectedInvoice?.id === invoice.id && (
-                    <div style={{ background: '#f9fafb', padding: '16px', borderRadius: '8px', marginTop: '16px', borderLeft: '4px solid #7c3aed' }}>
+                    <div style={{ background: '#f9fafb', padding: '16px', borderRadius: '8px', marginTop: '16px', borderLeft: '4px solid #B28A67' }}>
                       <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>📋 Detail Invoice</h4>
                       <div style={{ display: 'grid', gap: '8px', fontSize: '13px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -518,7 +518,7 @@ export default function CustomerInvoicesPage() {
                                 setRatingValue(5);
                                 setRatingReview('');
                               }}
-                              style={{ padding: '10px 12px', border: 'none', borderRadius: '8px', background: '#7c3aed', color: 'white', fontWeight: '700', cursor: 'pointer' }}
+                              style={{ padding: '10px 12px', border: 'none', borderRadius: '8px', background: '#B28A67', color: 'white', fontWeight: '700', cursor: 'pointer' }}
                             >
                               Beri Rating
                             </button>
@@ -559,7 +559,7 @@ export default function CustomerInvoicesPage() {
                                     handleSubmitRating(invoice);
                                   }}
                                   disabled={isRatingSubmitting}
-                                  style={{ padding: '10px 12px', border: 'none', borderRadius: '8px', background: isRatingSubmitting ? '#a78bfa' : '#7c3aed', color: 'white', fontWeight: '700', cursor: isRatingSubmitting ? 'not-allowed' : 'pointer' }}
+                                  style={{ padding: '10px 12px', border: 'none', borderRadius: '8px', background: isRatingSubmitting ? '#C8A587' : '#B28A67', color: 'white', fontWeight: '700', cursor: isRatingSubmitting ? 'not-allowed' : 'pointer' }}
                                 >
                                   {isRatingSubmitting ? 'Menyimpan...' : 'Kirim Rating'}
                                 </button>

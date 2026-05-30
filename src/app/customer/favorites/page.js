@@ -348,12 +348,12 @@ export default function FavoritesPage() {
       };
     }
 
-    if (dealData.status === 'agreed') {
+      if (dealData.status === 'agreed') {
       return {
         label: 'Deal disetujui',
         description: 'Deal sudah disepakati. Kamu bisa lanjut ke pembayaran.',
         background: '#dbeafe',
-        color: '#1d4ed8'
+          color: '#B28A67'
       };
     }
 
@@ -456,7 +456,7 @@ export default function FavoritesPage() {
             onClick={() => setFilter('all')}
             style={{
               padding: '8px 16px',
-              border: filter === 'all' ? '2px solid #5A45D1' : '1px solid #ddd',
+              border: filter === 'all' ? '2px solid #B28A67' : '1px solid #ddd',
               background: filter === 'all' ? '#ede9fe' : 'white',
               borderRadius: '6px',
               cursor: 'pointer',
@@ -717,7 +717,7 @@ export default function FavoritesPage() {
                 </p>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
                   <span style={{ fontSize: '14px', color: '#666' }}>Rp</span>
-                  <span style={{ fontSize: '28px', fontWeight: '700', color: '#5A45D1' }}>
+                  <span style={{ fontSize: '28px', fontWeight: '700', color: '#B28A67' }}>
                     {(selectedService.price || 0).toLocaleString('id-ID')}
                   </span>
                   <span style={{ fontSize: '14px', color: '#666' }}>/ hari</span>
@@ -733,9 +733,9 @@ export default function FavoritesPage() {
                     style={{
                       padding: '12px 16px',
                       background: 'transparent',
-                      color: detailTab === tab ? '#5A45D1' : '#666',
+                      color: detailTab === tab ? '#B28A67' : '#666',
                       border: 'none',
-                      borderBottom: detailTab === tab ? '3px solid #5A45D1' : 'none',
+                      borderBottom: detailTab === tab ? '3px solid #B28A67' : 'none',
                       cursor: 'pointer',
                       fontWeight: detailTab === tab ? '600' : '500',
                       fontSize: '14px',
@@ -769,7 +769,7 @@ export default function FavoritesPage() {
                               cursor: 'pointer',
                               borderRadius: '14px',
                               overflow: 'hidden',
-                              border: selectedItemDetail?.title === item.title ? '3px solid #5A45D1' : '1px solid #ddd',
+                              border: selectedItemDetail?.title === item.title ? '3px solid #B28A67' : '1px solid #ddd',
                               transition: 'all 0.3s ease',
                               transform: selectedItemDetail?.title === item.title ? 'scale(1.05)' : 'scale(1)'
                             }}
@@ -813,7 +813,7 @@ export default function FavoritesPage() {
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                             <div>
                               <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Harga</p>
-                              <p style={{ margin: '0', fontSize: '16px', fontWeight: 'bold', color: '#5A45D1' }}>
+                              <p style={{ margin: '0', fontSize: '16px', fontWeight: 'bold', color: '#B28A67' }}>
                                 Rp {(selectedItemDetail.hargaPcs || selectedItemDetail.price || 0).toLocaleString('id-ID')}
                               </p>
                             </div>
@@ -828,7 +828,7 @@ export default function FavoritesPage() {
                             style={{
                               width: '100%',
                               padding: '12px',
-                              backgroundColor: '#5A45D1',
+                              backgroundColor: '#B28A67',
                               color: 'white',
                               border: 'none',
                               borderRadius: '8px',
@@ -836,8 +836,8 @@ export default function FavoritesPage() {
                               fontWeight: '600',
                               fontSize: '14px'
                             }}
-                            onMouseEnter={(e) => e.target.style.backgroundColor = '#4a3bb8'}
-                            onMouseLeave={(e) => e.target.style.backgroundColor = '#5A45D1'}
+                            onMouseEnter={(e) => e.target.style.backgroundColor = '#8F6B4A'}
+                            onMouseLeave={(e) => e.target.style.backgroundColor = '#B28A67'}
                           >
                             💬 Chat untuk Paket Ini
                           </button>
@@ -911,7 +911,7 @@ export default function FavoritesPage() {
                       Rating & Review
                     </h4>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                      <span style={{ fontSize: '28px', fontWeight: 'bold', color: '#5A45D1' }}>
+                      <span style={{ fontSize: '28px', fontWeight: 'bold', color: '#B28A67' }}>
                         {(selectedService.rating || 0).toFixed(1)}
                       </span>
                       <span style={{ color: '#666' }}>
@@ -976,7 +976,7 @@ export default function FavoritesPage() {
                   <span style={{
                     fontSize: '11px',
                     fontWeight: '700',
-                    color: '#5A45D1',
+                    color: '#B28A67',
                     backgroundColor: '#ede9fe',
                     padding: '6px 12px',
                     borderRadius: '999px'
@@ -1180,10 +1180,10 @@ export default function FavoritesPage() {
                               style={{
                                 marginTop: '7px',
                                 padding: '7px 10px',
-                                border: '1px solid #1d4ed8',
+                                border: '1px solid #B28A67',
                                 borderRadius: '8px',
-                                background: 'rgba(29, 78, 216, 0.09)',
-                                color: '#1d4ed8',
+                                background: 'rgba(178, 138, 103, 0.09)',
+                                color: '#B28A67',
                                 fontWeight: '700',
                                 fontSize: '12px',
                                 cursor: 'pointer'
@@ -1245,7 +1245,7 @@ export default function FavoritesPage() {
         .vendor-card:hover {
           box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
           transform: translateY(-4px);
-          border-color: #7c3aed;
+          border-color: #B28A67;
         }
 
         .popular-badge {
@@ -1363,7 +1363,7 @@ export default function FavoritesPage() {
         .price-amount {
           font-size: 16px;
           font-weight: 700;
-          color: #5a45d1;
+          color: #B28A67;
         }
 
         .price-period {
@@ -1374,7 +1374,7 @@ export default function FavoritesPage() {
         .btn-detail {
           flex: 1;
           padding: 10px 16px;
-          background: #5a45d1;
+          background: #B28A67;
           color: white;
           border: none;
           border-radius: 8px;
@@ -1417,7 +1417,7 @@ export default function FavoritesPage() {
 
         .btn-primary-modal {
           flex: 1;
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 100%);
           color: white;
           border: none;
           padding: 12px;
@@ -1430,7 +1430,7 @@ export default function FavoritesPage() {
 
         .btn-primary-modal:hover {
           transform: translateY(-2px);
-          box-shadow: 0 8px 20px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 8px 20px rgba(178, 138, 103, 0.3);
         }
 
         .btn-primary-modal:active {
@@ -1537,9 +1537,9 @@ export default function FavoritesPage() {
           max-width: 70%;
           padding: 12px 16px;
           border-radius: 12px;
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 100%);
           color: white;
-          box-shadow: 0 2px 8px rgba(124, 58, 237, 0.2);
+          box-shadow: 0 2px 8px rgba(178, 138, 103, 0.2);
         }
 
         .chat-message.vendor .message-content {
@@ -1583,15 +1583,15 @@ export default function FavoritesPage() {
 
         .chat-input:focus {
           outline: none;
-          border-color: #7c3aed;
-          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+          border-color: #B28A67;
+          box-shadow: 0 0 0 3px rgba(178, 138, 103, 0.1);
         }
 
         .btn-send {
           padding: 10px 16px;
           border: none;
           border-radius: 8px;
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 100%);
           color: white;
           font-weight: 600;
           cursor: pointer;
@@ -1600,7 +1600,7 @@ export default function FavoritesPage() {
 
         .btn-send:hover {
           transform: translateY(-2px);
-          box-shadow: 0 8px 16px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 8px 16px rgba(178, 138, 103, 0.3);
         }
 
         .btn-send:active {
@@ -1663,8 +1663,8 @@ export default function FavoritesPage() {
 
         .rating-textarea:focus {
           outline: none;
-          border-color: #7c3aed;
-          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+          border-color: #B28A67;
+          box-shadow: 0 0 0 3px rgba(178, 138, 103, 0.1);
         }
 
         .btn-submit-rating {
@@ -1672,7 +1672,7 @@ export default function FavoritesPage() {
           padding: 12px;
           border: none;
           border-radius: 8px;
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 100%);
           color: white;
           font-weight: 600;
           font-size: 16px;
@@ -1682,7 +1682,7 @@ export default function FavoritesPage() {
 
         .btn-submit-rating:hover {
           transform: translateY(-2px);
-          box-shadow: 0 8px 16px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 8px 16px rgba(178, 138, 103, 0.3);
         }
 
         .btn-submit-rating:active {

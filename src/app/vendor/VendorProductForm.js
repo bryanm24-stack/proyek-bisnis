@@ -1539,7 +1539,7 @@ export default function VendorProductForm({
                   cursor: 'pointer',
                   transition: 'all 0.2s'
                 }}
-                onMouseEnter={(e) => e.target.style.background = '#2563eb'}
+                onMouseEnter={(e) => e.target.style.background = '#8F6B4A'}
                 onMouseLeave={(e) => e.target.style.background = '#3b82f6'}
               >
                 ➕ Tambah Paket Baru
@@ -2106,7 +2106,7 @@ export default function VendorProductForm({
           style={{
             width: '100%',
             padding: '14px',
-            background: isSubmitting ? '#ccc' : '#7c3aed',
+            background: isSubmitting ? '#ccc' : '#B28A67',
             color: 'white',
             border: 'none',
             borderRadius: '8px',
@@ -2719,7 +2719,7 @@ export default function VendorProductForm({
                         style={{
                           padding: '6px 10px',
                           background: '#eff6ff',
-                          color: '#2563eb',
+                          color: '#B28A67',
                           border: '1px solid #bfdbfe',
                           borderRadius: '6px',
                           fontSize: '12px',
@@ -2751,7 +2751,7 @@ export default function VendorProductForm({
                         onClick={handleAddVariation}
                         style={{
                           padding: '10px 16px',
-                          background: '#5A45D1',
+                          background: '#B28A67',
                           color: '#fff',
                           border: 'none',
                           borderRadius: '8px',

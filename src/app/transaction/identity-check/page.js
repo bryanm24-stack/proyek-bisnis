@@ -512,8 +512,8 @@ function IdentityCheckContent() {
         .form-group textarea:focus,
         .form-group select:focus {
           outline: none;
-          border-color: #5A45D1;
-          box-shadow: 0 0 0 3px rgba(90, 69, 209, 0.1);
+          border-color: #B28A67;
+          box-shadow: 0 0 0 3px rgba(178, 138, 103, 0.1);
         }
 
         .form-group input.input-error,
@@ -547,7 +547,7 @@ function IdentityCheckContent() {
         }
 
         .file-upload-label:hover {
-          border-color: #5A45D1;
+          border-color: #B28A67;
           background: #f5f0ff;
         }
 
@@ -584,7 +584,7 @@ function IdentityCheckContent() {
         .photo-change {
           margin-top: 12px;
           padding: 8px 16px;
-          background: #5A45D1;
+          background: #B28A67;
           color: white;
           border-radius: 6px;
           font-size: 12px;
@@ -619,14 +619,14 @@ function IdentityCheckContent() {
         }
 
         .btn-primary {
-          background: #5A45D1;
+          background: #B28A67;
           color: white;
         }
 
         .btn-primary:hover:not(:disabled) {
-          background: #4a38b0;
+          background: #8F6B4A;
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(90, 69, 209, 0.3);
+          box-shadow: 0 4px 12px rgba(178, 138, 103, 0.3);
         }
 
         .btn-primary:disabled,
@@ -665,11 +665,11 @@ function IdentityCheckContent() {
         .summary-item.total {
           padding-top: 12px;
           border-top: 1px solid #ddd;
-          color: #5A45D1;
+          color: #B28A67;
         }
 
         .summary-item.total strong {
-          color: #5A45D1;
+          color: #B28A67;
           font-size: 16px;
         }
 
