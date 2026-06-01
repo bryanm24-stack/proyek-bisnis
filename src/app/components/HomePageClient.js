@@ -807,6 +807,20 @@ export default function HomePageClient() {
     service?.availableQuantity ?? service?.availability ?? service?.quantity ?? 0
   );
 
+  const getDisplayedStock = (service) => {
+    if (!service) return 0;
+
+    if (service.type === 'jasa') {
+      return getServiceAvailability(service);
+    }
+
+    if (Array.isArray(service.items) && service.items.length > 0) {
+      return service.items.reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
+    }
+
+    return Number(service.availableQuantity ?? service.quantity ?? service.availability ?? 0) || 0;
+  };
+
   const filteredServices = getFilteredServices();
   // Derive a featured services list for the hero carousel (safe fallback)
   const featuredServices = Array.isArray(filteredServices) ? filteredServices.slice(0, 5) : [];
@@ -1279,24 +1293,6 @@ export default function HomePageClient() {
                         <span className="rating-stars">⭐ {Number(service.rating || 0).toFixed(1)}</span>
                         <span className="rating-count">({service.rentCount} disewa)</span>
                       </div>
-                      {isJasaService && (
-                        <div style={{ marginTop: '8px' }}>
-                          <span
-                            style={{
-                              fontSize: '11px',
-                              fontWeight: '600',
-                              color: serviceAvailability > 0 ? '#15803d' : '#b91c1c',
-                              background: serviceAvailability > 0 ? '#dcfce7' : '#fee2e2',
-                              border: `1px solid ${serviceAvailability > 0 ? '#86efac' : '#fca5a5'}`,
-                              borderRadius: '9999px',
-                              padding: '4px 10px',
-                              display: 'inline-block'
-                            }}
-                          >
-                            {serviceAvailability > 0 ? `Availability: ${serviceAvailability} Tim/Provider` : 'Availability Penuh'}
-                          </span>
-                        </div>
-                      )}
                     </div>
 
                     <div className="vendor-footer">

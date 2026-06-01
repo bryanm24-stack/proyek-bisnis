@@ -471,18 +471,31 @@ function PaymentContent() {
   };
 
   const serviceFee = 25000;
-  // ✅ FIXED: Use selectedItem price instead of deal?.totalPrice
-  const basePrice = selectedItem?.price || 0;
-  // ✅ NEW: Jika ada selectedPromo, gunakan promoPrice langsung, kalau tidak gunakan harga normal
-  const totalPrice = selectedPromo ? selectedPromo.price : (basePrice * quantity * durationDays);
+  // ✅ FIXED: Use deal price when a deal exists so checkout matches the agreed price
+  const selectedItemPrice = Number(selectedItem?.price || 0);
+  const dealOriginalPrice = Number(deal?.originalPrice ?? selectedItemPrice) || 0;
+  const basePrice = selectedPromo ? Number(selectedPromo.price || 0) : (deal ? dealOriginalPrice : selectedItemPrice);
+  const dealDiscountAmount = Number(deal?.discount?.amount ?? 0) || 0;
+  const dealFinalPrice = deal?.discountGiven
+    ? Number(deal?.finalPrice ?? Math.max(dealOriginalPrice - dealDiscountAmount, 0))
+    : null;
+
+  // ✅ NEW: Jika ada selectedPromo, gunakan promoPrice langsung, kalau ada discount vendor gunakan finalPrice deal
+  const dealSubtotal = deal?.discountGiven
+    ? Math.max(dealFinalPrice ?? 0, 0)
+    : (basePrice * quantity * durationDays);
+  const totalPrice = selectedPromo ? selectedPromo.price : dealSubtotal;
   const discountedSubtotal = totalPrice;
-  const discountAmount = 0; // ✅ NEW: No discounts for new promo system
+  const discountAmount = selectedPromo ? 0 : (deal?.discountGiven ? dealDiscountAmount : 0);
   const appliedPromo = null; // ✅ NEW: No promo code in new system
   const totalAmount = discountedSubtotal + (selectedPromo ? 0 : serviceFee); // ✅ NEW: No service fee for promo
   const downPayment = Math.round(totalAmount * 0.2); // 20% down payment
   const remainingPayment = totalAmount - downPayment; // 80% remaining
   const isService = service?.type === 'jasa' || deal?.serviceType === 'jasa' || deal?.type === 'jasa';
   const quantityLabel = isService ? 'Tim/Provider' : 'Item';
+  const displayedAvailableQuantity = Number(
+    maxAvailableQuantity ?? selectedItem?.stok ?? service?.availableQuantity ?? service?.availability ?? service?.quantity ?? 0
+  ) || 0;
   const borrowDateLabel = startDate
     ? new Date(`${startDate}T00:00:00.000Z`).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
     : '-';
@@ -737,7 +750,7 @@ function PaymentContent() {
                           </div>
                           <div style={{ textAlign: 'right' }}>
                             <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px 0' }}>Harga/unit</p>
-                            <p style={{ fontSize: '16px', fontWeight: '700', color: '#B28A67', margin: '0' }}>Rp {selectedItem.price?.toLocaleString('id-ID')}</p>
+                            <p style={{ fontSize: '16px', fontWeight: '700', color: '#B28A67', margin: '0' }}>Rp {basePrice.toLocaleString('id-ID')}</p>
                           </div>
                         </div>
                       </div>
@@ -790,7 +803,7 @@ function PaymentContent() {
                           color: '#15803d',
                           border: `1px solid #86efac`
                         }}>
-                          ✅ Stok tersedia: {selectedItem.stok} {quantityLabel}
+                          ✅ Stok tersedia: {displayedAvailableQuantity} {quantityLabel}
                         </div>
                       ) : (
                         availabilityMessage && (
@@ -878,6 +891,18 @@ function PaymentContent() {
                     <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>Subtotal</span>
                     <span style={{ fontSize: '14px', fontWeight: '700', color: '#22c55e' }}>Rp {totalPrice.toLocaleString('id-ID')}</span>
                   </div>
+                  {deal?.discountGiven && !selectedPromo && (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '13px', color: '#6b7280' }}>Harga asli</span>
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>Rp {dealOriginalPrice.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '13px', color: '#6b7280' }}>Potongan vendor</span>
+                        <span style={{ fontSize: '14px', fontWeight: '700', color: '#dc2626' }}>- Rp {dealDiscountAmount.toLocaleString('id-ID')}</span>
+                      </div>
+                    </>
+                  )}
                   {deal && !selectedPromo && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: '13px', color: '#6b7280' }}>Biaya layanan (5%)</span>
