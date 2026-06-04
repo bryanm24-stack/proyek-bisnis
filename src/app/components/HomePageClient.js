@@ -227,7 +227,7 @@ export default function HomePageClient() {
     }));
   };
 
-  // Helper function to safely format price
+// Helper function to safely format price
   const formatPrice = (price) => {
     if (typeof price === 'number' && isFinite(price) && price > 0 && price < 1e20) {
       return price.toLocaleString('id-ID');
@@ -235,15 +235,20 @@ export default function HomePageClient() {
     return '0';
   };
 
-  // Helper function to get display price from items
+  // Helper fungsi baru untuk memastikan ekstraksi harga yang absolut
+  const getItemPriceNumber = (item) => {
+    if (!item) return 0;
+    return Number(item.hargaPcs || item.hargaSesi || item.harga || item.price || 0);
+  };
+
+  // Perbarui getItemsPrice untuk mengonsumsi fungsi pembantu baru
   const getItemsPrice = (service) => {
     if (!service.items || service.items.length === 0) {
       return null;
     }
 
-    // Get prices from items based on type
     const prices = service.items
-      .map(item => item.hargaSesi || item.hargaPcs || 0)
+      .map(item => getItemPriceNumber(item))
       .filter(price => price > 0)
       .sort((a, b) => a - b);
 
