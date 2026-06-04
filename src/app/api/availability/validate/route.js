@@ -10,7 +10,7 @@ function getServiceCapacity(service) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { serviceId, quantity, startDate, endDate } = body;
+    const { serviceId, itemId, quantity, startDate, endDate } = body;
 
     if (!serviceId || !quantity || !startDate || !endDate) {
       return NextResponse.json({
@@ -46,8 +46,13 @@ export async function POST(request) {
       // JASA: prefer availableQuantity, fallback to availability/quantity for backward compatibility
       totalQuantity = getServiceCapacity(service);
     } else {
-      // BARANG: Sum of all items stok
-      totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
+      // BARANG: Use the selected item stock when available, otherwise sum all items
+      if (itemId) {
+        const selectedItem = (service.items || []).find((item) => String(item.id) === String(itemId));
+        totalQuantity = Number(selectedItem?.stok) || 0;
+      } else {
+        totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
+      }
     }
     
     if (totalQuantity === 0) {

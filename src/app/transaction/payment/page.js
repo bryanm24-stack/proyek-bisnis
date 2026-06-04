@@ -442,6 +442,7 @@ function PaymentContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           serviceId: deal.serviceId || deal.id,
+          itemId: selectedItem?.id || null,
           quantity: Number(qty),
           startDate: startDt,
           endDate: endDateStr
@@ -482,7 +483,7 @@ function PaymentContent() {
 
   // ✅ NEW: Jika ada selectedPromo, gunakan promoPrice langsung, kalau ada discount vendor gunakan finalPrice deal
   const dealSubtotal = deal?.discountGiven
-    ? Math.max(dealFinalPrice ?? 0, 0)
+    ? Math.max((dealFinalPrice ?? 0) * quantity * durationDays, 0)
     : (basePrice * quantity * durationDays);
   const totalPrice = selectedPromo ? selectedPromo.price : dealSubtotal;
   const discountedSubtotal = totalPrice;
@@ -517,7 +518,7 @@ function PaymentContent() {
     }, 500); // Debounce 500ms
 
     return () => clearTimeout(timer);
-  }, [quantity, durationDays, startDate, deal]);
+  }, [quantity, durationDays, startDate, deal, selectedItem]);
 
   if (isLoading) {
     return <div style={{ padding: '40px', textAlign: 'center', minHeight: '100vh', background: '#f5f3ff' }}>⏳ Loading...</div>;
@@ -895,11 +896,11 @@ function PaymentContent() {
                     <>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                         <span style={{ fontSize: '13px', color: '#6b7280' }}>Harga asli</span>
-                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>Rp {dealOriginalPrice.toLocaleString('id-ID')}</span>
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>Rp {(dealOriginalPrice * quantity * durationDays).toLocaleString('id-ID')}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                         <span style={{ fontSize: '13px', color: '#6b7280' }}>Potongan vendor</span>
-                        <span style={{ fontSize: '14px', fontWeight: '700', color: '#dc2626' }}>- Rp {dealDiscountAmount.toLocaleString('id-ID')}</span>
+                        <span style={{ fontSize: '14px', fontWeight: '700', color: '#dc2626' }}>- Rp {(dealDiscountAmount * quantity * durationDays).toLocaleString('id-ID')}</span>
                       </div>
                     </>
                   )}

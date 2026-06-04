@@ -15,6 +15,46 @@ const findLatestDealByChatId = (deals, chatId) => {
   return null;
 };
 
+const resolveItemPrice = (service, itemId) => {
+  if (!service || !itemId || !Array.isArray(service.items)) return null;
+
+  const item = service.items.find((entry) => normalizeId(entry?.id) === normalizeId(itemId));
+  if (!item) return null;
+
+  const priceField = service.type === 'barang' ? 'hargaPcs' : 'hargaSesi';
+  return Number(item[priceField] ?? item.price ?? null);
+};
+
+const resolveDealPrice = (service, itemId) => {
+  const itemPrice = resolveItemPrice(service, itemId);
+  if (Number.isFinite(itemPrice) && itemPrice > 0) return itemPrice;
+
+  return Number(service?.price ?? service?.harga ?? 0) || 0;
+};
+
+const enrichDealWithItemContext = (deal, chatRoom, service) => {
+  if (!deal) return null;
+
+  const resolvedItemId = deal.itemId || chatRoom?.itemId || null;
+  const resolvedItemName = deal.itemName || chatRoom?.itemName || null;
+  const resolvedOriginalPrice = resolveDealPrice(service, resolvedItemId);
+  const originalPrice = Number.isFinite(resolvedOriginalPrice) && resolvedOriginalPrice > 0
+    ? resolvedOriginalPrice
+    : Number(deal.originalPrice || 0);
+  const finalPrice = deal.discountGiven
+    ? Number(deal.finalPrice ?? Math.max(originalPrice - Number(deal.discount?.amount || 0), 0))
+    : Number(deal.finalPrice ?? originalPrice);
+
+  return {
+    ...deal,
+    itemId: resolvedItemId,
+    itemName: resolvedItemName,
+    itemPrice: originalPrice,
+    originalPrice,
+    finalPrice
+  };
+};
+
 // Helper function to create notification
 async function createNotification(userId, type, message, relatedId, relatedData = {}) {
   try {
@@ -95,7 +135,8 @@ export async function POST(request) {
         const servicesData = await fs.readFile(servicesPath, 'utf-8');
         const services = JSON.parse(servicesData);
         const svc = services.find(s => normalizeId(s.id) === normalizeId(deal.serviceId));
-        deal.originalPrice = Number(svc?.price ?? svc?.harga ?? 0);
+        const chatRoom = chats.find(c => normalizeId(c.id) === normalizeId(chatId));
+        deal.originalPrice = resolveDealPrice(svc, deal.itemId || chatRoom?.itemId || null);
       }
 
       const originalPrice = Number(deal.originalPrice || 0);
@@ -276,10 +317,14 @@ export async function POST(request) {
           const servicesData = await fs.readFile(servicesPath, 'utf-8');
           const services = JSON.parse(servicesData);
           const svc = services.find(s => s.id === serviceId);
-          originalPrice = svc ? svc.price || null : null;
+          originalPrice = resolveDealPrice(svc, chatRoom.itemId || null) || null;
         } catch (e) {
           originalPrice = null;
         }
+
+        const initialItemId = chatRoom.itemId || null;
+        const initialItemName = chatRoom.itemName || null;
+        const initialItemPrice = originalPrice;
 
         const newDeal = {
           id: Date.now().toString(),
@@ -287,6 +332,9 @@ export async function POST(request) {
           customerId,
           vendorId,
           serviceId,
+          itemId: initialItemId,
+          itemName: initialItemName,
+          itemPrice: initialItemPrice,
           customerAccepted: true,
           vendorAccepted: false,
           status: 'pending',
@@ -332,10 +380,13 @@ export async function POST(request) {
             const servicesData = await fs.readFile(servicesPath, 'utf-8');
             const services = JSON.parse(servicesData);
             const svc = services.find(s => s.id === existingDeal.serviceId);
-            originalPrice = svc ? svc.price || null : null;
+            originalPrice = resolveDealPrice(svc, existingDeal.itemId || chatRoom.itemId || null) || null;
           } catch (e) {
             originalPrice = null;
           }
+
+          const freshItemId = existingDeal.itemId || chatRoom.itemId || null;
+          const freshItemName = existingDeal.itemName || chatRoom.itemName || null;
 
           const freshDeal = {
             id: Date.now().toString(),
@@ -343,6 +394,9 @@ export async function POST(request) {
             customerId: customerId,
             vendorId: vendorId,
             serviceId: existingDeal.serviceId,
+            itemId: freshItemId,
+            itemName: freshItemName,
+            itemPrice: originalPrice,
             customerAccepted: true,
             vendorAccepted: false,
             status: 'pending',
@@ -414,7 +468,7 @@ export async function POST(request) {
             const servicesData = await fs.readFile(servicesPath, 'utf-8');
             const services = JSON.parse(servicesData);
             const svc = services.find(s => s.id === existingDeal.serviceId);
-            existingDeal.originalPrice = svc ? svc.price || null : null;
+            existingDeal.originalPrice = resolveDealPrice(svc, existingDeal.itemId || chatRoom.itemId || null) || null;
             existingDeal.finalPrice = existingDeal.originalPrice;
           } catch (e) {
             // ignore
@@ -491,14 +545,25 @@ export async function GET(request) {
     }
 
     const dealsPath = path.join(process.cwd(), 'deals.json');
+    const chatsPath = path.join(process.cwd(), 'chats.json');
+    const servicesPath = path.join(process.cwd(), 'services.json');
     const dealsData = await fs.readFile(dealsPath, 'utf-8');
     const deals = JSON.parse(dealsData);
+    const chatsData = await fs.readFile(chatsPath, 'utf-8');
+    const chats = JSON.parse(chatsData);
+    const servicesData = await fs.readFile(servicesPath, 'utf-8');
+    const services = JSON.parse(servicesData);
 
     const deal = findLatestDealByChatId(deals, chatId);
+    const chatRoom = chats.find((chat) => normalizeId(chat.id) === normalizeId(chatId));
+    const relatedService = deal
+      ? services.find((service) => normalizeId(service.id) === normalizeId(deal.serviceId))
+      : null;
+    const resolvedDeal = enrichDealWithItemContext(deal, chatRoom, relatedService);
 
     return NextResponse.json({
       success: true,
-      data: deal || null
+      data: resolvedDeal
     }, { status: 200 });
   } catch (error) {
     console.error('Error getting deal:', error);
