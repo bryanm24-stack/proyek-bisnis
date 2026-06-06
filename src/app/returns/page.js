@@ -321,6 +321,14 @@ export default function ReturnsPage() {
                               <div className={styles.small}>Biaya kerusakan: Rp {Number(d.damageCharge || 0).toLocaleString('id-ID')}</div>
                               <div className={styles.small}>Biaya keterlambatan: Rp {Number(d.lateCharge || 0).toLocaleString('id-ID')}</div>
                               <div className={styles.small}>Refund akhir: Rp {Number(d.totalRefund || 0).toLocaleString('id-ID')}</div>
+                              {d.damageInvoiceId && (
+                                <div className={styles.small} style={{ marginTop: 6 }}>
+                                  Invoice kerusakan: {d.damageInvoiceId} ({d.damageInvoiceStatus || 'pending'})
+                                  {user.role === 'customer' && d.damageInvoiceStatus === 'pending' && (
+                                    <a href="/customer/invoices" style={{ color: '#B28A67', textDecoration: 'underline', marginLeft: 6 }}>Bayar kerusakan</a>
+                                  )}
+                                </div>
+                              )}
                               {d.inspectionNotes && (
                                 <div className={styles.small} style={{ marginTop: 6 }}>
                                   Catatan vendor: {d.inspectionNotes}

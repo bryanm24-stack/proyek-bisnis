@@ -472,10 +472,10 @@ function PaymentContent() {
   };
 
   const serviceFee = 25000;
-  // ✅ FIXED: Use deal price when a deal exists so checkout matches the agreed price
+  // ✅ FIXED: Prefer the currently selected item price over an older stored deal price
   const selectedItemPrice = Number(selectedItem?.price || 0);
   const dealOriginalPrice = Number(deal?.originalPrice ?? selectedItemPrice) || 0;
-  const basePrice = selectedPromo ? Number(selectedPromo.price || 0) : (deal ? dealOriginalPrice : selectedItemPrice);
+  const basePrice = selectedPromo ? Number(selectedPromo.price || 0) : (selectedItemPrice || dealOriginalPrice);
   const dealDiscountAmount = Number(deal?.discount?.amount ?? 0) || 0;
   const dealFinalPrice = deal?.discountGiven
     ? Number(deal?.finalPrice ?? Math.max(dealOriginalPrice - dealDiscountAmount, 0))
@@ -751,7 +751,7 @@ function PaymentContent() {
                           </div>
                           <div style={{ textAlign: 'right' }}>
                             <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px 0' }}>Harga/unit</p>
-                            <p style={{ fontSize: '16px', fontWeight: '700', color: '#B28A67', margin: '0' }}>Rp {basePrice.toLocaleString('id-ID')}</p>
+                            <p style={{ fontSize: '16px', fontWeight: '700', color: '#B28A67', margin: '0' }}>Rp {(selectedItemPrice || basePrice).toLocaleString('id-ID')}</p>
                           </div>
                         </div>
                       </div>

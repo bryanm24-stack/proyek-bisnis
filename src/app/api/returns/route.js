@@ -4,10 +4,79 @@ import { NextResponse } from 'next/server';
 
 // Helpers: date-only UTC handling to avoid timezone off-by-one
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const invoicesPath = path.join(process.cwd(), 'invoices.json');
+
+async function ensureInvoicesFile() {
+  try {
+    await fs.access(invoicesPath);
+  } catch {
+    await fs.writeFile(invoicesPath, '[]', 'utf-8');
+  }
+}
+
 async function readJsonFile(filePath) {
   const fileData = await fs.readFile(filePath, 'utf-8');
   return JSON.parse(fileData.replace(/^\uFEFF/, '').trim());
 }
+
+async function readInvoicesFile() {
+  await ensureInvoicesFile();
+  const fileData = await fs.readFile(invoicesPath, 'utf-8');
+  return JSON.parse(fileData.replace(/^\uFEFF/, '').trim() || '[]');
+}
+
+async function writeInvoicesFile(invoices) {
+  await fs.writeFile(invoicesPath, JSON.stringify(invoices, null, 2), 'utf-8');
+}
+
+function getCurrentISOString() {
+  return new Date().toISOString();
+}
+
+function createDamageInvoice(deal, amount) {
+  return {
+    id: `INV-DAMAGE-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    dealId: deal.id,
+    customerId: deal.customerId,
+    vendorId: deal.vendorId,
+    serviceId: deal.serviceId,
+    transactionId: null,
+    remainingPayment: Number(amount || 0),
+    paymentDeadline: new Date(Date.now() + 2 * MS_PER_DAY).toISOString(),
+    paymentMethod: null,
+    paymentType: 'damage',
+    status: 'pending',
+    createdAt: getCurrentISOString(),
+    paidAt: null,
+    paymentTransactionId: null,
+    notes: 'Tagihan biaya kerusakan'
+  };
+}
+
+async function syncDamageInvoice(deal, amount) {
+  if (!deal?.id || Number(amount || 0) <= 0) {
+    return null;
+  }
+
+  const invoices = await readInvoicesFile();
+  let invoice = invoices.find(i => String(i.dealId) === String(deal.id) && String(i.paymentType) === 'damage');
+  if (invoice) {
+    invoice.remainingPayment = Number(amount || 0);
+    invoice.status = invoice.status === 'paid' ? 'paid' : 'pending';
+    invoice.paymentDeadline = invoice.paymentDeadline || new Date(Date.now() + 2 * MS_PER_DAY).toISOString();
+    invoice.notes = 'Tagihan biaya kerusakan';
+  } else {
+    invoice = createDamageInvoice(deal, amount);
+    invoices.push(invoice);
+  }
+
+  await writeInvoicesFile(invoices);
+  deal.damageInvoiceId = invoice.id;
+  deal.damageInvoiceStatus = invoice.status;
+  deal.damageInvoiceAmount = Number(amount || 0);
+  return invoice;
+}
+
 function toDateOnlyUTC(dateStr) {
   if (!dateStr) return null;
   const d = new Date(dateStr);
@@ -120,6 +189,9 @@ export async function GET(request) {
         damageStatus: deal.damageStatus || 'none',
         damageDescription: deal.damageDescription || '',
         damageCharge: deal.damageCharge || 0,
+        damageInvoiceId: deal.damageInvoiceId || null,
+        damageInvoiceStatus: deal.damageInvoiceStatus || null,
+        damageInvoiceAmount: deal.damageInvoiceAmount || 0,
         daysLate: deal.daysLate || 0,
         lateCharge: deal.lateCharge || 0,
         totalRefund: deal.totalRefund || 0,
@@ -276,6 +348,12 @@ export async function POST(request) {
         deal.damageCharge = deal.totalPrice || 0; // Full price as damage charge
       }
 
+      // Keep return invoice references for future charge flow
+      if (deal.damageCharge > 0) {
+        deal.damageInvoiceAmount = deal.damageCharge;
+        deal.damageInvoiceStatus = 'pending';
+      }
+
       // Calculate late charge: daily_rate × daysLate
       // daily_rate = totalPrice / rentalDays (using actual rental duration)
       let rentalDays = deal.rentalDays || deal.durationDays || 0;
@@ -288,6 +366,22 @@ export async function POST(request) {
 
       // Status for inspection
       deal.status = 'returning'; // Differentiate from 'agreed' or 'completed'
+
+      if (deal.chatId) {
+        try {
+          const chatsPath = path.join(process.cwd(), 'chats.json');
+          const chatsData = await fs.readFile(chatsPath, 'utf-8');
+          const chats = JSON.parse(chatsData.replace(/^\uFEFF/, '').trim() || '[]');
+          const chatIndex = chats.findIndex((c) => String(c.id) === String(deal.chatId));
+          if (chatIndex !== -1) {
+            chats[chatIndex].dealStatus = 'returning';
+            chats[chatIndex].returnRequestedAt = new Date().toISOString();
+            await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2), 'utf-8');
+          }
+        } catch (chatErr) {
+          console.warn('Could not update chat status on return initiation:', chatErr.message || chatErr);
+        }
+      }
     }
 
     await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
@@ -388,6 +482,10 @@ export async function PUT(request) {
     deal.damageCharge = damageCharge || 0;
     deal.inspectionNotes = notes || '';
     deal.vendorConfirmed = true;
+
+    if (deal.damageCharge > 0) {
+      await syncDamageInvoice(deal, deal.damageCharge);
+    }
 
     // Calculate total refund (same formula applies)
     const basePrice = deal.totalPrice || 0;
