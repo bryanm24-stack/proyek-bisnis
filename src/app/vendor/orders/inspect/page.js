@@ -188,7 +188,7 @@ function VendorInspectionContent() {
           </h1>
 
           {/* Status Info */}
-          <div style={{ background: '#f9f9f9', padding: '15px', borderRadius: '8px', marginBottom: '20px', borderLeft: '4px solid #5A45D1' }}>
+          <div style={{ background: '#f9f9f9', padding: '15px', borderRadius: '8px', marginBottom: '20px', borderLeft: '4px solid #B28A67' }}>
             <div style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>Status Saat Ini</div>
             <div style={{ fontSize: '18px', fontWeight: '600', color: '#333' }}>
               {statusLabels[order.inspectionStatus] || statusLabels.checking}

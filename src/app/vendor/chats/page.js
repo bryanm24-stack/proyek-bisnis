@@ -124,7 +124,7 @@ export default function VendorChatsPage() {
     } catch (error) {
       console.error('Error loading deal:', error);
     }
-    
+
     setChatModalOpen(true);
   };
 
@@ -361,9 +361,9 @@ export default function VendorChatsPage() {
                     background: 'transparent',
                     fontSize: '13px',
                     fontWeight: chatTab === 'vendor' ? '700' : '500',
-                    color: chatTab === 'vendor' ? '#5A45D1' : '#999',
+                    color: chatTab === 'vendor' ? '#B28A67' : '#999',
                     cursor: vendorChats.length === 0 ? 'not-allowed' : 'pointer',
-                    borderBottom: chatTab === 'vendor' ? '2px solid #5A45D1' : 'none',
+                    borderBottom: chatTab === 'vendor' ? '2px solid #B28A67' : 'none',
                     transition: 'all 0.2s',
                     opacity: vendorChats.length === 0 ? 0.5 : 1,
                     marginBottom: '-2px'
@@ -381,9 +381,9 @@ export default function VendorChatsPage() {
                     background: 'transparent',
                     fontSize: '13px',
                     fontWeight: chatTab === 'customer' ? '700' : '500',
-                    color: chatTab === 'customer' ? '#5A45D1' : '#999',
+                    color: chatTab === 'customer' ? '#B28A67' : '#999',
                     cursor: customerChats.length === 0 ? 'not-allowed' : 'pointer',
-                    borderBottom: chatTab === 'customer' ? '2px solid #5A45D1' : 'none',
+                    borderBottom: chatTab === 'customer' ? '2px solid #B28A67' : 'none',
                     transition: 'all 0.2s',
                     opacity: customerChats.length === 0 ? 0.5 : 1,
                     marginBottom: '-2px'
@@ -418,8 +418,8 @@ export default function VendorChatsPage() {
                     backgroundColor: '#fff'
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#7c3aed';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.1)';
+                    e.target.style.borderColor = '#B28A67';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(178, 138, 103, 0.1)';
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = '#eee';
@@ -479,9 +479,9 @@ export default function VendorChatsPage() {
                               marginBottom: '8px',
                               borderRadius: '8px',
                               cursor: 'pointer',
-                              background: selectedChat?.id === chat.id ? '#5A45D1' : '#fff',
+                              background: selectedChat?.id === chat.id ? '#B28A67' : '#fff',
                               color: selectedChat?.id === chat.id ? '#fff' : '#333',
-                              border: selectedChat?.id === chat.id ? '2px solid #5A45D1' : '1px solid #eee',
+                              border: selectedChat?.id === chat.id ? '2px solid #B28A67' : '1px solid #eee',
                               transition: 'all 0.3s'
                             }}
                           >
@@ -521,9 +521,9 @@ export default function VendorChatsPage() {
                               marginBottom: '8px',
                               borderRadius: '8px',
                               cursor: 'pointer',
-                              background: selectedChat?.id === chat.id ? '#5A45D1' : '#fff',
+                              background: selectedChat?.id === chat.id ? '#B28A67' : '#fff',
                               color: selectedChat?.id === chat.id ? '#fff' : '#333',
-                              border: selectedChat?.id === chat.id ? '2px solid #5A45D1' : '1px solid #eee',
+                              border: selectedChat?.id === chat.id ? '2px solid #B28A67' : '1px solid #eee',
                               transition: 'all 0.3s'
                             }}
                           >
@@ -566,14 +566,14 @@ export default function VendorChatsPage() {
                       margin: 0, 
                       fontSize: '18px',
                       cursor: 'pointer',
-                      color: '#7c3aed',
+                      color: '#B28A67',
                       transition: 'all 0.2s'
                     }}
                     onClick={() => setShowCustomerModal(true)}
                     onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
                     onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
                   >
-                    {user.id === selectedChat.customerId ? selectedChat.customerName : selectedChat.vendorName}
+                    {String(user.id) === String(selectedChat.vendorId) ? selectedChat.customerName : selectedChat.vendorName}
                   </h2>
                   <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#666' }}>
                     {getChatTopicLabel(selectedChat)}
@@ -585,7 +585,7 @@ export default function VendorChatsPage() {
                     padding: '8px 12px',
                     border: 'none',
                     borderRadius: '6px',
-                    background: '#7c3aed',
+                    background: '#B28A67',
                     color: 'white',
                     fontWeight: '600',
                     cursor: 'pointer',
@@ -594,6 +594,51 @@ export default function VendorChatsPage() {
                 >
                   👤 Profil
                 </button>
+              </div>
+
+              {/* Quick info and actions, visible without opening profile modal */}
+              <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', background: '#fff' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                  <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '10px', background: '#f8fafc' }}>
+                    <div style={{ fontSize: '12px', color: '#475569', marginBottom: '6px' }}>
+                      Profil lawan chat
+                    </div>
+                    <div style={{ fontWeight: '700', color: '#0f172a' }}>
+                      {String(user.id) === String(selectedChat.vendorId) ? selectedChat.customerName : selectedChat.vendorName}
+                    </div>
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: '#64748b' }}>
+                      Topik: {getChatTopicLabel(selectedChat)}
+                    </div>
+
+                    {String(user?.id) === String(selectedChat.vendorId) && (
+                      <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => handleDealAction('accept')}
+                          disabled={dealData?.status === 'agreed' || dealData?.status === 'cancelled' || dealData?.status === 'completed'}
+                          style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: '#10b981', color: 'white', fontWeight: '700', cursor: dealData?.status === 'agreed' || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? 'not-allowed' : 'pointer', opacity: dealData?.status === 'agreed' || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? 0.6 : 1 }}
+                        >
+                          ✅ Terima Deal
+                        </button>
+                        <button
+                          onClick={() => handleDealAction('cancel')}
+                          disabled={dealData?.status === 'cancelled'}
+                          style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: '#ef4444', color: 'white', fontWeight: '700', cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer', opacity: dealData?.status === 'cancelled' ? 0.6 : 1 }}
+                        >
+                          ❌ Tolak
+                        </button>
+                        {dealData?.status === 'agreed' && (
+                          <button
+                            onClick={() => setDiscountMode('yes')}
+                            style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: '#f59e0b', color: 'white', fontWeight: '700', cursor: 'pointer' }}
+                          >
+                            💰 Kasih Promo
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
               </div>
 
               {/* Discount prompt modal (small) */}
@@ -605,7 +650,7 @@ export default function VendorChatsPage() {
                     <div style={{ color: '#666', fontSize: '13px', marginBottom: '12px' }}>Pilih &quot;Ya&quot; untuk menetapkan potongan harga sekarang atau &quot;Tidak&quot; untuk melewati.</div>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                       <button onClick={() => setDiscountMode(null)} style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #ddd', background: 'white' }}>Tidak</button>
-                      <button onClick={() => setDiscountMode('yes')} style={{ padding: '8px 12px', borderRadius: '8px', border: 'none', background: '#5A45D1', color: 'white', fontWeight: 700 }}>Ya, beri diskon</button>
+                      <button onClick={() => setDiscountMode('yes')} style={{ padding: '8px 12px', borderRadius: '8px', border: 'none', background: '#B28A67', color: 'white', fontWeight: 700 }}>Ya, beri diskon</button>
                     </div>
                   </div>
                 </div>
@@ -654,7 +699,7 @@ export default function VendorChatsPage() {
 
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                       <button onClick={() => setDiscountMode(null)} style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #ddd', background: 'white' }}>Batal</button>
-                      <button onClick={async () => { await applyDiscount(); }} style={{ padding: '10px 14px', borderRadius: '8px', border: 'none', background: '#5A45D1', color: 'white', fontWeight: 800 }}>Simpan Harga</button>
+                      <button onClick={async () => { await applyDiscount(); }} style={{ padding: '10px 14px', borderRadius: '8px', border: 'none', background: '#B28A67', color: 'white', fontWeight: 800 }}>Simpan Harga</button>
                     </div>
                   </div>
                 </div>
@@ -695,7 +740,7 @@ export default function VendorChatsPage() {
                           maxWidth: '65%',
                           padding: '12px 14px',
                           borderRadius: '16px',
-                          background: isVendorMessage ? '#5A45D1' : '#e5e7eb',
+                          background: isVendorMessage ? '#B28A67' : '#e5e7eb',
                           color: isVendorMessage ? 'white' : '#333',
                           wordWrap: 'break-word'
                         }}>
@@ -775,7 +820,7 @@ export default function VendorChatsPage() {
                     padding: '10px 16px',
                     border: 'none',
                     borderRadius: '8px',
-                    background: '#5A45D1',
+                    background: '#B28A67',
                     color: 'white',
                     fontWeight: '600',
                     cursor: selectedChat?.dealStatus === 'closed' ? 'not-allowed' : 'pointer',
@@ -983,7 +1028,7 @@ export default function VendorChatsPage() {
                       padding: '12px 16px',
                       border: 'none',
                       borderRadius: '8px',
-                      background: selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt || dealData?.status === 'completed' ? '#9ca3af' : '#7c3aed',
+                      background: selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt || dealData?.status === 'completed' ? '#9ca3af' : '#B28A67',
                       color: 'white',
                       fontWeight: '600',
                       cursor: selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt || dealData?.status === 'completed' ? 'not-allowed' : 'pointer',

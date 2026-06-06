@@ -213,3 +213,57 @@ export async function POST(request) {
     return NextResponse.json({ success: false, message: 'Gagal membuat promo.' }, { status: 500 });
   }
 }
+
+export async function DELETE(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const promoIdFromQuery = searchParams.get('id') || searchParams.get('promoId');
+    const vendorIdFromQuery = searchParams.get('vendorId');
+
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {
+      body = {};
+    }
+
+    const promoId = promoIdFromQuery || body.promoId || body.id;
+    const vendorId = vendorIdFromQuery || body.vendorId;
+
+    if (!promoId || !vendorId) {
+      return NextResponse.json({
+        success: false,
+        message: 'promoId dan vendorId wajib diisi.'
+      }, { status: 400 });
+    }
+
+    const promos = await readPromos();
+    const promoIndex = promos.findIndex((promo) => String(promo.id) === String(promoId));
+
+    if (promoIndex === -1) {
+      return NextResponse.json({
+        success: false,
+        message: 'Promo tidak ditemukan.'
+      }, { status: 404 });
+    }
+
+    if (String(promos[promoIndex].vendorId) !== String(vendorId)) {
+      return NextResponse.json({
+        success: false,
+        message: 'Anda tidak berhak menghapus promo ini.'
+      }, { status: 403 });
+    }
+
+    const [deletedPromo] = promos.splice(promoIndex, 1);
+    await writePromos(promos);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Promo berhasil dihapus.',
+      data: deletedPromo
+    }, { status: 200 });
+  } catch (error) {
+    console.error('Error deleting promo:', error);
+    return NextResponse.json({ success: false, message: 'Gagal menghapus promo.' }, { status: 500 });
+  }
+}

@@ -5,6 +5,7 @@ const invoicesFile = path.join(process.cwd(), 'invoices.json');
 const transactionsFile = path.join(process.cwd(), 'transactions.json');
 const dealsFile = path.join(process.cwd(), 'deals.json');
 const servicesFile = path.join(process.cwd(), 'services.json');
+const promosFile = path.join(process.cwd(), 'promos.json');
 const ratingsFile = path.join(process.cwd(), 'ratings.json');
 const usersFile = path.join(process.cwd(), 'users.json');
 
@@ -74,6 +75,7 @@ export async function GET(request) {
     ensureFile(transactionsFile);
     ensureFile(dealsFile);
     ensureFile(servicesFile);
+    ensureFile(promosFile);
     ensureFile(ratingsFile);
     ensureFile(usersFile);
     
@@ -86,6 +88,7 @@ export async function GET(request) {
     const transactions = parseJsonFile(transactionsFile, []);
     const deals = parseJsonFile(dealsFile, []);
     const services = parseJsonFile(servicesFile, []);
+    const promos = parseJsonFile(promosFile, []);
     const ratings = parseJsonFile(ratingsFile, []);
     const users = parseJsonFile(usersFile, []);
 
@@ -98,7 +101,7 @@ export async function GET(request) {
     // Backfill invoices from historical transactions so old paid/full payments also appear.
     let hasGeneratedInvoices = false;
     transactions
-      .filter((item) => item.dealId && item.paymentType !== 'invoice_payment')
+      .filter((item) => (item.dealId || item.promoId) && item.paymentType !== 'invoice_payment')
       .forEach((transaction) => {
         // Improved deduplication using normalizeId for case-insensitive matching
         const alreadyExists = invoices.some(
@@ -110,6 +113,7 @@ export async function GET(request) {
         if (alreadyExists) return;
 
         const relatedDeal = deals.find((item) => item.id === transaction.dealId);
+        const relatedPromo = promos.find((item) => String(item.id) === String(transaction.promoId));
         const isPayAfter = transaction.paymentType === 'pay_after';
         const nowIso = new Date().toISOString();
         const deadlineDate = new Date(transaction.timestamp || nowIso);
@@ -117,9 +121,10 @@ export async function GET(request) {
 
         invoices.push({
           id: getNextInvoiceId(),
-          dealId: transaction.dealId,
+          dealId: transaction.dealId || null,
+          promoId: transaction.promoId || null,
           customerId: transaction.userId || relatedDeal?.customerId || null,
-          vendorId: relatedDeal?.vendorId || transaction.vendorId || null,
+          vendorId: relatedDeal?.vendorId || relatedPromo?.vendorId || transaction.vendorId || null,
           serviceId: relatedDeal?.serviceId || null,
           transactionId: transaction.id,
           remainingPayment: isPayAfter
@@ -132,7 +137,15 @@ export async function GET(request) {
           createdAt: transaction.createdAt || nowIso,
           paidAt: isPayAfter ? null : (transaction.timestamp || nowIso),
           paymentTransactionId: isPayAfter ? null : transaction.id,
-          notes: transaction.notes || ''
+          notes: transaction.notes || '',
+          serviceTitle: relatedPromo?.title || transaction.promo?.title || null,
+          promo: transaction.promo || (relatedPromo ? {
+            id: relatedPromo.id,
+            title: relatedPromo.title,
+            promoPrice: relatedPromo.promoPrice,
+            image: relatedPromo.image,
+            description: relatedPromo.description
+          } : null)
         });
         hasGeneratedInvoices = true;
       });
@@ -195,6 +208,7 @@ export async function GET(request) {
     const enrichInvoice = (invoice) => {
       const relatedTransaction = transactions.find((item) => item.id === invoice.transactionId || item.invoiceId === invoice.id);
       const relatedDeal = deals.find((item) => item.id === invoice.dealId);
+      const relatedPromo = promos.find((item) => String(item.id) === String(invoice.promoId || relatedTransaction?.promoId));
       const relatedService = relatedDeal
         ? services.find((item) => String(item.id) === String(relatedDeal.serviceId))
         : null;
@@ -236,12 +250,12 @@ export async function GET(request) {
       return {
         ...invoice,
         customerId: invoice.customerId || relatedDeal?.customerId || relatedTransaction?.userId || null,
-        vendorId: invoice.vendorId || relatedDeal?.vendorId || relatedTransaction?.vendorId || null,
+        vendorId: invoice.vendorId || relatedDeal?.vendorId || relatedPromo?.vendorId || relatedTransaction?.vendorId || null,
         serviceId: relatedDeal?.serviceId || invoice.serviceId || null,
         customerName: relatedDeal?.customerName || relatedTransaction?.customerName || invoice.customerName || findUserName(invoice.customerId || relatedDeal?.customerId || relatedTransaction?.userId, 'Customer'),
-        vendorName: relatedDeal?.vendorName || relatedTransaction?.vendorName || invoice.vendorName || findUserName(invoice.vendorId || relatedDeal?.vendorId || relatedTransaction?.vendorId, 'Vendor'),
-        serviceTitle: relatedService?.title || relatedService?.namaBarang || relatedService?.namaJasa || relatedDeal?.itemName || relatedDeal?.serviceTitle || invoice.serviceTitle || 'Item sewa',
-        serviceImage: relatedService?.images?.[0] || relatedDeal?.image || relatedTransaction?.image || '',
+        vendorName: relatedDeal?.vendorName || relatedPromo?.vendorName || relatedTransaction?.vendorName || invoice.vendorName || findUserName(invoice.vendorId || relatedDeal?.vendorId || relatedPromo?.vendorId || relatedTransaction?.vendorId, 'Vendor'),
+        serviceTitle: relatedService?.title || relatedService?.namaBarang || relatedService?.namaJasa || relatedDeal?.itemName || relatedDeal?.serviceTitle || relatedPromo?.title || relatedTransaction?.promo?.title || invoice.serviceTitle || 'Item sewa',
+        serviceImage: relatedService?.images?.[0] || relatedDeal?.image || relatedPromo?.image || relatedTransaction?.image || '',
         dealStatus: relatedDeal?.status || relatedDeal?.invoiceStatus || 'pending',
         paymentType: relatedTransaction?.paymentType || relatedDeal?.paymentType || invoice.paymentType || 'pay_after',
         quantity: relatedTransaction?.quantity || relatedDeal?.quantity || invoice.quantity || 1,
@@ -251,7 +265,7 @@ export async function GET(request) {
         discountedSubtotal: subtotal,
         serviceFee,
         totalAmount,
-        promo: relatedTransaction?.promo || relatedDeal?.promo || null,
+        promo: relatedTransaction?.promo || relatedDeal?.promo || relatedPromo || invoice.promo || null,
         notes: relatedTransaction?.notes || invoice.notes || '',
         startDate: relatedTransaction?.startDate || invoice.startDate || null,
         dueDateLabel: invoice.paymentDeadline ? new Date(invoice.paymentDeadline).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A',

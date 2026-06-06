@@ -155,7 +155,7 @@ export default function LoginPage() {
         .login-container {
           display: flex;
           height: 100vh;
-          background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 50%, #1e3a8a 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
           font-family: system-ui, -apple-system, sans-serif;
         }
 
@@ -306,8 +306,8 @@ export default function LoginPage() {
 
         .form-group input:focus {
           outline: none;
-          border-color: #7c3aed;
-          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+          border-color: #B28A67;
+          box-shadow: 0 0 0 3px rgba(178, 138, 103, 0.1);
         }
 
         .form-actions {
@@ -330,11 +330,11 @@ export default function LoginPage() {
           cursor: pointer;
           width: 16px;
           height: 16px;
-          accent-color: #7c3aed;
+          accent-color: #B28A67;
         }
 
         .forgot-link {
-          color: #7c3aed;
+          color: #B28A67;
           text-decoration: none;
           font-weight: 500;
           transition: opacity 0.2s;
@@ -347,7 +347,7 @@ export default function LoginPage() {
         .btn-primary {
           width: 100%;
           padding: 12px 16px;
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 100%);
           color: white;
           border: none;
           border-radius: 8px;
@@ -360,7 +360,7 @@ export default function LoginPage() {
 
         .btn-primary:hover:not(:disabled) {
           transform: translateY(-2px);
-          box-shadow: 0 8px 20px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 8px 20px rgba(178, 138, 103, 0.3);
         }
 
         .btn-primary:disabled {
@@ -418,7 +418,7 @@ export default function LoginPage() {
         }
 
         .register-link a {
-          color: #7c3aed;
+          color: #B28A67;
           text-decoration: none;
           font-weight: 600;
           transition: opacity 0.2s;
@@ -436,7 +436,7 @@ export default function LoginPage() {
         }
 
         .terms a {
-          color: #7c3aed;
+          color: #B28A67;
           text-decoration: none;
         }
 

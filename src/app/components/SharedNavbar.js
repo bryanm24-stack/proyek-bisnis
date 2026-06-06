@@ -46,14 +46,14 @@ function NavLink({ href, active, children }) {
     <Link
       href={href}
       style={{
-        fontSize: '14px',
-        color: active ? '#7c3aed' : '#666',
-        textDecoration: 'none',
-        fontWeight: active ? '600' : '500',
-        padding: '6px 12px',
-        borderRadius: '6px',
-        background: active ? '#f0e6ff' : 'transparent',
-      }}
+          fontSize: '14px',
+          color: active ? '#B28A67' : '#666',
+          textDecoration: 'none',
+          fontWeight: active ? '600' : '500',
+          padding: '6px 12px',
+          borderRadius: '6px',
+          background: active ? '#f0e6ff' : 'transparent',
+        }}
     >
       {children}
     </Link>
@@ -126,7 +126,7 @@ export default function SharedNavbar() {
         style={{
           fontSize: '20px',
           fontWeight: '700',
-          color: '#7c3aed',
+          color: '#B28A67',
           textDecoration: 'none',
           display: 'flex',
           alignItems: 'center',
@@ -282,7 +282,7 @@ export default function SharedNavbar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div
             style={{
-              background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+              background: 'linear-gradient(135deg, #C8A587, #B28A67)',
               color: 'white',
               padding: '6px 10px',
               borderRadius: '50%',

@@ -351,7 +351,7 @@ export default function VendorApprovalPage() {
         .nav-logo {
           font-size: 20px;
           font-weight: 700;
-          color: #7c3aed;
+          color: #B28A67;
           text-decoration: none;
           display: flex;
           align-items: center;
@@ -360,7 +360,7 @@ export default function VendorApprovalPage() {
         }
 
         .nav-logo:hover {
-          color: #a855f7;
+          color: #C8A587;
           opacity: 0.9;
         }
 
@@ -390,7 +390,7 @@ export default function VendorApprovalPage() {
         }
 
         .nav-link:hover {
-          color: #7c3aed;
+          color: #B28A67;
           background: #f3f4f6;
         }
 
@@ -526,7 +526,7 @@ export default function VendorApprovalPage() {
 
         .registration-card:hover {
           box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-          border-color: #7c3aed;
+          border-color: #B28A67;
         }
 
         /* Card Header */
