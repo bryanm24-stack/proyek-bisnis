@@ -487,7 +487,7 @@ function PaymentContent() {
     : (basePrice * quantity * durationDays);
   const totalPrice = selectedPromo ? selectedPromo.price : dealSubtotal;
   const discountedSubtotal = totalPrice;
-  const discountAmount = selectedPromo ? 0 : (deal?.discountGiven ? dealDiscountAmount : 0);
+  const discountAmount = selectedPromo ? 0 : (deal?.discountGiven ? (dealDiscountAmount * quantity * durationDays) : 0);
   const appliedPromo = null; // ✅ NEW: No promo code in new system
   const totalAmount = discountedSubtotal + (selectedPromo ? 0 : serviceFee); // ✅ NEW: No service fee for promo
   const downPayment = Math.round(totalAmount * 0.2); // 20% down payment

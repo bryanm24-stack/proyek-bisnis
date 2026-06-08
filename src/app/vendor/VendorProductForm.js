@@ -233,10 +233,13 @@ export default function VendorProductForm({
   isEditing = false
 }) {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isCustomCategoryModalOpen, setIsCustomCategoryModalOpen] = useState(false);
+  const [customCategoryMode, setCustomCategoryMode] = useState('main');
   const [categorySearch, setCategorySearch] = useState('');
   const [draftMainCategory, setDraftMainCategory] = useState(formData.mainCategory || '');
   const [draftSubCategory, setDraftSubCategory] = useState(formData.subCategory || '');
   const [draftSuperSubCategory, setDraftSuperSubCategory] = useState(formData.superSubCategory || '');
+  const [customCategoryTree, setCustomCategoryTree] = useState({});
   const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
   const [editingVariasiId, setEditingVariasiId] = useState(null);
   const [variationName, setVariationName] = useState('');
@@ -246,7 +249,56 @@ export default function VendorProductForm({
 
   // Gunakan categories dari props atau default tree global vendor
   const CATEGORIES = categories || ALL_VENDOR_CATEGORY_TREE;
-  const normalizedCategoryTree = normalizeCategoryTree(CATEGORIES);
+  const mergeCategoryNodes = (existingNode, newNode) => {
+    if (Array.isArray(existingNode) && Array.isArray(newNode)) {
+      return Array.from(new Set([...existingNode, ...newNode]));
+    }
+
+    if (!Array.isArray(existingNode) && !Array.isArray(newNode)) {
+      const merged = { ...existingNode };
+      Object.entries(newNode).forEach(([key, value]) => {
+        if (key in merged) {
+          merged[key] = mergeCategoryNodes(merged[key], value);
+        } else {
+          merged[key] = value;
+        }
+      });
+      return merged;
+    }
+
+    if (Array.isArray(existingNode) && !Array.isArray(newNode)) {
+      return newNode;
+    }
+
+    return existingNode;
+  };
+  const combinedCategorySource = { ...CATEGORIES };
+
+  Object.entries(customCategoryTree).forEach(([mainCategory, customSubNode]) => {
+    if (!combinedCategorySource[mainCategory]) {
+      combinedCategorySource[mainCategory] = customSubNode;
+      return;
+    }
+
+    const existingNode = combinedCategorySource[mainCategory];
+    combinedCategorySource[mainCategory] = mergeCategoryNodes(existingNode, customSubNode);
+  });
+
+  const normalizedCategoryTree = normalizeCategoryTree(combinedCategorySource);
+
+  const isCustomCategoryModeMain = customCategoryMode === 'main';
+  const isCustomCategoryModeSub = customCategoryMode === 'sub';
+  const isCustomCategoryModeSuper = customCategoryMode === 'super';
+  const customCategoryModalTitle = isCustomCategoryModeMain
+    ? 'Tambah Kategori Khusus'
+    : isCustomCategoryModeSub
+      ? 'Tambah Sub Kategori Khusus'
+      : 'Tambah Super-sub Kategori Khusus';
+  const canSaveCustomCategory = isCustomCategoryModeMain
+    ? Boolean(draftMainCategory.trim())
+    : isCustomCategoryModeSub
+      ? Boolean(draftMainCategory.trim() && draftSubCategory.trim())
+      : Boolean(draftMainCategory.trim() && draftSubCategory.trim() && draftSuperSubCategory.trim());
 
   // Determine if this is a Jasa (service) form based on passed categories or mainCategory
   const isJasaFormType = categories === SERVICE_CATEGORY_TREE;
@@ -283,6 +335,28 @@ export default function VendorProductForm({
     setDraftSuperSubCategory('');
   };
 
+  const buildCustomCategoryEntry = () => {
+    const main = (draftMainCategory || '').trim();
+    const sub = (draftSubCategory || '').trim();
+    const superSub = (draftSuperSubCategory || '').trim();
+
+    if (!main) return null;
+
+    if (customCategoryMode === 'sub') {
+      if (!sub) return null;
+      return { [main]: { [sub]: [] } };
+    }
+
+    if (customCategoryMode === 'super') {
+      if (!sub || !superSub) return null;
+      return { [main]: { [sub]: [superSub] } };
+    }
+
+    if (!sub) return { [main]: [] };
+    if (!superSub) return { [main]: { [sub]: [] } };
+    return { [main]: { [sub]: [superSub] } };
+  };
+
   const handleConfirmCategory = () => {
     if (!draftMainCategory) return;
 
@@ -295,6 +369,46 @@ export default function VendorProductForm({
     }));
 
     closeCategoryPicker();
+  };
+
+  const openCustomCategoryModal = (mode = 'main') => {
+    setCustomCategoryMode(mode);
+    setDraftMainCategory(draftMainCategory || formData.mainCategory || '');
+    setDraftSubCategory(mode === 'super' ? (draftSubCategory || formData.subCategory || '') : '');
+    setDraftSuperSubCategory('');
+    setIsCustomCategoryModalOpen(true);
+  };
+
+  const closeCustomCategoryModal = () => {
+    setIsCustomCategoryModalOpen(false);
+  };
+
+  const handleConfirmCustomCategory = () => {
+    const customEntry = buildCustomCategoryEntry();
+    if (!customEntry) return;
+
+    const main = Object.keys(customEntry)[0];
+    const value = customEntry[main];
+
+    setCustomCategoryTree(prev => {
+      const existingNode = prev[main];
+
+      if (!existingNode) {
+        return { ...prev, [main]: value };
+      }
+
+      return { ...prev, [main]: mergeCategoryNodes(existingNode, value) };
+    });
+
+    setFormData(prev => ({
+      ...prev,
+      mainCategory: draftMainCategory,
+      subCategory: draftSubCategory,
+      superSubCategory: draftSuperSubCategory,
+      category: draftMainCategory
+    }));
+
+    setIsCustomCategoryModalOpen(false);
   };
 
   const handleImageUpload = (e) => {
@@ -415,8 +529,9 @@ export default function VendorProductForm({
   );
 
   const serviceMainCategorySet = new Set(Object.keys(normalizeCategoryTree(SERVICE_CATEGORY_TREE)));
-  const isJasaSelected = isJasaFormType || serviceMainCategorySet.has(formData.mainCategory);
-  const isBarangSelected = !isJasaSelected;
+  const explicitFormType = String(formData.type || '').trim().toLowerCase();
+  const isJasaSelected = explicitFormType === 'jasa' || (explicitFormType !== 'barang' && (isJasaFormType || serviceMainCategorySet.has(formData.mainCategory)));
+  const isBarangSelected = explicitFormType === 'barang' || (explicitFormType !== 'jasa' && !isJasaSelected);
   const entityLabel = isJasaSelected ? 'Jasa' : 'Barang';
   const activeCategoryPath = getCategoryPath(formData.mainCategory, formData.subCategory, formData.superSubCategory);
   const selectedMainCategory = formData.mainCategory || '';
@@ -2181,6 +2296,29 @@ export default function VendorProductForm({
               />
             </div>
 
+            <div style={{ padding: '0 24px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div>
+                <p style={{ margin: 0, color: '#4b5563', fontSize: '13px' }}>
+                  Cari kategori yang sudah ada atau tambahkan kategori vendor Anda sendiri.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={openCustomCategoryModal}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid #d1d5db',
+                  background: '#ffffff',
+                  color: '#111827',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                + Tambah Kategori Khusus
+              </button>
+            </div>
+
             <div
               style={{
                 display: 'grid',
@@ -2229,6 +2367,26 @@ export default function VendorProductForm({
               </div>
 
               <div style={{ borderRight: '1px solid #e5e7eb', overflowY: 'auto', background: '#fff', minHeight: 0 }}>
+                {draftMainCategory && (
+                  <div style={{ padding: '12px 16px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '700', color: '#111827' }}>Sub Kategori</span>
+                    <button
+                      type="button"
+                      onClick={() => openCustomCategoryModal('sub')}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #d1d5db',
+                        background: '#fff',
+                        color: '#111827',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      + Tambah Sub
+                    </button>
+                  </div>
+                )}
                 {!draftMainCategory ? (
                   <p style={{ margin: 0, padding: '16px', color: '#6b7280', fontSize: '14px' }}>Pilih kategori utama terlebih dahulu.</p>
                 ) : filteredDraftSubCategories.length === 0 ? (
@@ -2269,6 +2427,26 @@ export default function VendorProductForm({
               </div>
 
               <div style={{ overflowY: 'auto', background: '#fff', minHeight: 0 }}>
+                {draftSubCategory && (
+                  <div style={{ padding: '12px 16px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '700', color: '#111827' }}>Super-sub Kategori</span>
+                    <button
+                      type="button"
+                      onClick={() => openCustomCategoryModal('super')}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #d1d5db',
+                        background: '#fff',
+                        color: '#111827',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      + Tambah Super-sub
+                    </button>
+                  </div>
+                )}
                 {!draftSubCategory ? (
                   <p style={{ margin: 0, padding: '16px', color: '#6b7280', fontSize: '14px' }}>Pilih sub kategori terlebih dahulu.</p>
                 ) : !draftSuperSubCategories.length ? (
@@ -2349,6 +2527,169 @@ export default function VendorProductForm({
               </div>
             </div>
           </div>
+
+          {isCustomCategoryModalOpen && (
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(17, 24, 39, 0.55)',
+                zIndex: 1100,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '16px'
+              }}
+              onClick={closeCustomCategoryModal}
+            >
+              <div
+                style={{
+                  width: '100%',
+                  maxWidth: '520px',
+                  background: '#ffffff',
+                  borderRadius: '16px',
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+                  overflow: 'hidden'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, fontSize: '24px', lineHeight: '1.2', color: '#111827', fontWeight: '700' }}>
+                    {customCategoryModalTitle}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={closeCustomCategoryModal}
+                    style={{ border: 'none', background: 'transparent', fontSize: '24px', lineHeight: 1, cursor: 'pointer', color: '#6b7280' }}
+                    aria-label="Tutup"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div style={{ padding: '20px 24px 24px', display: 'grid', gap: '16px' }}>
+                  {isCustomCategoryModeMain && (
+                    <div style={{ display: 'grid', gap: '8px' }}>
+                      <label style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>Kategori Utama</label>
+                      <input
+                        type="text"
+                        value={draftMainCategory}
+                        onChange={(e) => setDraftMainCategory(e.target.value)}
+                        placeholder="Contoh: Jasa Custom Wedding"
+                        style={{
+                          width: '100%',
+                          padding: '12px 14px',
+                          borderRadius: '10px',
+                          border: '1px solid #d1d5db',
+                          fontSize: '15px',
+                          boxSizing: 'border-box',
+                          background: '#ffffff'
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {isCustomCategoryModeSub && (
+                    <>
+                      <div style={{ display: 'grid', gap: '8px' }}>
+                        <label style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>Kategori Utama</label>
+                        <div style={{ padding: '12px 14px', borderRadius: '10px', border: '1px solid #d1d5db', background: '#f9fafb', color: '#111827' }}>
+                          {draftMainCategory || 'Pilih kategori utama dulu'}
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gap: '8px' }}>
+                        <label style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>Sub Kategori</label>
+                        <input
+                          type="text"
+                          value={draftSubCategory}
+                          onChange={(e) => setDraftSubCategory(e.target.value)}
+                          placeholder="Contoh: Dekorasi, Entertainment"
+                          style={{
+                            width: '100%',
+                            padding: '12px 14px',
+                            borderRadius: '10px',
+                            border: '1px solid #d1d5db',
+                            fontSize: '15px',
+                            boxSizing: 'border-box',
+                            background: '#ffffff'
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {isCustomCategoryModeSuper && (
+                    <>
+                      <div style={{ display: 'grid', gap: '8px' }}>
+                        <label style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>Kategori Utama</label>
+                        <div style={{ padding: '12px 14px', borderRadius: '10px', border: '1px solid #d1d5db', background: '#f9fafb', color: '#111827' }}>
+                          {draftMainCategory || 'Pilih kategori utama dulu'}
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gap: '8px' }}>
+                        <label style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>Sub Kategori</label>
+                        <div style={{ padding: '12px 14px', borderRadius: '10px', border: '1px solid #d1d5db', background: '#f9fafb', color: '#111827' }}>
+                          {draftSubCategory || 'Pilih sub kategori dulu'}
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gap: '8px' }}>
+                        <label style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>Super-sub Kategori</label>
+                        <input
+                          type="text"
+                          value={draftSuperSubCategory}
+                          onChange={(e) => setDraftSuperSubCategory(e.target.value)}
+                          placeholder="Contoh: Toyota Innova Zenix, Avanza Facelift"
+                          style={{
+                            width: '100%',
+                            padding: '12px 14px',
+                            borderRadius: '10px',
+                            border: '1px solid #d1d5db',
+                            fontSize: '15px',
+                            boxSizing: 'border-box',
+                            background: '#ffffff'
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={closeCustomCategoryModal}
+                      style={{
+                        padding: '10px 18px',
+                        borderRadius: '8px',
+                        border: '1px solid #d1d5db',
+                        background: '#fff',
+                        color: '#374151',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmCustomCategory}
+                      disabled={!canSaveCustomCategory}
+                      style={{
+                        padding: '10px 18px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: !canSaveCustomCategory ? '#fca5a5' : '#ef4444',
+                        color: '#fff',
+                        fontWeight: '700',
+                        cursor: !canSaveCustomCategory ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      Simpan Kategori
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

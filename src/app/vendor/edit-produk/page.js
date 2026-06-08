@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import VendorProductForm from '../VendorProductForm';
 import {
   ALL_VENDOR_CATEGORY_TREE,
+  BARANG_CATEGORY_TREE,
   SERVICE_CATEGORY_TREE,
   normalizeCategoryTree,
   getSubCategoryMap,
@@ -272,7 +273,7 @@ function EditProdukPageContent() {
           isSubmitting={isSubmitting}
           errorMsg=""
           successMsg=""
-          categories={ALL_VENDOR_CATEGORY_TREE}
+          categories={formData.type === 'jasa' ? SERVICE_CATEGORY_TREE : BARANG_CATEGORY_TREE}
           isEditing={true}
         />
       </div>

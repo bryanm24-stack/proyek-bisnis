@@ -170,7 +170,9 @@ export async function GET(request) {
           0
         );
 
-        const finalAmount = Number(
+        const dealQuantity = Number(deal.quantity || 1);
+        const dealDuration = Number(deal.durationDays || 1);
+        const unitPrice = Number(
           deal.finalPrice ??
           deal.originalPrice ??
           deal.totalPrice ??
@@ -180,6 +182,7 @@ export async function GET(request) {
           firstItemPrice ??
           0
         );
+        const finalAmount = Math.max(unitPrice * dealQuantity * dealDuration, 0);
 
         invoices.push({
           id: getNextInvoiceId(),
@@ -221,15 +224,18 @@ export async function GET(request) {
         0
       );
 
-      const discountAmount = Number(
+      const invoiceQuantity = Number(relatedTransaction?.quantity ?? relatedDeal?.quantity ?? invoice.quantity ?? 1);
+      const invoiceDurationDays = Number(relatedTransaction?.durationDays ?? relatedDeal?.durationDays ?? invoice.durationDays ?? 1);
+      const discountPerUnitAmount = Number(
         relatedTransaction?.discountAmount ??
         relatedDeal?.discount?.amount ??
         0
       );
+      const discountAmount = discountPerUnitAmount * invoiceQuantity * invoiceDurationDays;
 
       const subtotal = Number(
         relatedTransaction?.discountedSubtotal ??
-        (originalPrice * Number(relatedTransaction?.quantity || 1) * Number(relatedTransaction?.durationDays || 1)) - discountAmount
+        (originalPrice * invoiceQuantity * invoiceDurationDays) - discountAmount
       );
 
       const serviceFee = Number(relatedTransaction?.serviceFee ?? 0);
