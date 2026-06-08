@@ -441,7 +441,7 @@ export async function POST(request) {
         }
 
         // ❌ If deal is in other invalid states, reject
-        if (existingDeal.status !== 'pending' && existingDeal.status !== 'agreed') {
+        if (existingDeal.status !== 'pending' && existingDeal.status !== 'agreed' && existingDeal.status !== 'returning' && existingDeal.status !== 'active' && existingDeal.status !== 'completed') {
           return NextResponse.json({ success: false, message: `Deal dengan status ${existingDeal.status} tidak bisa diproses` }, { status: 400 });
         }
 

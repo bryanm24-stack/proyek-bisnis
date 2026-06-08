@@ -27,9 +27,19 @@ export async function POST(request) {
     const registrationsPath = path.join(process.cwd(), 'vendor_registrations.json');
     const usersPath = path.join(process.cwd(), 'users.json');
 
-    // Baca users
-    const usersData = await fs.readFile(usersPath, 'utf-8');
-    const users = JSON.parse(usersData);
+    // Baca users dengan fallback jika file corrupt/tidak ada
+    let users = [];
+    try {
+      const usersData = await fs.readFile(usersPath, 'utf-8');
+      users = JSON.parse(usersData);
+    } catch (err) {
+      console.error('[vendor register] Error reading users.json:', err);
+      return NextResponse.json({
+        success: false,
+        message: 'Gagal membaca data pengguna. Silakan coba lagi.'
+      }, { status: 500 });
+    }
+
     const user = users.find(u => u.id === userId);
 
     if (!user) {
@@ -47,8 +57,15 @@ export async function POST(request) {
     }
 
     // Cek apakah user sudah pernah mendaftar sebagai vendor
-    const registrationsData = await fs.readFile(registrationsPath, 'utf-8');
-    const registrations = JSON.parse(registrationsData);
+    let registrations = [];
+    try {
+      const registrationsData = await fs.readFile(registrationsPath, 'utf-8');
+      registrations = JSON.parse(registrationsData);
+    } catch (err) {
+      console.error('[vendor register] Error reading registrations.json:', err);
+      // Fallback ke array kosong jika file tidak ada atau corrupt
+      registrations = [];
+    }
     
     const existingRegistration = registrations.find(r => r.userId === userId);
     
@@ -76,7 +93,15 @@ export async function POST(request) {
       };
       
       registrations[registrationIndex] = updatedRegistration;
-      await fs.writeFile(registrationsPath, JSON.stringify(registrations, null, 2));
+      try {
+        await fs.writeFile(registrationsPath, JSON.stringify(registrations, null, 2));
+      } catch (err) {
+        console.error('[vendor register] Error writing registrations.json:', err);
+        return NextResponse.json({
+          success: false,
+          message: 'Gagal menyimpan data registrasi. Silakan coba lagi.'
+        }, { status: 500 });
+      }
 
       return NextResponse.json({
         success: true,
@@ -102,7 +127,15 @@ export async function POST(request) {
     };
 
     registrations.push(newRegistration);
-    await fs.writeFile(registrationsPath, JSON.stringify(registrations, null, 2));
+    try {
+      await fs.writeFile(registrationsPath, JSON.stringify(registrations, null, 2));
+    } catch (err) {
+      console.error('[vendor register] Error writing registrations.json:', err);
+      return NextResponse.json({
+        success: false,
+        message: 'Gagal menyimpan data registrasi. Silakan coba lagi.'
+      }, { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,
