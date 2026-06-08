@@ -27,6 +27,8 @@ export default function ReturnsPage() {
   const [inspecting, setInspecting] = useState(null);
   const [damageStatus, setDamageStatus] = useState('none');
   const [damageCharge, setDamageCharge] = useState(0);
+  const [complaintResolution, setComplaintResolution] = useState('confirm');
+  const [complaintPenalty, setComplaintPenalty] = useState('0');
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
@@ -148,7 +150,7 @@ export default function ReturnsPage() {
 
       const form = new FormData();
       form.append('dealId', targetDealId);
-      form.append('type', mode === 'issue' ? 'issue' : 'end_of_use');
+      form.append('type', mode === 'complaint' ? 'complaint' : 'end_of_use');
       form.append('customerId', user.id);
       form.append('itemCondition', itemCondition);
       form.append('damageDescription', damageDescription || '');
@@ -157,7 +159,7 @@ export default function ReturnsPage() {
       const r = await fetch('/api/returns', { method: 'POST', body: form });
       const j = await r.json();
       if (!r.ok || j.success === false) throw new Error(j.message || 'Gagal mengajukan return');
-      alert('Return diajukan');
+      alert('complaint diajukan');
       setDealId('');
       setDamageDescription('');
       setPhotos([]);
@@ -173,7 +175,9 @@ export default function ReturnsPage() {
     setInspecting(deal);
     setDamageStatus(deal.damageStatus || 'none');
     setDamageCharge(deal.damageCharge || 0);
-    setNotes(deal.inspectionNotes || '');
+    setComplaintResolution(deal.complaintResolution || 'confirm');
+    setComplaintPenalty(deal.complaintPenalty?.toString() || '0');
+    setNotes(deal.inspectionNotes || deal.complaintResolutionNotes || '');
   }
 
   async function submitInspection() {
@@ -186,10 +190,14 @@ export default function ReturnsPage() {
         damageCharge: Number(damageCharge) || 0,
         notes
       };
+      if (inspecting.returnType === 'complaint') {
+        body.complaintResolution = complaintResolution;
+        body.complaintPenalty = Number(complaintPenalty) || 0;
+      }
       const r = await fetch('/api/returns', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const j = await r.json();
       if (!r.ok || j.success === false) throw new Error(j.message || 'Gagal menyimpan inspeksi');
-      alert('Inspeksi tersimpan');
+      alert(inspecting.returnType === 'complaint' ? 'Resolusi complaint tersimpan' : 'Inspeksi tersimpan');
       setInspecting(null);
       loadReturns();
     } catch (err) {
@@ -201,20 +209,25 @@ export default function ReturnsPage() {
     <div>
       <SharedNavbar />
       <div className={styles.container}>
-      <h2>{mode === 'end' ? 'Retur (Pengembalian Akhir)' : 'Pengembalian (Lapor Masalah)'}</h2>
+      <h2>{mode === 'end' ? 'Retur (Pengembalian Akhir)' : 'Complaint (Lapor Keluhan)'}</h2>
       <div style={{ margin: '12px 0 18px', display: 'flex', gap: 8 }}>
         <button type="button" onClick={() => setMode('end')} className={mode === 'end' ? styles.btn : styles.btn + ' ' + styles.secondary}>Retur</button>
-        <button type="button" onClick={() => setMode('issue')} className={mode === 'issue' ? styles.btn : styles.btn + ' ' + styles.secondary}>Pengembalian</button>
+        <button type="button" onClick={() => setMode('complaint')} className={mode === 'complaint' ? styles.btn : styles.btn + ' ' + styles.secondary}>Complaint</button>
       </div>
       {!user && (
-        <div style={{ color: '#6b7280' }}>Silakan login untuk melihat atau mengajukan pengembalian barang.</div>
+        <div style={{ color: '#6b7280' }}>Silakan login untuk melihat atau mengajukan retur atau complaint.</div>
       )}
 
       {user && (
         <div className={styles.grid}>
           <div className={styles.columns}>
             <div className={styles.column}>
-              <h3>Buat Permintaan Return Barang (Customer)</h3>
+              <h3>{mode === 'end' ? 'Buat Permintaan Return Barang (Customer)' : 'Buat Laporan Complaint (Customer)'}</h3>
+              {mode === 'complaint' && (
+                <div style={{ marginBottom: 16, padding: 16, borderRadius: 12, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
+                  <strong>Complaint</strong> digunakan untuk melaporkan kerusakan, ketidaknyamanan, atau masalah layanan dari vendor.
+                </div>
+              )}
               <form onSubmit={submitReturn}>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>Invoice / Deal ID</label>
@@ -241,16 +254,28 @@ export default function ReturnsPage() {
                   )}
                 </div>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Kondisi Barang</label>
+                  <label className={styles.label}>{mode === 'complaint' ? 'Jenis Complaint' : 'Kondisi Barang'}</label>
                   <select className={styles.select} value={itemCondition} onChange={(e) => setItemCondition(e.target.value)}>
-                    <option value="good">Baik</option>
-                    <option value="minor_damage">Rusak ringan</option>
-                    <option value="major_damage">Rusak berat</option>
-                    <option value="lost">Hilang</option>
+                    {mode === 'complaint' ? (
+                      <>
+                        <option value="damage">Kerusakan Barang / Jasa</option>
+                        <option value="service_quality">Kualitas Jasa Buruk</option>
+                        <option value="inconvenience">Ketidaknyamanan / Pelayanan</option>
+                        <option value="delayed">Keterlambatan Layanan</option>
+                        <option value="other">Lainnya</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="good">Baik</option>
+                        <option value="minor_damage">Rusak ringan</option>
+                        <option value="major_damage">Rusak berat</option>
+                        <option value="lost">Hilang</option>
+                      </>
+                    )}
                   </select>
                 </div>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Deskripsi Kerusakan (opsional)</label>
+                  <label className={styles.label}>{mode === 'complaint' ? 'Deskripsi Complaint (opsional)' : 'Deskripsi Kerusakan (opsional)'}</label>
                   <textarea className={styles.textarea} value={damageDescription} onChange={(e) => setDamageDescription(e.target.value)} rows={3} />
                 </div>
                 <div className={styles.formGroup}>
@@ -258,13 +283,13 @@ export default function ReturnsPage() {
                   <input className={styles.fileInput} type="file" multiple accept="image/*" onChange={handlePhotosChange} />
                 </div>
                 <div className={styles.actions}>
-                  <button className={styles.btn} type="submit" disabled={submitting}>{submitting ? 'Mengirim...' : 'Ajukan Pengembalian'}</button>
+                  <button className={styles.btn} type="submit" disabled={submitting}>{submitting ? 'Mengirim...' : mode === 'complaint' ? 'Ajukan Complaint' : 'Ajukan Pengembalian'}</button>
                 </div>
               </form>
             </div>
 
             <div className={styles.column}>
-              <h3>Daftar Return Anda / Vendor</h3>
+              <h3>{mode === 'end' ? 'Daftar Return Anda / Vendor' : 'Daftar Complaint Anda / Vendor'}</h3>
               {loading ? (
                 <div>Memuat...</div>
               ) : error ? (
@@ -276,7 +301,7 @@ export default function ReturnsPage() {
                   {returnsList
                     .filter((d) => {
                       const t = d.returnType || 'end_of_use';
-                      return mode === 'end' ? t === 'end_of_use' : t === 'issue';
+                      return mode === 'end' ? t === 'end_of_use' : (t === 'issue' || t === 'complaint');
                     })
                     .map((d) => (
                     <div key={d.id} className={styles.card}>
@@ -284,15 +309,28 @@ export default function ReturnsPage() {
                         <div>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                             <div className={styles.cardTitle}>{d.service?.title || d.itemName || 'Item'}</div>
-                            <div className={styles.small} style={{ padding: '4px 8px', borderRadius: 6, background: '#f3f4f6' }}>{(d.returnType === 'issue' ? 'Pengembalian' : 'Retur')}</div>
+                            <div className={styles.small} style={{ padding: '4px 8px', borderRadius: 6, background: '#f3f4f6' }}>{(d.returnType === 'issue' || d.returnType === 'complaint' ? 'Complaint' : 'Retur')}</div>
                           </div>
                           <div className={`${styles.small} ${styles.muted}`}>{d.vendorName || d.customerName || ''}</div>
-                          <div className={`${styles.small} ${styles.muted}`}>Tanggal return: {d.actualReturnDate || '-'}</div>
+                          <div className={`${styles.small} ${styles.muted}`}>Tanggal laporan: {d.reportedAt || d.actualReturnDate || '-'}</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <div className={styles.statusBadge}>{d.returnStatus}</div>
-                          <div>Refund: Rp {(d.totalRefund || 0).toLocaleString('id-ID')}</div>
+                          {mode === 'end' ? (
+                            <div>Refund: Rp {(d.totalRefund || 0).toLocaleString('id-ID')}</div>
+                          ) : (
+                            <div style={{ fontSize: '13px', color: '#4b5563' }}>{d.complaintResolution ? d.complaintResolution.replace(/_/g, ' ') : 'Belum diproses'}</div>
+                          )}
                         </div>
+                      </div>
+                      <div style={{ display: 'grid', gap: 8, padding: '12px 0', borderBottom: mode === 'complaint' ? '1px solid #e5e7eb' : 'none' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px', color: '#4b5563' }}>
+                          <div><strong>{mode === 'complaint' ? 'Jenis Complaint' : 'Kondisi'}</strong><br />{d.complaintCategory || d.itemCondition || '-'}</div>
+                          <div><strong>{mode === 'complaint' ? 'Catatan Komplain' : 'Deskripsi'}</strong><br />{d.complaintDescription || d.damageDescription || '-'}</div>
+                        </div>
+                        {mode === 'complaint' && d.returnPhotos?.length > 0 && (
+                          <div style={{ fontSize: '13px', color: '#4b5563' }}><strong>Foto bukti:</strong> {d.returnPhotos.length} file terlampir</div>
+                        )}
                       </div>
                       {Array.isArray(d.returnPhotos) && d.returnPhotos.length > 0 && (
                         <div className={styles.photos}>
@@ -310,29 +348,44 @@ export default function ReturnsPage() {
 
                       <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
                         {user.role === 'vendor' && (
-                          <button onClick={() => openInspectModal(d)} className={`${styles.btn} ${styles.secondary}`}>Inspeksi</button>
+                          <button onClick={() => openInspectModal(d)} className={`${styles.btn} ${styles.secondary}`}>{mode === 'complaint' ? 'Tindak Complaint' : 'Inspeksi'}</button>
                         )}
                         {user.role === 'customer' && (
                           <div style={{ width: '100%' }}>
                             <div className={`${styles.muted} ${styles.small}`}>Status: {d.returnStatus}</div>
                             <div style={{ marginTop: 6, padding: '10px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#f8fafc' }}>
-                              <div className={styles.small}><strong>Hasil inspeksi vendor:</strong></div>
-                              <div className={styles.small}>Damage status: {d.damageStatus || '-'}</div>
-                              <div className={styles.small}>Biaya kerusakan: Rp {Number(d.damageCharge || 0).toLocaleString('id-ID')}</div>
-                              <div className={styles.small}>Biaya keterlambatan: Rp {Number(d.lateCharge || 0).toLocaleString('id-ID')}</div>
-                              <div className={styles.small}>Refund akhir: Rp {Number(d.totalRefund || 0).toLocaleString('id-ID')}</div>
-                              {d.damageInvoiceId && (
-                                <div className={styles.small} style={{ marginTop: 6 }}>
-                                  Invoice kerusakan: {d.damageInvoiceId} ({d.damageInvoiceStatus || 'pending'})
-                                  {user.role === 'customer' && d.damageInvoiceStatus === 'pending' && (
-                                    <a href="/customer/invoices" style={{ color: '#B28A67', textDecoration: 'underline', marginLeft: 6 }}>Bayar kerusakan</a>
+                              <div className={styles.small}><strong>{d.returnType === 'complaint' ? 'Hasil Tindak Complaint:' : 'Hasil inspeksi vendor:'}</strong></div>
+                              {d.returnType === 'complaint' ? (
+                                <>
+                                  <div className={styles.small}>Resolusi: {d.complaintResolution ? d.complaintResolution.replace(/_/g, ' ') : '-'}</div>
+                                  <div className={styles.small}>Denda / potongan: Rp {Number(d.complaintPenalty || 0).toLocaleString('id-ID')}</div>
+                                  <div className={styles.small}>Refund akhir: Rp {Number(d.totalRefund || 0).toLocaleString('id-ID')}</div>
+                                  {d.complaintResolutionNotes && (
+                                    <div className={styles.small} style={{ marginTop: 6 }}>
+                                      Catatan vendor: {d.complaintResolutionNotes}
+                                    </div>
                                   )}
-                                </div>
-                              )}
-                              {d.inspectionNotes && (
-                                <div className={styles.small} style={{ marginTop: 6 }}>
-                                  Catatan vendor: {d.inspectionNotes}
-                                </div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className={styles.small}>Damage status: {d.damageStatus || '-'}</div>
+                                  <div className={styles.small}>Biaya kerusakan: Rp {Number(d.damageCharge || 0).toLocaleString('id-ID')}</div>
+                                  <div className={styles.small}>Biaya keterlambatan: Rp {Number(d.lateCharge || 0).toLocaleString('id-ID')}</div>
+                                  <div className={styles.small}>Refund akhir: Rp {Number(d.totalRefund || 0).toLocaleString('id-ID')}</div>
+                                  {d.damageInvoiceId && (
+                                    <div className={styles.small} style={{ marginTop: 6 }}>
+                                      Invoice kerusakan: {d.damageInvoiceId} ({d.damageInvoiceStatus || 'pending'})
+                                      {user.role === 'customer' && d.damageInvoiceStatus === 'pending' && (
+                                        <a href="/customer/invoices" style={{ color: '#B28A67', textDecoration: 'underline', marginLeft: 6 }}>Bayar kerusakan</a>
+                                      )}
+                                    </div>
+                                  )}
+                                  {d.inspectionNotes && (
+                                    <div className={styles.small} style={{ marginTop: 6 }}>
+                                      Catatan vendor: {d.inspectionNotes}
+                                    </div>
+                                  )}
+                                </>
                               )}
                             </div>
                           </div>
@@ -348,7 +401,7 @@ export default function ReturnsPage() {
           {inspecting && (
             <div className={styles.modalOverlay}>
               <div className={styles.modal}>
-                <h3>Inspeksi Return - {inspecting.service?.title || inspecting.itemName}</h3>
+                <h3>{(inspecting.returnType === 'complaint' || inspecting.returnType === 'issue') ? 'Tindak Complaint' : 'Inspeksi Return'} - {inspecting.service?.title || inspecting.itemName}</h3>
                 {Array.isArray(inspecting.returnPhotos) && inspecting.returnPhotos.length > 0 && (
                   <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                     {inspecting.returnPhotos.map((p, idx) => (
@@ -357,26 +410,61 @@ export default function ReturnsPage() {
                   </div>
                 )}
 
-                <div style={{ marginBottom: 8 }}>
-                  <label className={styles.label}>Damage Status</label>
-                  <select className={styles.select} value={damageStatus} onChange={(e) => setDamageStatus(e.target.value)}>
-                    <option value="none">Tidak ada kerusakan</option>
-                    <option value="minor">Kerusakan ringan</option>
-                    <option value="major">Kerusakan berat</option>
-                    <option value="lost">Hilang</option>
-                  </select>
-                </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Damage Charge (Rp)</label>
-                  <input className={styles.input} value={damageCharge} onChange={(e) => setDamageCharge(e.target.value)} />
-                </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Catatan</label>
-                  <textarea className={styles.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
-                </div>
+                {(inspecting?.returnType === 'complaint' || inspecting?.returnType === 'issue') && (
+                  <div style={{ marginBottom: 16, padding: 14, borderRadius: 10, border: '1px solid #e5e7eb', background: '#f8fafc' }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Detail Complaint</div>
+                    <div style={{ fontSize: 13, color: '#4b5563', marginBottom: 4 }}><strong>Jenis:</strong> {inspecting.complaintCategory || inspecting.itemCondition || '-'}</div>
+                    <div style={{ fontSize: 13, color: '#4b5563', marginBottom: 4 }}><strong>Deskripsi:</strong> {inspecting.complaintDescription || inspecting.damageDescription || '-'}</div>
+                    <div style={{ fontSize: 13, color: '#4b5563' }}><strong>Tanggal laporan:</strong> {inspecting.complaintDate ? new Date(inspecting.complaintDate).toLocaleString('id-ID') : (inspecting.reportedAt ? new Date(inspecting.reportedAt).toLocaleString('id-ID') : '-')}</div>
+                  </div>
+                )}
+
+                {(inspecting?.returnType === 'complaint' || inspecting?.returnType === 'issue') ? (
+                  <>
+                    <div style={{ marginBottom: 8 }}>
+                      <label className={styles.label}>Resolusi Complaint</label>
+                      <select className={styles.select} value={complaintResolution} onChange={(e) => setComplaintResolution(e.target.value)}>
+                        <option value="confirm">Setujui Complaint (Full Refund)</option>
+                        <option value="partial_refund">Partial Refund</option>
+                        <option value="penalty">Terapkan Denda</option>
+                        <option value="reject">Tolak Complaint</option>
+                      </select>
+                    </div>
+                    {(complaintResolution === 'partial_refund' || complaintResolution === 'penalty') && (
+                      <div className={styles.formGroup}>
+                        <label className={styles.label}>Nominal (Rp)</label>
+                        <input type="number" className={styles.input} value={complaintPenalty} onChange={(e) => setComplaintPenalty(e.target.value)} />
+                      </div>
+                    )}
+                    <div className={styles.formGroup}>
+                      <label className={styles.label}>Catatan Tindak Lanjut</label>
+                      <textarea className={styles.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ marginBottom: 8 }}>
+                      <label className={styles.label}>Damage Status</label>
+                      <select className={styles.select} value={damageStatus} onChange={(e) => setDamageStatus(e.target.value)}>
+                        <option value="none">Tidak ada kerusakan</option>
+                        <option value="minor">Kerusakan ringan</option>
+                        <option value="major">Kerusakan berat</option>
+                        <option value="lost">Hilang</option>
+                      </select>
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label className={styles.label}>Damage Charge (Rp)</label>
+                      <input className={styles.input} value={damageCharge} onChange={(e) => setDamageCharge(e.target.value)} />
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label className={styles.label}>Catatan</label>
+                      <textarea className={styles.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+                    </div>
+                  </>
+                )}
                 <div className={styles.modalFooter}>
                   <button onClick={() => setInspecting(null)} className={`${styles.btn} ${styles.secondary}`}>Batal</button>
-                  <button onClick={submitInspection} className={styles.btn}>Simpan Inspeksi</button>
+                  <button onClick={submitInspection} className={styles.btn}>{inspecting?.returnType === 'complaint' ? 'Simpan Resolusi Complaint' : 'Simpan Inspeksi'}</button>
                 </div>
               </div>
             </div>
