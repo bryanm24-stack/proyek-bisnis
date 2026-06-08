@@ -34,8 +34,7 @@ function PaymentContent() {
   const [selectedPromo, setSelectedPromo] = useState(null); // ✅ NEW: Promo yang dipilih dari home
   const [promoError, setPromoError] = useState('');
   const [promoNow, setPromoNow] = useState(Date.now());
-  // Payment type is now always 'full' (removed Pay After option)
-  // const [paymentType, setPaymentType] = useState('full');
+  const [paymentType, setPaymentType] = useState('full'); // 'full' or 'pay_after'
   const [availabilityCheck, setAvailabilityCheck] = useState(null); // null, 'checking', 'available', 'unavailable'
   const [availabilityMessage, setAvailabilityMessage] = useState('');
   const [maxAvailableQuantity, setMaxAvailableQuantity] = useState(null);
@@ -348,10 +347,10 @@ function PaymentContent() {
           end.setDate(end.getDate() + durationDays);
           return end.toISOString().split('T')[0];
         })(),
-        paymentType: selectedPromo ? 'promo' : 'full',
-        amount: selectedPromo ? selectedPromo.price : discountedSubtotal,
-        downPayment: null,
-        remainingPayment: null,
+        paymentType: selectedPromo ? 'promo' : paymentType,
+        amount: selectedPromo ? selectedPromo.price : (paymentType === 'pay_after' ? downPayment : discountedSubtotal),
+        downPayment: selectedPromo ? null : (paymentType === 'pay_after' ? downPayment : null),
+        remainingPayment: selectedPromo ? null : (paymentType === 'pay_after' ? remainingPayment : null),
         discountedSubtotal: selectedPromo ? selectedPromo.price : discountedSubtotal,
         serviceFee: selectedPromo ? 0 : serviceFee,
         totalAmount: selectedPromo ? selectedPromo.price : totalAmount,
@@ -762,35 +761,47 @@ function PaymentContent() {
                     <div style={{ marginBottom: '20px' }}>
                       <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Jumlah {quantityLabel}</label>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <button onClick={() => setQuantity(Math.max(1, quantity - 1))} style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '18px', fontWeight: '700', color: '#B28A67' }}>−</button>
-                        <input
-                          type="number"
-                          value={quantity}
-                          onChange={(e) => {
-                            const nextValue = Math.max(1, parseInt(e.target.value, 10) || 1);
-                            if (maxAvailableQuantity && maxAvailableQuantity > 0) {
-                              setQuantity(Math.min(nextValue, maxAvailableQuantity));
-                              return;
-                            }
-                            setQuantity(nextValue);
-                          }}
-                          style={{ width: '80px', textAlign: 'center', border: '1px solid #ddd', borderRadius: '8px', padding: '8px', fontSize: '14px', fontWeight: '600' }}
-                          min="1"
-                        />
-                        <button
-                          onClick={() => {
-                            if (maxAvailableQuantity && maxAvailableQuantity > 0) {
-                              setQuantity(Math.min(quantity + 1, maxAvailableQuantity));
-                              return;
-                            }
-                            setQuantity(quantity + 1);
-                          }}
-                          disabled={Boolean(maxAvailableQuantity && quantity >= maxAvailableQuantity)}
-                          style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: (maxAvailableQuantity && quantity >= maxAvailableQuantity) ? 'not-allowed' : 'pointer', fontSize: '18px', fontWeight: '700', color: '#B28A67', opacity: (maxAvailableQuantity && quantity >= maxAvailableQuantity) ? 0.5 : 1 }}
-                        >
-                          +
-                        </button>
-                        <span style={{ fontSize: '14px', color: '#6b7280', marginLeft: '12px' }}>{quantityLabel}</span>
+                        {/* ✅ REAL-TIME VALIDATION: Determine effective max qty (from availability check OR from item stok immediately) */}
+                        {(() => {
+                          const effectiveMax = maxAvailableQuantity ?? (selectedItem?.stok ?? null);
+                          const isAtMax = effectiveMax !== null && quantity >= effectiveMax;
+                          
+                          return (
+                            <>
+                              <button onClick={() => setQuantity(Math.max(1, quantity - 1))} style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '18px', fontWeight: '700', color: '#B28A67' }}>−</button>
+                              <input
+                                type="number"
+                                value={quantity}
+                                onChange={(e) => {
+                                  const nextValue = Math.max(1, parseInt(e.target.value, 10) || 1);
+                                  const effectiveMax = maxAvailableQuantity ?? (selectedItem?.stok ?? null);
+                                  if (effectiveMax !== null && effectiveMax > 0) {
+                                    setQuantity(Math.min(nextValue, effectiveMax));
+                                    return;
+                                  }
+                                  setQuantity(nextValue);
+                                }}
+                                style={{ width: '80px', textAlign: 'center', border: '1px solid #ddd', borderRadius: '8px', padding: '8px', fontSize: '14px', fontWeight: '600' }}
+                                min="1"
+                              />
+                              <button
+                                onClick={() => {
+                                  const effectiveMax = maxAvailableQuantity ?? (selectedItem?.stok ?? null);
+                                  if (effectiveMax !== null && effectiveMax > 0) {
+                                    setQuantity(Math.min(quantity + 1, effectiveMax));
+                                    return;
+                                  }
+                                  setQuantity(quantity + 1);
+                                }}
+                                disabled={isAtMax}
+                                style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: isAtMax ? 'not-allowed' : 'pointer', fontSize: '18px', fontWeight: '700', color: '#B28A67', opacity: isAtMax ? 0.5 : 1 }}
+                              >
+                                +
+                              </button>
+                              <span style={{ fontSize: '14px', color: '#6b7280', marginLeft: '12px' }}>{quantityLabel}</span>
+                            </>
+                          );
+                        })()}
                       </div>
 
                       {/* AVAILABILITY STATUS */}
@@ -843,9 +854,27 @@ function PaymentContent() {
                       <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Tambahkan catatan khusus untuk vendor..." style={{ width: '100%', border: '1px solid #ddd', borderRadius: '8px', padding: '12px', fontSize: '14px', fontFamily: 'inherit', minHeight: '80px', boxSizing: 'border-box' }} />
                     </div>
 
-                    {/* Continue Button */}
-                    <button onClick={() => setStep('payment')} style={{ width: '100%', padding: '14px 16px', background: '#B28A67', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '16px', cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={(e) => e.target.style.background = '#8F6B4A'} onMouseLeave={(e) => e.target.style.background = '#B28A67'}>
-                      Lanjut ke Pembayaran →
+                    {/* Continue Button - ✅ REAL-TIME VALIDATION: Disabled if stock/availability unavailable */}
+                    <button 
+                      onClick={() => setStep('payment')} 
+                      disabled={availabilityCheck === 'unavailable' || availabilityCheck === 'checking'}
+                      style={{ 
+                        width: '100%', 
+                        padding: '14px 16px', 
+                        background: (availabilityCheck === 'unavailable' || availabilityCheck === 'checking') ? '#C8A587' : '#B28A67', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: '8px', 
+                        fontWeight: '600', 
+                        fontSize: '16px', 
+                        cursor: (availabilityCheck === 'unavailable' || availabilityCheck === 'checking') ? 'not-allowed' : 'pointer', 
+                        transition: 'all 0.2s',
+                        opacity: (availabilityCheck === 'unavailable' || availabilityCheck === 'checking') ? 0.6 : 1
+                      }} 
+                      onMouseEnter={(e) => { if (availabilityCheck !== 'unavailable' && availabilityCheck !== 'checking') e.target.style.background = '#8F6B4A'; }} 
+                      onMouseLeave={(e) => { if (availabilityCheck !== 'unavailable' && availabilityCheck !== 'checking') e.target.style.background = '#B28A67'; }}
+                    >
+                      {availabilityCheck === 'checking' ? '⏳ Memeriksa ketersediaan...' : (availabilityCheck === 'unavailable' ? '❌ Stok tidak tersedia' : 'Lanjut ke Pembayaran →')}
                     </button>
                   </>
                 ) : null}
@@ -940,6 +969,37 @@ function PaymentContent() {
               <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '24px', color: '#1f2937' }}>Pilih Metode Pembayaran</h1>
 
               <form onSubmit={handlePayment}>
+                {/* Payment Type Selection */}
+                <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '2px solid #e5e7eb' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px', color: '#1f2937' }}>Tipe Pembayaran</h3>
+                  
+                  {/* Full Payment Option */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', border: paymentType === 'full' ? '2px solid #B28A67' : '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', background: paymentType === 'full' ? '#f3f4f6' : 'transparent', transition: 'all 0.2s' }}>
+                      <input type="radio" name="paymentType" value="full" checked={paymentType === 'full'} onChange={(e) => setPaymentType(e.target.value)} style={{ marginTop: '4px', cursor: 'pointer' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '600', color: '#1f2937' }}>💰 Bayar Penuh</div>
+                        <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>Bayar 100% sekarang</p>
+                        <p style={{ fontSize: '14px', fontWeight: '700', color: '#22c55e', marginTop: '8px', marginBottom: 0 }}>Rp {totalAmount.toLocaleString('id-ID')}</p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Pay After Option */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', border: paymentType === 'pay_after' ? '2px solid #B28A67' : '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', background: paymentType === 'pay_after' ? '#f3f4f6' : 'transparent', transition: 'all 0.2s' }}>
+                      <input type="radio" name="paymentType" value="pay_after" checked={paymentType === 'pay_after'} onChange={(e) => setPaymentType(e.target.value)} style={{ marginTop: '4px', cursor: 'pointer' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '600', color: '#1f2937' }}>🔄 Bayar Kemudian (Pay After)</div>
+                        <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>Bayar 20% sekarang, sisa 80% dalam 2 hari setelah kedua belah pihak setuju</p>
+                        <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: '600', color: '#666' }}>
+                          <p style={{ margin: '4px 0' }}>📌 Uang muka (20%): <span style={{ color: '#22c55e', fontWeight: '700' }}>Rp {downPayment.toLocaleString('id-ID')}</span></p>
+                          <p style={{ margin: '4px 0' }}>📋 Sisa pembayaran (80%): <span style={{ color: '#B28A67', fontWeight: '700' }}>Rp {remainingPayment.toLocaleString('id-ID')}</span></p>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
 
                 {/* Payment Method Selection */}
                 {/* QRIS Option */}
