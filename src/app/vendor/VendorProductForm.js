@@ -2302,21 +2302,6 @@ export default function VendorProductForm({
                   Cari kategori yang sudah ada atau tambahkan kategori vendor Anda sendiri.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={openCustomCategoryModal}
-                style={{
-                  padding: '10px 16px',
-                  borderRadius: '10px',
-                  border: '1px solid #d1d5db',
-                  background: '#ffffff',
-                  color: '#111827',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}
-              >
-                + Tambah Kategori Khusus
-              </button>
             </div>
 
             <div
@@ -2332,6 +2317,24 @@ export default function VendorProductForm({
               }}
             >
               <div style={{ borderRight: '1px solid #e5e7eb', overflowY: 'auto', background: '#fff', minHeight: 0 }}>
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '700', color: '#111827' }}>Kategori Utama</span>
+                  <button
+                    type="button"
+                    onClick={() => openCustomCategoryModal('main')}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      background: '#fff',
+                      color: '#111827',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    + Tambah Kategori Khusus
+                  </button>
+                </div>
                 {filteredMainCategories.length === 0 ? (
                   <p style={{ margin: 0, padding: '16px', color: '#6b7280', fontSize: '14px' }}>Kategori tidak ditemukan.</p>
                 ) : (
