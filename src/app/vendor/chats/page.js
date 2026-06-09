@@ -14,6 +14,7 @@ export default function VendorChatsPage() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [dealData, setDealData] = useState(null);
+  const [dealProcessing, setDealProcessing] = useState(false);
   const [discountMode, setDiscountMode] = useState(null); // null | 'prompt' | 'yes' | 'no'
   const [discountType, setDiscountType] = useState('percent');
   const [discountValue, setDiscountValue] = useState('10');
@@ -193,6 +194,7 @@ export default function VendorChatsPage() {
   };
 
   const handleDealAction = async (action) => {
+    if (dealProcessing) return;
     if (!selectedChat) return;
 
     if (String(user?.id) !== String(selectedChat.vendorId)) {
@@ -200,6 +202,7 @@ export default function VendorChatsPage() {
       return;
     }
 
+    setDealProcessing(true);
     try {
       const response = await fetch('/api/deals', {
         method: 'POST',
@@ -226,6 +229,8 @@ export default function VendorChatsPage() {
     } catch (error) {
       console.error('Error processing deal:', error);
       alert('Gagal memproses deal');
+    } finally {
+      setDealProcessing(false);
     }
   };
 
@@ -614,15 +619,15 @@ export default function VendorChatsPage() {
                       <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         <button
                           onClick={() => handleDealAction('accept')}
-                          disabled={dealData?.status === 'agreed' || dealData?.status === 'cancelled' || dealData?.status === 'completed'}
-                          style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: '#10b981', color: 'white', fontWeight: '700', cursor: dealData?.status === 'agreed' || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? 'not-allowed' : 'pointer', opacity: dealData?.status === 'agreed' || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? 0.6 : 1 }}
+                          disabled={dealProcessing || dealData?.status !== 'pending'}
+                          style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: dealProcessing || dealData?.status !== 'pending' ? '#94d3a2' : '#10b981', color: 'white', fontWeight: '700', cursor: dealProcessing || dealData?.status !== 'pending' ? 'not-allowed' : 'pointer', opacity: dealProcessing || dealData?.status !== 'pending' ? 0.6 : 1 }}
                         >
-                          ✅ Terima Deal
+                          {dealProcessing ? 'Memproses...' : '✅ Terima Deal'}
                         </button>
                         <button
                           onClick={() => handleDealAction('cancel')}
-                          disabled={dealData?.status === 'cancelled'}
-                          style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: '#ef4444', color: 'white', fontWeight: '700', cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer', opacity: dealData?.status === 'cancelled' ? 0.6 : 1 }}
+                          disabled={!dealData || dealData?.status === 'cancelled' || dealData?.status === 'completed'}
+                          style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: !dealData || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? '#fca5a5' : '#ef4444', color: 'white', fontWeight: '700', cursor: !dealData || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? 'not-allowed' : 'pointer', opacity: !dealData || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? 0.6 : 1 }}
                         >
                           ❌ Tolak
                         </button>
@@ -908,34 +913,34 @@ export default function VendorChatsPage() {
                     handleDealAction('accept');
                     setShowCustomerModal(false);
                   }}
-                  disabled={dealData?.status === 'agreed' || dealData?.status === 'cancelled' || dealData?.status === 'completed'}
+                  disabled={dealProcessing || dealData?.status !== 'pending'}
                   style={{
                     padding: '12px 16px',
                     border: 'none',
                     borderRadius: '8px',
-                    background: dealData?.status === 'agreed' || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? '#d1d5db' : '#10b981',
+                    background: dealProcessing || dealData?.status !== 'pending' ? '#d1d5db' : '#10b981',
                     color: 'white',
                     fontWeight: '600',
-                    cursor: dealData?.status === 'agreed' || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? 'not-allowed' : 'pointer',
+                    cursor: dealProcessing || dealData?.status !== 'pending' ? 'not-allowed' : 'pointer',
                     fontSize: '14px'
                   }}
                 >
-                  ✅ Terima Deal
+                  {dealProcessing ? 'Memproses...' : '✅ Terima Deal'}
                 </button>
                 <button
                   onClick={() => {
                     handleDealAction('cancel');
                     setShowCustomerModal(false);
                   }}
-                  disabled={dealData?.status === 'cancelled'}
+                  disabled={!dealData || dealData?.status === 'cancelled' || dealData?.status === 'completed'}
                   style={{
                     padding: '12px 16px',
                     border: 'none',
                     borderRadius: '8px',
-                    background: dealData?.status === 'cancelled' ? '#d1d5db' : '#ef4444',
+                    background: !dealData || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? '#d1d5db' : '#ef4444',
                     color: 'white',
                     fontWeight: '600',
-                    cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer',
+                    cursor: !dealData || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? 'not-allowed' : 'pointer',
                     fontSize: '14px'
                   }}
                 >

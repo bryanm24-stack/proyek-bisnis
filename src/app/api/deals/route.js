@@ -308,8 +308,16 @@ export async function POST(request) {
 
       // Check if deal sudah ada dari pihak lain
       const existingDeal = findLatestDealByChatId(deals, chatId);
+      const isSameCustomer = existingDeal && normalizeId(customerId) === normalizeId(existingDeal.customerId);
+      const isSameVendor = existingDeal && normalizeId(vendorId) === normalizeId(existingDeal.vendorId);
+      const isRequestFromCustomer = normalizeId(customerId) === normalizeId(chatRoom.customerId);
+      const isRequestFromVendor = normalizeId(vendorId) === normalizeId(chatRoom.vendorId);
 
       if (!existingDeal) {
+        if (!isRequestFromCustomer) {
+          return NextResponse.json({ success: false, message: 'Vendor tidak dapat membuat deal secara langsung. Tunggu penawaran customer terlebih dahulu.' }, { status: 403 });
+        }
+
         // Buat deal baru (dari pihak customer)
         // load service price if available
         let originalPrice = null;
