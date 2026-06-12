@@ -315,6 +315,32 @@ export async function POST(request) {
     }
     
     // Add new transaction
+    // ✅ NEW: If transaction is tied to a deal, verify the deal exists and is in correct state
+    if (body.dealId) {
+      try {
+        const dealsData = fs.readFileSync(dealsFile, 'utf-8');
+        const deals = JSON.parse(dealsData || '[]');
+        const deal = deals.find(d => String(d.id) === String(body.dealId));
+        if (!deal) {
+          return Response.json({ success: false, error: 'Deal tidak ditemukan', message: 'Deal tidak ditemukan untuk pembayaran ini' }, { status: 404 });
+        }
+
+        // Only allow payment when deal is in 'agreed' state (both sides accepted) or explicit vendor payment flow
+        if (!['agreed', 'active', 'pending'].includes(deal.status)) {
+          return Response.json({ success: false, error: 'Deal tidak siap untuk pembayaran', message: `Deal status '${deal.status}' tidak memperbolehkan pembayaran` }, { status: 400 });
+        }
+
+        // If UI removed pay_after option, enforce full payment server-side when configured
+        if (body.paymentType === 'pay_after') {
+          // reject pay_after by default to avoid unexpected credit flows
+          return Response.json({ success: false, error: 'Pay after tidak diizinkan', message: 'Metode pembayaran "pay_after" tidak diizinkan. Gunakan pembayaran penuh.' }, { status: 400 });
+        }
+      } catch (dealVerifyError) {
+        console.warn('Deal verification warning:', dealVerifyError.message);
+        return Response.json({ success: false, error: 'Gagal memverifikasi deal', message: 'Gagal memverifikasi deal sebelum pembayaran' }, { status: 500 });
+      }
+    }
+
     const identityVerification = body.identityVerification
       ? {
           ...body.identityVerification,
@@ -368,8 +394,19 @@ export async function POST(request) {
       console.warn('Could not read deal for invoice metadata:', dealReadError);
     }
 
-    // Create invoice for deal payments (exclude invoice settlement transactions)
-    if (body.dealId && body.paymentType !== 'invoice_payment') {
+    let currentPromo = null;
+    if (body.promoId) {
+      try {
+        const promosData = fs.readFileSync(promosFile, 'utf-8');
+        const promos = JSON.parse(promosData);
+        currentPromo = promos.find((item) => String(item.id) === String(body.promoId)) || null;
+      } catch (promoReadError) {
+        console.warn('Could not read promo for invoice metadata:', promoReadError);
+      }
+    }
+
+    // Create invoice for deal/promo payments (exclude invoice settlement transactions)
+    if ((body.dealId || body.promoId) && body.paymentType !== 'invoice_payment') {
       const invoicesData = fs.readFileSync(invoicesFile, 'utf-8');
       let invoices = JSON.parse(invoicesData);
 
@@ -383,13 +420,15 @@ export async function POST(request) {
       const existingInvoice = invoices.find(
         (item) =>
           item.transactionId === body.id ||
-          (item.dealId === body.dealId && item.paymentType === body.paymentType) ||
+          (body.dealId && item.dealId === body.dealId && item.paymentType === body.paymentType) ||
+          (body.promoId && String(item.promoId) === String(body.promoId) && String(item.customerId) === String(body.userId) && item.status !== 'paid') ||
           (item.dealId === body.dealId && item.paymentType === 'deal_pending' && item.status !== 'paid')
       );
       if (existingInvoice) {
         existingInvoice.customerId = existingInvoice.customerId || body.userId || currentDeal?.customerId || null;
-        existingInvoice.vendorId = existingInvoice.vendorId || currentDeal?.vendorId || body.vendorId || null;
+        existingInvoice.vendorId = existingInvoice.vendorId || currentDeal?.vendorId || currentPromo?.vendorId || body.vendorId || null;
         existingInvoice.serviceId = existingInvoice.serviceId || currentDeal?.serviceId || null;
+        existingInvoice.promoId = existingInvoice.promoId || body.promoId || null;
         existingInvoice.transactionId = body.id;
         existingInvoice.remainingPayment = isPayAfter
           ? Number(body.remainingPayment ?? 0)
@@ -402,16 +441,25 @@ export async function POST(request) {
         existingInvoice.paidAt = isPayAfter ? null : paymentCompletedAt;
         existingInvoice.paymentTransactionId = isPayAfter ? null : body.id;
         existingInvoice.notes = body.notes || existingInvoice.notes || '';
+        existingInvoice.serviceTitle = existingInvoice.serviceTitle || currentPromo?.title || body.promo?.title || null;
+        existingInvoice.promo = existingInvoice.promo || body.promo || (currentPromo ? {
+          id: currentPromo.id,
+          title: currentPromo.title,
+          promoPrice: currentPromo.promoPrice,
+          image: currentPromo.image,
+          description: currentPromo.description
+        } : null);
         upsertedInvoiceId = existingInvoice.id;
         fs.writeFileSync(invoicesFile, JSON.stringify(invoices, null, 2));
       } else {
 
       const newInvoice = {
         id: `INV-${Date.now()}`,
-        dealId: body.dealId,
+        dealId: body.dealId || null,
         customerId: body.userId || currentDeal?.customerId || null,
-        vendorId: currentDeal?.vendorId || body.vendorId || null,
+        vendorId: currentDeal?.vendorId || currentPromo?.vendorId || body.vendorId || null,
         serviceId: currentDeal?.serviceId || null,
+        promoId: body.promoId || null,
         transactionId: body.id,
         remainingPayment: isPayAfter
           ? Number(body.remainingPayment ?? 0)
@@ -423,7 +471,15 @@ export async function POST(request) {
         createdAt,
         paidAt: isPayAfter ? null : paymentCompletedAt,
         paymentTransactionId: isPayAfter ? null : body.id,
-        notes: body.notes || ''
+        notes: body.notes || '',
+        serviceTitle: currentPromo?.title || body.promo?.title || null,
+        promo: body.promo || (currentPromo ? {
+          id: currentPromo.id,
+          title: currentPromo.title,
+          promoPrice: currentPromo.promoPrice,
+          image: currentPromo.image,
+          description: currentPromo.description
+        } : null)
       };
 
       invoices.push(newInvoice);
@@ -444,7 +500,7 @@ export async function POST(request) {
             downPayment: isPayAfter ? body.downPayment : null,
             remainingPayment: isPayAfter ? body.remainingPayment : 0,
             invoiceStatus: isPayAfter ? 'pending' : 'paid',
-            status: isPayAfter ? (deals[dealIndex].status || 'agreed') : 'completed',
+            status: isPayAfter ? (deals[dealIndex].status || 'agreed') : 'active',
             completedAt: isPayAfter ? (deals[dealIndex].completedAt || null) : paymentCompletedAt,
             paymentDeadline: isPayAfter ? paymentDeadlineDate.toISOString() : null,
             invoiceId: upsertedInvoiceId || deals[dealIndex].invoiceId || null,
@@ -478,7 +534,7 @@ export async function POST(request) {
             if (chatIndex !== -1) {
               chats[chatIndex] = {
                 ...chats[chatIndex],
-                dealStatus: isPayAfter ? 'agreed' : 'completed',
+                dealStatus: isPayAfter ? 'agreed' : 'active',
                 closedAt: null,
                 closedReason: null
               };
@@ -528,6 +584,25 @@ export async function POST(request) {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           };
+
+          // Reserve/decrement actual stock immediately on successful payment
+          // and mark booking.stockReserved to avoid double-decrement at pickup.
+          // For goods (barang), decrement item.stok greedily by quantity.
+          if (service.type !== 'jasa') {
+            let remaining = Number(body.quantity);
+            for (const item of service.items || []) {
+              if (remaining <= 0) break;
+              const dec = Math.min(Number(item.stok) || 0, remaining);
+              item.stok = (Number(item.stok) || 0) - dec;
+              remaining -= dec;
+            }
+          } else {
+            // For jasa, decrement service.quantity
+            service.quantity = Math.max(0, (service.quantity || 0) - Number(body.quantity));
+          }
+
+          // mark booking as having reserved stock
+          newBooking.stockReserved = true;
 
           service.bookings.push(newBooking);
 

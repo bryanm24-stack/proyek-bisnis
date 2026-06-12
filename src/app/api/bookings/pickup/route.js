@@ -65,20 +65,25 @@ export async function POST(request) {
       const serviceType = service.type || 'barang';
       let totalQuantity = 0;
       
-      if (serviceType === 'jasa') {
-        // For services (jasa), decrement service.quantity
-        service.quantity = Math.max(0, (service.quantity || 0) - booking.quantity);
-        totalQuantity = service.quantity;
+      // If stock was already reserved during payment/reservation, skip decrement here
+      if (booking.stockReserved) {
+        // stock already adjusted at reservation/transaction time
       } else {
-        // For goods (barang), decrement from items stok
-        let remaining = booking.quantity;
-        for (const item of service.items || []) {
-          if (remaining <= 0) break;
-          const decrement = Math.min(item.stok || 0, remaining);
-          item.stok = (item.stok || 0) - decrement;
-          remaining -= decrement;
+        if (serviceType === 'jasa') {
+          // For services (jasa), decrement service.quantity
+          service.quantity = Math.max(0, (service.quantity || 0) - booking.quantity);
+          totalQuantity = service.quantity;
+        } else {
+          // For goods (barang), decrement from items stok
+          let remaining = booking.quantity;
+          for (const item of service.items || []) {
+            if (remaining <= 0) break;
+            const decrement = Math.min(item.stok || 0, remaining);
+            item.stok = (item.stok || 0) - decrement;
+            remaining -= decrement;
+          }
+          totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
         }
-        totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
       }
 
       // Recalculate availableQuantity (stock - currently booked)

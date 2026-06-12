@@ -1,5 +1,9 @@
 # 🧪 Test Results Summary: Invoice Cycle Bug
 
+## ✅ CURRENT STATUS NOTE
+
+Beberapa issue di bawah berasal dari snapshot pengujian lama. Jika ada dokumen fix terbaru untuk issue yang sama, prioritaskan dokumen fix tersebut untuk status current.
+
 ## Test Completed ✅
 - **Date**: May 6, 2026
 - **Test User**: Strawberry Customer

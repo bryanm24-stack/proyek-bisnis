@@ -200,8 +200,8 @@ export default function TambahProdukPage() {
                 background: 'white'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#7c3aed';
-                e.currentTarget.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.1)';
+                e.currentTarget.style.borderColor = '#B28A67';
+                e.currentTarget.style.boxShadow = '0 10px 25px rgba(178, 138, 103, 0.1)';
                 e.currentTarget.style.transform = 'translateY(-4px)';
               }}
               onMouseLeave={(e) => {
@@ -219,7 +219,7 @@ export default function TambahProdukPage() {
               </p>
               <button style={{
                 padding: '12px 24px',
-                background: '#7c3aed',
+                background: '#B28A67',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -244,8 +244,8 @@ export default function TambahProdukPage() {
                 background: 'white'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#7c3aed';
-                e.currentTarget.style.boxShadow = '0 10px 25px rgba(124, 58, 237, 0.1)';
+                e.currentTarget.style.borderColor = '#B28A67';
+                e.currentTarget.style.boxShadow = '0 10px 25px rgba(178, 138, 103, 0.1)';
                 e.currentTarget.style.transform = 'translateY(-4px)';
               }}
               onMouseLeave={(e) => {
@@ -263,7 +263,7 @@ export default function TambahProdukPage() {
               </p>
               <button style={{
                 padding: '12px 24px',
-                background: '#7c3aed',
+                background: '#B28A67',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',

@@ -5,8 +5,39 @@ const invoicesFile = path.join(process.cwd(), 'invoices.json');
 const transactionsFile = path.join(process.cwd(), 'transactions.json');
 const dealsFile = path.join(process.cwd(), 'deals.json');
 const servicesFile = path.join(process.cwd(), 'services.json');
+const promosFile = path.join(process.cwd(), 'promos.json');
 const ratingsFile = path.join(process.cwd(), 'ratings.json');
 const usersFile = path.join(process.cwd(), 'users.json');
+
+// Global invoice counter file (simple persistent counter)
+const invoiceCounterFile = path.join(process.cwd(), 'invoice_counter.json');
+
+function ensureInvoiceCounter() {
+  try {
+    if (!fs.existsSync(invoiceCounterFile)) {
+      fs.writeFileSync(invoiceCounterFile, JSON.stringify({ next: 1 }, null, 2), 'utf-8');
+    }
+  } catch (e) {
+    console.warn('Could not ensure invoice counter file:', e?.message || e);
+  }
+}
+
+function getNextInvoiceId() {
+  try {
+    ensureInvoiceCounter();
+    const raw = fs.readFileSync(invoiceCounterFile, 'utf-8');
+    const obj = raw ? JSON.parse(raw.replace(/^\uFEFF/, '').trim() || '{}') : {};
+    let next = Number(obj.next || 1);
+    const id = 'INV-' + String(next).padStart(6, '0');
+    // increment and persist
+    obj.next = next + 1;
+    fs.writeFileSync(invoiceCounterFile, JSON.stringify(obj, null, 2), 'utf-8');
+    return id;
+  } catch (e) {
+    console.warn('Could not read/write invoice counter, falling back to timestamp id:', e?.message || e);
+    return `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  }
+}
 
 // Helper: Normalize ID for consistent comparison
 const normalizeId = (id) => String(id || '').trim();
@@ -44,6 +75,7 @@ export async function GET(request) {
     ensureFile(transactionsFile);
     ensureFile(dealsFile);
     ensureFile(servicesFile);
+    ensureFile(promosFile);
     ensureFile(ratingsFile);
     ensureFile(usersFile);
     
@@ -56,6 +88,7 @@ export async function GET(request) {
     const transactions = parseJsonFile(transactionsFile, []);
     const deals = parseJsonFile(dealsFile, []);
     const services = parseJsonFile(servicesFile, []);
+    const promos = parseJsonFile(promosFile, []);
     const ratings = parseJsonFile(ratingsFile, []);
     const users = parseJsonFile(usersFile, []);
 
@@ -68,7 +101,7 @@ export async function GET(request) {
     // Backfill invoices from historical transactions so old paid/full payments also appear.
     let hasGeneratedInvoices = false;
     transactions
-      .filter((item) => item.dealId && item.paymentType !== 'invoice_payment')
+      .filter((item) => (item.dealId || item.promoId) && item.paymentType !== 'invoice_payment')
       .forEach((transaction) => {
         // Improved deduplication using normalizeId for case-insensitive matching
         const alreadyExists = invoices.some(
@@ -80,16 +113,18 @@ export async function GET(request) {
         if (alreadyExists) return;
 
         const relatedDeal = deals.find((item) => item.id === transaction.dealId);
+        const relatedPromo = promos.find((item) => String(item.id) === String(transaction.promoId));
         const isPayAfter = transaction.paymentType === 'pay_after';
         const nowIso = new Date().toISOString();
         const deadlineDate = new Date(transaction.timestamp || nowIso);
         deadlineDate.setDate(deadlineDate.getDate() + 2);
 
         invoices.push({
-          id: `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          dealId: transaction.dealId,
+          id: getNextInvoiceId(),
+          dealId: transaction.dealId || null,
+          promoId: transaction.promoId || null,
           customerId: transaction.userId || relatedDeal?.customerId || null,
-          vendorId: relatedDeal?.vendorId || transaction.vendorId || null,
+          vendorId: relatedDeal?.vendorId || relatedPromo?.vendorId || transaction.vendorId || null,
           serviceId: relatedDeal?.serviceId || null,
           transactionId: transaction.id,
           remainingPayment: isPayAfter
@@ -102,7 +137,15 @@ export async function GET(request) {
           createdAt: transaction.createdAt || nowIso,
           paidAt: isPayAfter ? null : (transaction.timestamp || nowIso),
           paymentTransactionId: isPayAfter ? null : transaction.id,
-          notes: transaction.notes || ''
+          notes: transaction.notes || '',
+          serviceTitle: relatedPromo?.title || transaction.promo?.title || null,
+          promo: transaction.promo || (relatedPromo ? {
+            id: relatedPromo.id,
+            title: relatedPromo.title,
+            promoPrice: relatedPromo.promoPrice,
+            image: relatedPromo.image,
+            description: relatedPromo.description
+          } : null)
         });
         hasGeneratedInvoices = true;
       });
@@ -127,7 +170,9 @@ export async function GET(request) {
           0
         );
 
-        const finalAmount = Number(
+        const dealQuantity = Number(deal.quantity || 1);
+        const dealDuration = Number(deal.durationDays || 1);
+        const unitPrice = Number(
           deal.finalPrice ??
           deal.originalPrice ??
           deal.totalPrice ??
@@ -137,9 +182,10 @@ export async function GET(request) {
           firstItemPrice ??
           0
         );
+        const finalAmount = Math.max(unitPrice * dealQuantity * dealDuration, 0);
 
         invoices.push({
-          id: `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          id: getNextInvoiceId(),
           dealId: deal.id,
           customerId: deal.customerId || null,
           vendorId: deal.vendorId || null,
@@ -165,6 +211,7 @@ export async function GET(request) {
     const enrichInvoice = (invoice) => {
       const relatedTransaction = transactions.find((item) => item.id === invoice.transactionId || item.invoiceId === invoice.id);
       const relatedDeal = deals.find((item) => item.id === invoice.dealId);
+      const relatedPromo = promos.find((item) => String(item.id) === String(invoice.promoId || relatedTransaction?.promoId));
       const relatedService = relatedDeal
         ? services.find((item) => String(item.id) === String(relatedDeal.serviceId))
         : null;
@@ -177,15 +224,18 @@ export async function GET(request) {
         0
       );
 
-      const discountAmount = Number(
+      const invoiceQuantity = Number(relatedTransaction?.quantity ?? relatedDeal?.quantity ?? invoice.quantity ?? 1);
+      const invoiceDurationDays = Number(relatedTransaction?.durationDays ?? relatedDeal?.durationDays ?? invoice.durationDays ?? 1);
+      const discountPerUnitAmount = Number(
         relatedTransaction?.discountAmount ??
         relatedDeal?.discount?.amount ??
         0
       );
+      const discountAmount = discountPerUnitAmount * invoiceQuantity * invoiceDurationDays;
 
       const subtotal = Number(
         relatedTransaction?.discountedSubtotal ??
-        (originalPrice * Number(relatedTransaction?.quantity || 1) * Number(relatedTransaction?.durationDays || 1)) - discountAmount
+        (originalPrice * invoiceQuantity * invoiceDurationDays) - discountAmount
       );
 
       const serviceFee = Number(relatedTransaction?.serviceFee ?? 0);
@@ -206,12 +256,12 @@ export async function GET(request) {
       return {
         ...invoice,
         customerId: invoice.customerId || relatedDeal?.customerId || relatedTransaction?.userId || null,
-        vendorId: invoice.vendorId || relatedDeal?.vendorId || relatedTransaction?.vendorId || null,
+        vendorId: invoice.vendorId || relatedDeal?.vendorId || relatedPromo?.vendorId || relatedTransaction?.vendorId || null,
         serviceId: relatedDeal?.serviceId || invoice.serviceId || null,
         customerName: relatedDeal?.customerName || relatedTransaction?.customerName || invoice.customerName || findUserName(invoice.customerId || relatedDeal?.customerId || relatedTransaction?.userId, 'Customer'),
-        vendorName: relatedDeal?.vendorName || relatedTransaction?.vendorName || invoice.vendorName || findUserName(invoice.vendorId || relatedDeal?.vendorId || relatedTransaction?.vendorId, 'Vendor'),
-        serviceTitle: relatedService?.title || relatedService?.namaBarang || relatedService?.namaJasa || relatedDeal?.itemName || relatedDeal?.serviceTitle || invoice.serviceTitle || 'Item sewa',
-        serviceImage: relatedService?.images?.[0] || relatedDeal?.image || relatedTransaction?.image || '',
+        vendorName: relatedDeal?.vendorName || relatedPromo?.vendorName || relatedTransaction?.vendorName || invoice.vendorName || findUserName(invoice.vendorId || relatedDeal?.vendorId || relatedPromo?.vendorId || relatedTransaction?.vendorId, 'Vendor'),
+        serviceTitle: relatedService?.title || relatedService?.namaBarang || relatedService?.namaJasa || relatedDeal?.itemName || relatedDeal?.serviceTitle || relatedPromo?.title || relatedTransaction?.promo?.title || invoice.serviceTitle || 'Item sewa',
+        serviceImage: relatedService?.images?.[0] || relatedDeal?.image || relatedPromo?.image || relatedTransaction?.image || '',
         dealStatus: relatedDeal?.status || relatedDeal?.invoiceStatus || 'pending',
         paymentType: relatedTransaction?.paymentType || relatedDeal?.paymentType || invoice.paymentType || 'pay_after',
         quantity: relatedTransaction?.quantity || relatedDeal?.quantity || invoice.quantity || 1,
@@ -221,7 +271,7 @@ export async function GET(request) {
         discountedSubtotal: subtotal,
         serviceFee,
         totalAmount,
-        promo: relatedTransaction?.promo || relatedDeal?.promo || null,
+        promo: relatedTransaction?.promo || relatedDeal?.promo || relatedPromo || invoice.promo || null,
         notes: relatedTransaction?.notes || invoice.notes || '',
         startDate: relatedTransaction?.startDate || invoice.startDate || null,
         dueDateLabel: invoice.paymentDeadline ? new Date(invoice.paymentDeadline).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A',
@@ -264,7 +314,7 @@ export async function POST(request) {
 
     // Create new invoice
     const newInvoice = {
-      id: `INV-${Date.now()}`,
+      id: getNextInvoiceId(),
       dealId: body.dealId,
       customerId: body.customerId,
       vendorId: body.vendorId,
@@ -314,7 +364,8 @@ export async function PUT(request) {
     invoices[invoiceIndex] = updatedInvoice;
     fs.writeFileSync(invoicesFile, JSON.stringify(invoices, null, 2));
 
-    // Update deal status if invoice is paid
+    // Update deal to mark invoice as paid, but do NOT mark the whole deal as completed here.
+    // Completion should only occur after the return/inspection flow completes.
     if (status === 'paid') {
       try {
         const dealsData = fs.readFileSync(dealsFile, 'utf-8');
@@ -322,13 +373,104 @@ export async function PUT(request) {
 
         const dealIndex = deals.findIndex(d => d.id === updatedInvoice.dealId);
         if (dealIndex !== -1) {
-          deals[dealIndex] = {
-            ...deals[dealIndex],
+          // Only update invoice status and record payment timestamp.
+          const existing = deals[dealIndex];
+          const updated = {
+            ...existing,
             invoiceStatus: 'paid',
-            status: 'completed',
-            completedAt: new Date().toISOString()
+            paymentConfirmedAt: new Date().toISOString()
           };
+
+          // If the deal was in 'agreed' state (waiting payment), move it to 'active'
+          // but do NOT mark as 'completed' here. Also set borrowDate if missing.
+          if (String(existing.status) === 'agreed') {
+            updated.status = 'active';
+            if (!existing.borrowDate) {
+              updated.borrowDate = new Date().toISOString();
+            }
+          }
+
+          deals[dealIndex] = updated;
           fs.writeFileSync(dealsFile, JSON.stringify(deals, null, 2));
+
+          // Also reserve/decrease stock in services.json if there is a matching booking
+          try {
+            const servicesRaw = fs.readFileSync(servicesFile, 'utf-8');
+            const services = servicesRaw ? JSON.parse(servicesRaw.replace(/^\uFEFF/, '').trim() || '[]') : [];
+            const svcIndex = services.findIndex(s => String(s.id) === String(existing.serviceId));
+            if (svcIndex !== -1) {
+              const svc = services[svcIndex];
+              // Find booking by dealId / transactionId / bookingId
+              const booking = (svc.bookings || []).find(b => String(b.dealId) === String(existing.id) || String(b.transactionId || '') === String(updatedInvoice.paymentTransactionId || '') || String(b.id || '') === String(existing.bookingId || ''));
+              if (booking && !booking.stockReserved) {
+                const qty = Number(booking.quantity || 1);
+                // Decrease availableQuantity safely
+                svc.availableQuantity = Math.max(0, Number(svc.availableQuantity || 0) - qty);
+                // Mark booking reserved
+                booking.stockReserved = true;
+
+                // Try to also decrement specific item stock if chat->itemId exists and service.items contains it
+                try {
+                  const chatsFile = path.join(process.cwd(), 'chats.json');
+                  const chatsRaw = fs.readFileSync(chatsFile, 'utf-8');
+                  const chats = chatsRaw ? JSON.parse(chatsRaw.replace(/^\uFEFF/, '').trim() || '[]') : [];
+                  const chat = chats.find(c => String(c.id) === String(existing.chatId));
+                  const itemId = chat?.itemId || existing.itemId || null;
+                  if (itemId && Array.isArray(svc.items)) {
+                    const itemIndex = svc.items.findIndex(it => String(it.id) === String(itemId));
+                    if (itemIndex !== -1 && typeof svc.items[itemIndex].stok === 'number') {
+                      svc.items[itemIndex].stok = Math.max(0, Number(svc.items[itemIndex].stok || 0) - qty);
+                    }
+                  }
+                } catch (e) {
+                  console.warn('Could not decrement item stok:', e?.message || e);
+                }
+                // Optionally decrease individual item stok if service has items and a mapping is clear
+                // (Not implemented here - we update overall availableQuantity)
+                // persist
+                services[svcIndex] = svc;
+                fs.writeFileSync(servicesFile, JSON.stringify(services, null, 2));
+              }
+                else {
+                  // Fallback: booking not found or already reserved. Try to derive quantity from transactions.
+                  try {
+                    const transactionsRaw = fs.readFileSync(transactionsFile, 'utf-8');
+                    const transactions = transactionsRaw ? JSON.parse(transactionsRaw.replace(/^\uFEFF/, '').trim() || '[]') : [];
+                    const trx = transactions.find(t => String(t.id) === String(updatedInvoice.paymentTransactionId) || String(t.dealId) === String(existing.id));
+                    const qtyFromTrx = trx ? Number(trx.quantity || trx.requestedQuantity || 1) : 0;
+                    const qtyUse = qtyFromTrx > 0 ? qtyFromTrx : 0;
+                    if (qtyUse > 0) {
+                      // decrease availableQuantity by qtyUse if not already reserved
+                      svc.availableQuantity = Math.max(0, Number(svc.availableQuantity || 0) - qtyUse);
+
+                      // Try to decrement item stok using deal/chat mapping as before
+                      try {
+                        const chatsFile = path.join(process.cwd(), 'chats.json');
+                        const chatsRaw = fs.readFileSync(chatsFile, 'utf-8');
+                        const chats = chatsRaw ? JSON.parse(chatsRaw.replace(/^\uFEFF/, '').trim() || '[]') : [];
+                        const chat = chats.find(c => String(c.id) === String(existing.chatId));
+                        const itemId = chat?.itemId || existing.itemId || null;
+                        if (itemId && Array.isArray(svc.items)) {
+                          const itemIndex = svc.items.findIndex(it => String(it.id) === String(itemId));
+                          if (itemIndex !== -1 && typeof svc.items[itemIndex].stok === 'number') {
+                            svc.items[itemIndex].stok = Math.max(0, Number(svc.items[itemIndex].stok || 0) - qtyUse);
+                          }
+                        }
+                      } catch (e) {
+                        console.warn('Could not decrement item stok (fallback):', e?.message || e);
+                      }
+
+                      services[svcIndex] = svc;
+                      fs.writeFileSync(servicesFile, JSON.stringify(services, null, 2));
+                    }
+                  } catch (e) {
+                    // ignore
+                  }
+                }
+            }
+          } catch (e) {
+            console.warn('Could not update service stock on payment:', e?.message || e);
+          }
         }
       } catch (dealError) {
         console.warn('Could not update deal:', dealError);

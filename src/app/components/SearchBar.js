@@ -258,8 +258,8 @@ export default function SearchBar({ services, onSearch, onCategoryChange, catego
         }
 
         .search-input-wrapper:focus-within {
-          border-color: #5a45d1;
-          box-shadow: 0 0 0 3px rgba(90, 69, 209, 0.1);
+          border-color: #B28A67;
+          box-shadow: 0 0 0 3px rgba(178, 138, 103, 0.1);
         }
 
         .search-icon {
@@ -304,12 +304,12 @@ export default function SearchBar({ services, onSearch, onCategoryChange, catego
         }
 
         .category-dropdown-btn:hover {
-          border-color: #5a45d1;
+          border-color: #B28A67;
           background: #f8f7ff;
         }
 
         .category-dropdown-btn:active {
-          border-color: #5a45d1;
+          border-color: #B28A67;
           background: #f0edff;
         }
 
@@ -368,12 +368,12 @@ export default function SearchBar({ services, onSearch, onCategoryChange, catego
 
         .category-option:hover {
           background: #f8f7ff;
-          color: #5a45d1;
+          color: #B28A67;
         }
 
         .category-option.active {
           background: #f0edff;
-          color: #5a45d1;
+          color: #B28A67;
           font-weight: 600;
         }
 
@@ -386,7 +386,7 @@ export default function SearchBar({ services, onSearch, onCategoryChange, catego
         }
 
         .checkmark {
-          color: #5a45d1;
+          color: #B28A67;
           font-weight: bold;
         }
 
@@ -430,8 +430,8 @@ export default function SearchBar({ services, onSearch, onCategoryChange, catego
 
         .filter-field input:focus,
         .filter-field select:focus {
-          border-color: #5a45d1;
-          box-shadow: 0 0 0 3px rgba(90, 69, 209, 0.12);
+          border-color: #B28A67;
+          box-shadow: 0 0 0 3px rgba(178, 138, 103, 0.12);
         }
 
         @media (max-width: 768px) {

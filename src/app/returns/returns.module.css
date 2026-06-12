@@ -1,0 +1,82 @@
+.container {
+  padding: 24px;
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
+.grid {
+  display: grid;
+  gap: 18px;
+}
+.columns {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+.column {
+  flex: 1;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 6px 18px rgba(14, 28, 56, 0.06);
+}
+.formGroup {
+  margin-bottom: 12px;
+}
+.label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #374151;
+}
+.input, .select, .textarea, .fileInput {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e6edf3;
+  border-radius: 8px;
+  outline: none;
+  font-size: 14px;
+  color: #111827;
+}
+.textarea { min-height: 96px; resize: vertical; }
+.actions { margin-top: 8px; }
+.btn {
+  padding: 10px 14px;
+  background: linear-gradient(90deg,#C8A587,#B28A67);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.btn.secondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+.secondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+.muted { color: #6b7280 }
+.listGrid { display: grid; gap: 12px; }
+.card {
+  border: 1px solid #eef2ff;
+  padding: 12px;
+  border-radius: 8px;
+  background: linear-gradient(180deg,#ffffff,#fbfdff);
+}
+.cardHeader { display:flex; justify-content:space-between; gap:12px }
+.cardTitle { font-weight:700 }
+.photos { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap }
+.photoImg { width:120px; height:80px; object-fit:cover; border-radius:6px; border:1px solid #eef2ff }
+.modalOverlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:60;
+}
+.modal {
+  background:white; padding:18px; border-radius:12px; width:min(720px,96%); box-shadow:0 12px 40px rgba(2,6,23,0.2);
+}
+.modalFooter { display:flex; gap:8px; justify-content:flex-end; margin-top:12px }
+.statusBadge { font-weight:700; color:#111827 }
+.small { font-size:13px }
+
+.invoicePreview { }

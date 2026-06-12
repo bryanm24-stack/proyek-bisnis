@@ -23,7 +23,7 @@ export default function SharedFooter() {
 
   return (
     <footer style={{
-      background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+      background: 'linear-gradient(135deg, #C8A587 0%, #B28A67 100%)',
       color: 'white',
       padding: '48px 24px 24px 24px',
       marginTop: '80px',

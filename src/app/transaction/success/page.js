@@ -179,7 +179,7 @@ function SuccessContent() {
               onClick={() => router.push('/')}
               style={{
                 padding: '14px 24px',
-                background: '#7c3aed',
+                background: '#B28A67',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',

@@ -30,12 +30,12 @@
 
 .navbar a:hover {
   background-color: #f0f0f0;
-  color: #7c3aed;
+  color: #B28A67;
 }
 
 .navbar a.active {
   background-color: #f0e6ff;
-  color: #7c3aed;
+  color: #B28A67;
   font-weight: 600;
 }
 

@@ -4,6 +4,79 @@ import { NextResponse } from 'next/server';
 
 // Helpers: date-only UTC handling to avoid timezone off-by-one
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const invoicesPath = path.join(process.cwd(), 'invoices.json');
+
+async function ensureInvoicesFile() {
+  try {
+    await fs.access(invoicesPath);
+  } catch {
+    await fs.writeFile(invoicesPath, '[]', 'utf-8');
+  }
+}
+
+async function readJsonFile(filePath) {
+  const fileData = await fs.readFile(filePath, 'utf-8');
+  return JSON.parse(fileData.replace(/^\uFEFF/, '').trim());
+}
+
+async function readInvoicesFile() {
+  await ensureInvoicesFile();
+  const fileData = await fs.readFile(invoicesPath, 'utf-8');
+  return JSON.parse(fileData.replace(/^\uFEFF/, '').trim() || '[]');
+}
+
+async function writeInvoicesFile(invoices) {
+  await fs.writeFile(invoicesPath, JSON.stringify(invoices, null, 2), 'utf-8');
+}
+
+function getCurrentISOString() {
+  return new Date().toISOString();
+}
+
+function createDamageInvoice(deal, amount) {
+  return {
+    id: `INV-DAMAGE-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    dealId: deal.id,
+    customerId: deal.customerId,
+    vendorId: deal.vendorId,
+    serviceId: deal.serviceId,
+    transactionId: null,
+    remainingPayment: Number(amount || 0),
+    paymentDeadline: new Date(Date.now() + 2 * MS_PER_DAY).toISOString(),
+    paymentMethod: null,
+    paymentType: 'damage',
+    status: 'pending',
+    createdAt: getCurrentISOString(),
+    paidAt: null,
+    paymentTransactionId: null,
+    notes: 'Tagihan biaya kerusakan'
+  };
+}
+
+async function syncDamageInvoice(deal, amount) {
+  if (!deal?.id || Number(amount || 0) <= 0) {
+    return null;
+  }
+
+  const invoices = await readInvoicesFile();
+  let invoice = invoices.find(i => String(i.dealId) === String(deal.id) && String(i.paymentType) === 'damage');
+  if (invoice) {
+    invoice.remainingPayment = Number(amount || 0);
+    invoice.status = invoice.status === 'paid' ? 'paid' : 'pending';
+    invoice.paymentDeadline = invoice.paymentDeadline || new Date(Date.now() + 2 * MS_PER_DAY).toISOString();
+    invoice.notes = 'Tagihan biaya kerusakan';
+  } else {
+    invoice = createDamageInvoice(deal, amount);
+    invoices.push(invoice);
+  }
+
+  await writeInvoicesFile(invoices);
+  deal.damageInvoiceId = invoice.id;
+  deal.damageInvoiceStatus = invoice.status;
+  deal.damageInvoiceAmount = Number(amount || 0);
+  return invoice;
+}
+
 function toDateOnlyUTC(dateStr) {
   if (!dateStr) return null;
   const d = new Date(dateStr);
@@ -27,17 +100,74 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const dealId = searchParams.get('dealId');
+    const userId = searchParams.get('userId');
+    const userRole = searchParams.get('userRole');
 
-    if (!dealId) {
+    if (!dealId && (!userId || !userRole)) {
       return NextResponse.json({
         success: false,
-        message: 'dealId diperlukan'
+        message: 'dealId atau userId dan userRole diperlukan'
       }, { status: 400 });
     }
 
     const dealsPath = path.join(process.cwd(), 'deals.json');
-    const dealsData = await fs.readFile(dealsPath, 'utf-8');
-    const deals = JSON.parse(dealsData);
+    const servicesPath = path.join(process.cwd(), 'services.json');
+    const usersPath = path.join(process.cwd(), 'users.json');
+    const deals = await readJsonFile(dealsPath);
+    const services = await readJsonFile(servicesPath);
+    const users = await readJsonFile(usersPath);
+
+    if (userId && userRole) {
+      const normalizedUserId = String(userId);
+      const returnDeals = deals.filter((deal) => {
+        const matchesUser = userRole === 'vendor'
+          ? String(deal.vendorId) === normalizedUserId
+          : String(deal.customerId) === normalizedUserId;
+
+        const hasReturnActivity = Boolean(
+          deal.actualReturnDate ||
+          deal.itemCondition ||
+          deal.returnPhotos?.length ||
+          deal.damageDescription ||
+          deal.returnStatus === 'pending_inspection' ||
+          deal.returnStatus === 'inspected' ||
+          deal.returnStatus === 'completed' ||
+          deal.returnStatus === 'returning' ||
+          deal.refundStatus === 'pending_payment' ||
+          deal.refundStatus === 'processed'
+        );
+
+        return matchesUser && hasReturnActivity;
+      });
+
+      const enrichedReturns = returnDeals
+        .map((deal) => {
+          const service = services.find((item) => String(item.id) === String(deal.serviceId)) || null;
+          const otherUser = userRole === 'vendor'
+            ? users.find((item) => String(item.id) === String(deal.customerId)) || null
+            : users.find((item) => String(item.id) === String(deal.vendorId)) || null;
+
+          return {
+            ...deal,
+            service,
+            otherUser,
+            returnSummary: deal.returnStatus === 'completed'
+              ? 'Return selesai'
+              : deal.returnStatus === 'inspected'
+                ? 'Return sudah diinspeksi'
+                : deal.returnStatus === 'pending_inspection'
+                  ? 'Menunggu inspeksi vendor'
+                  : 'Proses return berjalan'
+          };
+        })
+        .sort((a, b) => new Date(b.actualReturnDate || b.agreedAt || b.createdAt || 0) - new Date(a.actualReturnDate || a.agreedAt || a.createdAt || 0));
+
+      return NextResponse.json({
+        success: true,
+        data: enrichedReturns,
+        message: enrichedReturns.length === 0 ? 'Tidak ada return yang tercatat' : 'Data return ditemukan'
+      }, { status: 200 });
+    }
 
     const deal = deals.find(d => d.id === dealId);
     if (!deal) {
@@ -59,6 +189,9 @@ export async function GET(request) {
         damageStatus: deal.damageStatus || 'none',
         damageDescription: deal.damageDescription || '',
         damageCharge: deal.damageCharge || 0,
+        damageInvoiceId: deal.damageInvoiceId || null,
+        damageInvoiceStatus: deal.damageInvoiceStatus || null,
+        damageInvoiceAmount: deal.damageInvoiceAmount || 0,
         daysLate: deal.daysLate || 0,
         lateCharge: deal.lateCharge || 0,
         totalRefund: deal.totalRefund || 0,
@@ -85,8 +218,44 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
-    const body = await request.json();
-    const { dealId, customerId, itemCondition, damageDescription, returnPhotos } = body;
+    // Support both JSON body (existing clients) and multipart/form-data (file uploads)
+    let dealId, customerId, itemCondition, damageDescription, returnPhotos = [], type = null;
+    const contentType = request.headers.get('content-type') || '';
+
+    if (contentType.includes('multipart/form-data')) {
+      const form = await request.formData();
+      dealId = form.get('dealId');
+      customerId = form.get('customerId');
+      itemCondition = form.get('itemCondition');
+    damageDescription = form.get('damageDescription') || '';
+    type = form.get('type') || null;
+
+      // Handle uploaded files under field name 'photos' (multiple)
+      const files = form.getAll('photos') || [];
+      if (files.length > 0) {
+        const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'returns');
+        await fs.mkdir(uploadsDir, { recursive: true });
+
+        for (const f of files) {
+          try {
+            // 'f' is a File-like object provided by Web platform in Next.js route handlers
+            const arrayBuffer = await f.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const safeName = (f.name || 'photo').replace(/[^a-zA-Z0-9_.-]/g, '_');
+            const filename = `${Date.now()}-${safeName}`;
+            const dest = path.join(uploadsDir, filename);
+            await fs.writeFile(dest, buffer);
+            const url = `/uploads/returns/${filename}`;
+            returnPhotos.push({ url, filename, uploadedAt: new Date().toISOString() });
+          } catch (fileErr) {
+            console.warn('Could not save uploaded file:', fileErr?.message || fileErr);
+          }
+        }
+      }
+    } else {
+      const body = await request.json();
+      ({ dealId, customerId, itemCondition, damageDescription, returnPhotos = [], type = null } = body || {});
+    }
 
     if (!dealId || !customerId || !itemCondition) {
       return NextResponse.json({
@@ -134,45 +303,89 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    // Set return date to today (date-only) and calculate days late using UTC date-only math
-    const actualReturnDate = todayDateString();
-    deal.actualReturnDate = actualReturnDate;
-    const daysLate = daysBetweenDates(actualReturnDate, deal.expectedReturnDate);
-    deal.daysLate = daysLate;
+    // Determine flow type: 'issue' or 'complaint' (report problem during rental) or 'end_of_use' (retur akhir)
+    const normalizedType = (type || '').toString().toLowerCase();
+    const returnType = normalizedType === 'complaint' ? 'complaint' : (normalizedType === 'issue' ? 'issue' : 'end_of_use');
 
-    // Store item condition and damage info
-    deal.itemCondition = itemCondition; // 'good', 'minor_damage', 'major_damage', 'lost'
-    deal.returnPhotos = returnPhotos || [];
-    deal.returnStatus = 'pending_inspection'; // Waiting for vendor inspection
-    deal.damageDescription = damageDescription || '';
-    
-    // Set initial damage status based on condition
-    if (itemCondition === 'good') {
-      deal.damageStatus = 'none';
-      deal.damageCharge = 0;
-    } else if (itemCondition === 'minor_damage') {
-      deal.damageStatus = 'minor';
-      deal.damageCharge = 0; // Will be set by vendor
-    } else if (itemCondition === 'major_damage') {
-      deal.damageStatus = 'major';
-      deal.damageCharge = 0; // Will be set by vendor
-    } else if (itemCondition === 'lost') {
-      deal.damageStatus = 'lost';
-      deal.damageCharge = deal.totalPrice || 0; // Full price as damage charge
+    if (returnType === 'complaint' || returnType === 'issue') {
+      // Issue/complaint report flow: do not finalize actual return date, just mark as reported for vendor inspection
+      deal.returnType = returnType;
+      deal.reportedAt = new Date().toISOString();
+      deal.complaintDate = new Date().toISOString();
+      deal.complaintCategory = itemCondition;
+      deal.complaintDescription = damageDescription || '';
+      deal.returnPhotos = Array.isArray(deal.returnPhotos) ? deal.returnPhotos.concat(returnPhotos || []) : (returnPhotos || []);
+      deal.returnStatus = 'reported';
+      deal.daysLate = 0;
+      deal.lateCharge = 0;
+      deal.issueReported = returnType === 'issue';
+      deal.complaintReported = returnType === 'complaint';
+    } else {
+      // End-of-use retur flow: set actual return date and calculate late/deductions (existing logic)
+      deal.returnType = 'end_of_use';
+      // Set return date to today (date-only) and calculate days late using UTC date-only math
+      const actualReturnDate = todayDateString();
+      deal.actualReturnDate = actualReturnDate;
+      const daysLate = daysBetweenDates(actualReturnDate, deal.expectedReturnDate);
+      deal.daysLate = daysLate;
+
+      // Store item condition and damage info
+      deal.itemCondition = itemCondition; // 'good', 'minor_damage', 'major_damage', 'lost'
+      // Merge any newly uploaded photos with existing array
+      deal.returnPhotos = Array.isArray(deal.returnPhotos) ? deal.returnPhotos.concat(returnPhotos || []) : (returnPhotos || []);
+      deal.returnStatus = 'pending_inspection'; // Waiting for vendor inspection
+      deal.damageDescription = damageDescription || '';
+      
+      // Set initial damage status based on condition
+      if (itemCondition === 'good') {
+        deal.damageStatus = 'none';
+        deal.damageCharge = 0;
+      } else if (itemCondition === 'minor_damage') {
+        deal.damageStatus = 'minor';
+        deal.damageCharge = 0; // Will be set by vendor
+      } else if (itemCondition === 'major_damage') {
+        deal.damageStatus = 'major';
+        deal.damageCharge = 0; // Will be set by vendor
+      } else if (itemCondition === 'lost') {
+        deal.damageStatus = 'lost';
+        deal.damageCharge = deal.totalPrice || 0; // Full price as damage charge
+      }
+
+      // Keep return invoice references for future charge flow
+      if (deal.damageCharge > 0) {
+        deal.damageInvoiceAmount = deal.damageCharge;
+        deal.damageInvoiceStatus = 'pending';
+      }
+
+      // Calculate late charge: daily_rate × daysLate
+      // daily_rate = totalPrice / rentalDays (using actual rental duration)
+      let rentalDays = deal.rentalDays || deal.durationDays || 0;
+      if (!rentalDays && deal.borrowDate && deal.expectedReturnDate) {
+        rentalDays = daysBetweenDates(deal.expectedReturnDate, deal.borrowDate) || 1;
+      }
+      rentalDays = Math.max(1, rentalDays);
+      const dailyRate = (deal.totalPrice || 0) / rentalDays;
+      deal.lateCharge = Math.round(daysLate * dailyRate);
+
+      // Status for inspection
+      deal.status = 'returning'; // Differentiate from 'agreed' or 'completed'
+
+      if (deal.chatId) {
+        try {
+          const chatsPath = path.join(process.cwd(), 'chats.json');
+          const chatsData = await fs.readFile(chatsPath, 'utf-8');
+          const chats = JSON.parse(chatsData.replace(/^\uFEFF/, '').trim() || '[]');
+          const chatIndex = chats.findIndex((c) => String(c.id) === String(deal.chatId));
+          if (chatIndex !== -1) {
+            chats[chatIndex].dealStatus = 'returning';
+            chats[chatIndex].returnRequestedAt = new Date().toISOString();
+            await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2), 'utf-8');
+          }
+        } catch (chatErr) {
+          console.warn('Could not update chat status on return initiation:', chatErr.message || chatErr);
+        }
+      }
     }
-
-    // Calculate late charge: daily_rate × daysLate
-    // daily_rate = totalPrice / rentalDays (using actual rental duration)
-    let rentalDays = deal.rentalDays || deal.durationDays || 0;
-    if (!rentalDays && deal.borrowDate && deal.expectedReturnDate) {
-      rentalDays = daysBetweenDates(deal.expectedReturnDate, deal.borrowDate) || 1;
-    }
-    rentalDays = Math.max(1, rentalDays);
-    const dailyRate = (deal.totalPrice || 0) / rentalDays;
-    deal.lateCharge = Math.round(daysLate * dailyRate);
-
-    // Status for inspection
-    deal.status = 'returning'; // Differentiate from 'agreed' or 'completed'
 
     await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
 
@@ -205,12 +418,12 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const body = await request.json();
-    const { dealId, vendorId, damageStatus, damageCharge, notes } = body;
+    const { dealId, vendorId, damageStatus, damageCharge, notes, complaintResolution, complaintPenalty } = body;
 
-    if (!dealId || !vendorId || !damageStatus) {
+    if (!dealId || !vendorId) {
       return NextResponse.json({
         success: false,
-        message: 'dealId, vendorId, dan damageStatus wajib diisi'
+        message: 'dealId dan vendorId wajib diisi'
       }, { status: 400 });
     }
 
@@ -243,16 +456,16 @@ export async function PUT(request) {
       }, { status: 403 });
     }
 
-    // ✅ FIX #5: Validate return has been initiated by customer
-    if (deal.returnStatus !== 'pending_inspection' && deal.returnStatus !== 'inspected') {
+    // ✅ FIX #5: Validate return has been initiated by customer (allow 'reported' for issue flow)
+    if (!['pending_inspection', 'inspected', 'reported'].includes(deal.returnStatus)) {
       return NextResponse.json({
         success: false,
         message: `Peminjaman belum siap untuk inspeksi. Return status: '${deal.returnStatus}'. Tunggu customer mengajukan return terlebih dahulu.`
       }, { status: 400 });
     }
 
-    // ✅ FIX #5: Validate rental dates are set (should be set when customer submits return)
-    if (!deal.borrowDate || !deal.expectedReturnDate || !deal.actualReturnDate) {
+    // ✅ FIX #5: Validate rental dates are set (issue reports do not need actualReturnDate yet)
+    if (!deal.borrowDate || !deal.expectedReturnDate || (deal.returnStatus !== 'reported' && !deal.actualReturnDate)) {
       return NextResponse.json({
         success: false,
         message: 'Data peminjaman tidak lengkap. Hubungi support jika masalah berlanjut.'
@@ -273,17 +486,60 @@ export async function PUT(request) {
     deal.inspectionNotes = notes || '';
     deal.vendorConfirmed = true;
 
-    // Calculate total refund
-    const basePrice = deal.totalPrice || 0;
-    const totalDeductions = (deal.damageCharge || 0) + (deal.lateCharge || 0);
-    deal.totalRefund = Math.max(0, basePrice - totalDeductions);
-    deal.refundStatus = 'pending_payment'; // Ready for refund processing
+    if (deal.returnType === 'complaint' || deal.returnType === 'issue') {
+      const normalizedResolution = (complaintResolution || '').toString().toLowerCase();
+      const penaltyAmount = Number(complaintPenalty || 0) || 0;
+      const allowedResolutions = ['confirm', 'partial_refund', 'penalty', 'reject'];
+      if (!allowedResolutions.includes(normalizedResolution)) {
+        return NextResponse.json({
+          success: false,
+          message: 'complaintResolution harus salah satu: confirm, partial_refund, penalty, reject'
+        }, { status: 400 });
+      }
 
-    // Set return status to inspected
-    deal.returnStatus = 'inspected';
+      deal.complaintResolution = normalizedResolution;
+      deal.complaintPenalty = penaltyAmount;
+      deal.complaintResolutionNotes = notes || '';
 
-    // ✅ FIX #2: Update booking status to 'pending_return' (awaiting return confirmation)
-    if (deal.bookingId) {
+      if (normalizedResolution === 'confirm') {
+        deal.totalRefund = deal.totalPrice || 0;
+        deal.refundStatus = 'processed';
+        deal.returnStatus = 'complaint_confirmed';
+        deal.status = 'completed';
+      } else if (normalizedResolution === 'partial_refund') {
+        deal.totalRefund = Math.max(0, (deal.totalPrice || 0) - penaltyAmount);
+        deal.refundStatus = 'processed';
+        deal.returnStatus = 'complaint_partial';
+        deal.status = 'completed';
+      } else if (normalizedResolution === 'penalty') {
+        deal.totalRefund = Math.max(0, (deal.totalPrice || 0) - penaltyAmount);
+        deal.refundStatus = 'processed';
+        deal.returnStatus = 'complaint_penalty';
+        deal.status = 'completed';
+      } else if (normalizedResolution === 'reject') {
+        deal.totalRefund = 0;
+        deal.refundStatus = 'processed';
+        deal.returnStatus = 'complaint_rejected';
+        deal.status = 'completed';
+      }
+    } else {
+      if (deal.damageCharge > 0) {
+        await syncDamageInvoice(deal, deal.damageCharge);
+      }
+
+      // Calculate total refund (same formula applies)
+      const basePrice = deal.totalPrice || 0;
+      const totalDeductions = (deal.damageCharge || 0) + (deal.lateCharge || 0);
+      deal.totalRefund = Math.max(0, basePrice - totalDeductions);
+      deal.refundStatus = 'pending_payment'; // Ready for refund processing
+
+      
+      // Set return status to inspected
+      deal.returnStatus = 'inspected';
+    }
+
+    // ✅ FIX #2: Update booking status to 'pending_return' (awaiting return confirmation) only for end_of_use flow
+    if (deal.returnType === 'end_of_use' && deal.bookingId) {
       try {
         const servicesPath = path.join(process.cwd(), 'services.json');
         let servicesData = await fs.readFile(servicesPath, 'utf-8');
@@ -306,19 +562,21 @@ export async function PUT(request) {
     }
 
     // If no issues and on-time, auto-complete. Ensure we mark refund processed and settlement date.
-    if (damageStatus === 'none' && deal.daysLate === 0 && deal.customerConfirmed) {
-      deal.status = 'completed';
-      deal.returnStatus = 'completed';
-      deal.refundStatus = 'processed';
-      deal.settlementDate = todayDateString();
-      if (deal.totalRefund === undefined || deal.totalRefund === null) {
-        const basePrice = deal.totalPrice || 0;
-        const totalDeductions = (deal.damageCharge || 0) + (deal.lateCharge || 0);
-        deal.totalRefund = Math.max(0, basePrice - totalDeductions);
+    if (deal.returnType === 'end_of_use') {
+      if (damageStatus === 'none' && deal.daysLate === 0 && deal.customerConfirmed) {
+        deal.status = 'completed';
+        deal.returnStatus = 'completed';
+        deal.refundStatus = 'processed';
+        deal.settlementDate = todayDateString();
+        if (deal.totalRefund === undefined || deal.totalRefund === null) {
+          const basePrice = deal.totalPrice || 0;
+          const totalDeductions = (deal.damageCharge || 0) + (deal.lateCharge || 0);
+          deal.totalRefund = Math.max(0, basePrice - totalDeductions);
+        }
       }
     }
 
-    // If vendor confirms now and customer has already confirmed earlier, finalize the return
+    // If vendor confirms now and customer has already confirmed earlier, finalize the return (both flows)
     if (deal.vendorConfirmed && deal.customerConfirmed) {
       deal.status = 'completed';
       deal.returnStatus = 'completed';

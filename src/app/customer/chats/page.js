@@ -203,8 +203,8 @@ export default function CustomerChatsPage() {
                     backgroundColor: '#fff'
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#7c3aed';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.1)';
+                    e.target.style.borderColor = '#B28A67';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(178, 138, 103, 0.1)';
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = '#eee';
@@ -269,9 +269,9 @@ export default function CustomerChatsPage() {
                       marginBottom: '8px',
                       borderRadius: '8px',
                       cursor: 'pointer',
-                      background: selectedChat?.id === chat.id ? '#7c3aed' : '#fff',
+                      background: selectedChat?.id === chat.id ? '#B28A67' : '#fff',
                       color: selectedChat?.id === chat.id ? '#fff' : '#333',
-                      border: selectedChat?.id === chat.id ? '2px solid #7c3aed' : '1px solid #eee',
+                      border: selectedChat?.id === chat.id ? '2px solid #B28A67' : '1px solid #eee',
                       transition: 'all 0.3s'
                     }}
                   >
@@ -310,7 +310,7 @@ export default function CustomerChatsPage() {
                       margin: 0, 
                       fontSize: '18px',
                       cursor: 'pointer',
-                      color: '#7c3aed',
+                      color: '#B28A67',
                       transition: 'all 0.2s'
                     }}
                     onClick={() => setShowVendorModal(true)}
@@ -323,31 +323,28 @@ export default function CustomerChatsPage() {
                     {selectedChat.serviceTitle}
                   </p>
                 </div>
-                <button
-                  onClick={() => setShowVendorModal(true)}
-                  style={{
-                    padding: '8px 12px',
-                    border: 'none',
-                    borderRadius: '6px',
-                    background: '#7c3aed',
-                    color: 'white',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    fontSize: '12px'
-                  }}
-                >
-                  👤 Profil
-                </button>
+                    <button
+                      onClick={() => setShowVendorModal(true)}
+                      style={{
+                        padding: '8px 12px',
+                        border: 'none',
+                        borderRadius: '6px',
+                        background: '#B28A67',
+                        color: 'white',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        fontSize: '12px'
+                      }}
+                    >
+                      👤 Profil
+                    </button>
               </div>
 
-              {/* Show pricing and discount info when deal agreed */}
+              {/* Show payment action when deal agreed, without displaying price */}
               {dealData?.status === 'agreed' && selectedChat?.dealStatus !== 'closed' && !selectedChat?.closedAt && (
                 <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '13px', color: '#666' }}>Deal telah disetujui</div>
-                    <div style={{ fontWeight: 800, fontSize: '16px', marginTop: '4px' }}>
-                      Harga akhir: Rp {(dealData.finalPrice || dealData.originalPrice || 0).toLocaleString('id-ID')}
-                    </div>
                     {dealData.discountGiven && dealData.discount && (
                       <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
                         Potongan: Rp {dealData.discount.amount.toLocaleString('id-ID')} ({dealData.discount.type === 'percent' ? `${dealData.discount.value}%` : `Rp ${dealData.discount.value.toLocaleString('id-ID')}`})
@@ -357,7 +354,7 @@ export default function CustomerChatsPage() {
                   <div>
                     <button
                       onClick={proceedToPayment}
-                      style={{ padding: '8px 12px', borderRadius: '8px', border: 'none', background: '#7c3aed', color: 'white', fontWeight: 700, cursor: 'pointer' }}
+                      style={{ padding: '8px 12px', borderRadius: '8px', border: 'none', background: '#B28A67', color: 'white', fontWeight: 700, cursor: 'pointer' }}
                     >
                       Lanjut ke Pembayaran
                     </button>
@@ -400,7 +397,7 @@ export default function CustomerChatsPage() {
                           maxWidth: '65%',
                           padding: '12px 14px',
                           borderRadius: '16px',
-                          background: isCustomerMessage ? '#7c3aed' : '#e5e7eb',
+                          background: isCustomerMessage ? '#B28A67' : '#e5e7eb',
                           color: isCustomerMessage ? 'white' : '#333',
                           wordWrap: 'break-word'
                         }}>
@@ -480,7 +477,7 @@ export default function CustomerChatsPage() {
                     padding: '10px 16px',
                     border: 'none',
                     borderRadius: '8px',
-                    background: '#7c3aed',
+                    background: '#B28A67',
                     color: 'white',
                     fontWeight: '600',
                     cursor: selectedChat?.dealStatus === 'closed' ? 'not-allowed' : 'pointer',

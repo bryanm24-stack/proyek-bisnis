@@ -20,12 +20,14 @@ export default function HomePageClient() {
   const [modalImageIndex, setModalImageIndex] = useState(0);
   // ✅ NEW: Track image carousel for product cards
   const [currentImageIndex, setCurrentImageIndex] = useState({});
+  const [heroImageIndex, setHeroImageIndex] = useState(0);
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [chatData, setChatData] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [dealData, setDealData] = useState(null);
   const [showRatingForm, setShowRatingForm] = useState(false);
+  const [dealProcessing, setDealProcessing] = useState(false);
   const [ratingValue, setRatingValue] = useState(5);
   const [ratingReview, setRatingReview] = useState('');
   const [notifications, setNotifications] = useState([]);
@@ -114,53 +116,67 @@ export default function HomePageClient() {
     }
   }, []);
 
+  const loadServices = useCallback(async () => {
+    try {
+      const response = await fetch('/api/vendor/services', { cache: 'no-store' });
+      const data = await response.json();
+      if (data.success) {
+        setServices(Array.isArray(data.data) ? data.data : []);
+      }
+    } catch (error) {
+      console.error('Error fetching services:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadPromos = useCallback(async () => {
+    try {
+      const cachedUser = JSON.parse(localStorage.getItem('user') || 'null');
+      const promoQuery = cachedUser?.id
+        ? `/api/promos?active=true&userId=${encodeURIComponent(cachedUser.id)}`
+        : '/api/promos?active=true';
+      const response = await fetch(promoQuery, { cache: 'no-store' });
+      const data = await response.json();
+      if (data.success) {
+        setPromos(Array.isArray(data.data) ? data.data : []);
+      }
+    } catch (error) {
+      console.error('Error fetching promos:', error);
+    }
+  }, []);
+
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (userData) {
       setUser(JSON.parse(userData));
     }
 
-    const fetchServices = async () => {
-      try {
-        const response = await fetch('/api/vendor/services', { cache: 'no-store' });
-        const data = await response.json();
-        if (data.success) {
-          setServices(Array.isArray(data.data) ? data.data : []);
-        }
-      } catch (error) {
-        console.error('Error fetching services:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const fetchPromos = async () => {
-      try {
-        const cachedUser = JSON.parse(localStorage.getItem('user') || 'null');
-        const promoQuery = cachedUser?.id
-          ? `/api/promos?active=true&userId=${encodeURIComponent(cachedUser.id)}`
-          : '/api/promos?active=true';
-        const response = await fetch(promoQuery, { cache: 'no-store' });
-        const data = await response.json();
-        if (data.success) {
-          setPromos(Array.isArray(data.data) ? data.data : []);
-        }
-      } catch (error) {
-        console.error('Error fetching promos:', error);
-      }
-    };
-
-    fetchServices();
-    fetchPromos();
+    loadServices();
+    loadPromos();
 
     // Refresh services setiap 10 detik untuk deteksi service baru dari vendor
-    const serviceInterval = setInterval(fetchServices, 10000);
-    const promoInterval = setInterval(fetchPromos, 15000);
+    const serviceInterval = setInterval(loadServices, 10000);
+    const promoInterval = setInterval(loadPromos, 15000);
     return () => {
       clearInterval(serviceInterval);
       clearInterval(promoInterval);
     };
-  }, []);
+  }, [loadServices, loadPromos]);
+
+  // Auto-refresh when payment completes in another tab/component
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (!e) return;
+      if (e.key === 'lastPaymentAt') {
+        // reload services to reflect reserved/decremented stock
+        loadServices();
+      }
+    };
+
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [loadServices]);
 
   useEffect(() => {
     const timer = setInterval(() => setPromoNow(Date.now()), 1000);
@@ -212,7 +228,7 @@ export default function HomePageClient() {
     }));
   };
 
-  // Helper function to safely format price
+// Helper function to safely format price
   const formatPrice = (price) => {
     if (typeof price === 'number' && isFinite(price) && price > 0 && price < 1e20) {
       return price.toLocaleString('id-ID');
@@ -220,15 +236,20 @@ export default function HomePageClient() {
     return '0';
   };
 
-  // Helper function to get display price from items
+  // Helper fungsi baru untuk memastikan ekstraksi harga yang absolut
+  const getItemPriceNumber = (item) => {
+    if (!item) return 0;
+    return Number(item.hargaPcs || item.hargaSesi || item.harga || item.price || 0);
+  };
+
+  // Perbarui getItemsPrice untuk mengonsumsi fungsi pembantu baru
   const getItemsPrice = (service) => {
     if (!service.items || service.items.length === 0) {
       return null;
     }
 
-    // Get prices from items based on type
     const prices = service.items
-      .map(item => item.hargaSesi || item.hargaPcs || 0)
+      .map(item => getItemPriceNumber(item))
       .filter(price => price > 0)
       .sort((a, b) => a - b);
 
@@ -504,8 +525,10 @@ export default function HomePageClient() {
   };
 
   const handleDealAction = async (action) => {
+    if (dealProcessing) return;
     if (!selectedService || !user || !chatData?.id) return;
 
+    setDealProcessing(true);
     try {
       const response = await fetch('/api/deals', {
         method: 'POST',
@@ -540,6 +563,8 @@ export default function HomePageClient() {
     } catch (error) {
       console.error('Error processing deal:', error);
       alert('Gagal memproses deal: ' + error.message);
+    } finally {
+      setDealProcessing(false);
     }
   };
 
@@ -562,12 +587,12 @@ export default function HomePageClient() {
       };
     }
 
-    if (dealData.status === 'agreed') {
+      if (dealData.status === 'agreed') {
       return {
         label: 'Deal disetujui',
         description: 'Deal sudah disepakati. Kamu bisa lanjut ke pembayaran.',
         background: '#dbeafe',
-        color: '#1d4ed8'
+          color: '#B28A67'
       };
     }
 
@@ -792,7 +817,23 @@ export default function HomePageClient() {
     service?.availableQuantity ?? service?.availability ?? service?.quantity ?? 0
   );
 
+  const getDisplayedStock = (service) => {
+    if (!service) return 0;
+
+    if (service.type === 'jasa') {
+      return getServiceAvailability(service);
+    }
+
+    if (Array.isArray(service.items) && service.items.length > 0) {
+      return service.items.reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
+    }
+
+    return Number(service.availableQuantity ?? service.quantity ?? service.availability ?? 0) || 0;
+  };
+
   const filteredServices = getFilteredServices();
+  // Derive a featured services list for the hero carousel (safe fallback)
+  const featuredServices = Array.isArray(filteredServices) ? filteredServices.slice(0, 5) : [];
   const visiblePromos = Array.isArray(promos)
     ? promos.filter((promo) => Number(promo?.promoPrice) > 0)
     : [];
@@ -918,25 +959,100 @@ export default function HomePageClient() {
 
       {/* Hero Section */}
       <div className="hero-section">
-        <div className="hero-content">
-          <h1>Sewa Apa Saja,<br/>dari Vendor Terbaik</h1>
-          <p>Ribuan vendor penyewaan terpercaya siap melayani kebutuhan sewa kamu</p>
-          <div className="hero-buttons">
-            <button className="btn-white">Cari Vendor Sekarang</button>
-            {!user && (
-              <>
+        <div className="hero-inner">
+          <div className="hero-content">
+            <h1>Sewa Apa Saja,<br/>dari Vendor Terbaik</h1>
+            <p>Ribuan vendor penyewaan terpercaya siap melayani kebutuhan sewa kamu</p>
+            <div className="hero-buttons">
+              <button className="btn-white">Cari Vendor Sekarang</button>
+              {!user && (
+                <>
+                  <Link href="/vendor/register" className="btn-outline" style={{textDecoration: 'none', display: 'inline-block'}}>
+                    Menjadi Vendor
+                  </Link>
+                  <Link href="/login" className="btn-white" style={{marginLeft: '10px', background: '#333', color: 'white', textDecoration: 'none', display: 'inline-block'}}>
+                    Masuk / Login
+                  </Link>
+                </>
+              )}
+              {user && user.role === 'customer' && (
                 <Link href="/vendor/register" className="btn-outline" style={{textDecoration: 'none', display: 'inline-block'}}>
                   Menjadi Vendor
                 </Link>
-                <Link href="/login" className="btn-white" style={{marginLeft: '10px', background: '#333', color: 'white', textDecoration: 'none', display: 'inline-block'}}>
-                  Masuk / Login
-                </Link>
+              )}
+            </div>
+          </div>
+
+          <div className="hero-carousel">
+            {featuredServices.length > 0 ? (
+              <>
+                <div className="hero-featured-card">
+                  {(() => {
+                    const service = featuredServices[heroImageIndex % featuredServices.length];
+                    const serviceImage = service.image || (service.images && service.images.length > 0 ? service.images[0] : 'https://via.placeholder.com/420x400?text=Service');
+                    const priceInfo = getServicePriceNumber(service);
+                    const rentCountNum = typeof service.rentCount === 'string' 
+                      ? parseInt(service.rentCount.replace(/[K,]/g, '')) || 0
+                      : service.rentCount || 0;
+
+                    return (
+                      <div
+                        className="featured-card-content"
+                        onClick={() => {
+                          setSelectedService(service);
+                          setModalOpen(true);
+                          setDetailTab('overview');
+                          setModalImageIndex(0);
+                        }}
+                      >
+                        <div className="featured-card-image">
+                          <img src={serviceImage} alt={service.title} />
+                          <button
+                            className="featured-card-favorite"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFavorite(service, isFavorited(service.id));
+                            }}
+                            disabled={favoriteLoading[service.id]}
+                          >
+                            {isFavorited(service.id) ? '❤️' : '🤍'}
+                          </button>
+                        </div>
+                        <div className="featured-card-info">
+                          <h3>{service.title}</h3>
+                          <p className="featured-vendor">{service.vendorName}</p>
+                          <div className="featured-stats">
+                            <span>⭐ {Number(service.rating || 0).toFixed(1)}</span>
+                            <span>👥 {rentCountNum > 1000 ? (rentCountNum / 1000).toFixed(1) + 'K' : rentCountNum}</span>
+                          </div>
+                          <div className="featured-price">
+                            <span>Mulai dari</span>
+                            <strong>{priceInfo ? `Rp${priceInfo.toLocaleString('id-ID')}` : 'Hubungi'}</strong>
+                          </div>
+                          <button className="btn-featured-detail">
+                            Lihat Detail →
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+                <div className="hero-carousel-dots">
+                  {featuredServices.map((_, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className={`hero-carousel-dot ${idx === (heroImageIndex % featuredServices.length) ? 'active' : ''}`}
+                      onClick={() => setHeroImageIndex(idx)}
+                      aria-label={`Tampilkan layanan ${idx + 1}`}
+                    />
+                  ))}
+                </div>
               </>
-            )}
-            {user && user.role === 'customer' && (
-              <Link href="/vendor/register" className="btn-outline" style={{textDecoration: 'none', display: 'inline-block'}}>
-                Menjadi Vendor
-              </Link>
+            ) : (
+              <div className="hero-carousel-placeholder">
+                <p>Memuat layanan unggulan...</p>
+              </div>
             )}
           </div>
         </div>
@@ -1187,24 +1303,6 @@ export default function HomePageClient() {
                         <span className="rating-stars">⭐ {Number(service.rating || 0).toFixed(1)}</span>
                         <span className="rating-count">({service.rentCount} disewa)</span>
                       </div>
-                      {isJasaService && (
-                        <div style={{ marginTop: '8px' }}>
-                          <span
-                            style={{
-                              fontSize: '11px',
-                              fontWeight: '600',
-                              color: serviceAvailability > 0 ? '#15803d' : '#b91c1c',
-                              background: serviceAvailability > 0 ? '#dcfce7' : '#fee2e2',
-                              border: `1px solid ${serviceAvailability > 0 ? '#86efac' : '#fca5a5'}`,
-                              borderRadius: '9999px',
-                              padding: '4px 10px',
-                              display: 'inline-block'
-                            }}
-                          >
-                            {serviceAvailability > 0 ? `Availability: ${serviceAvailability} Tim/Provider` : 'Availability Penuh'}
-                          </span>
-                        </div>
-                      )}
                     </div>
 
                     <div className="vendor-footer">
@@ -1353,7 +1451,7 @@ export default function HomePageClient() {
                                   cursor: 'pointer',
                                   borderRadius: '14px',
                                   overflow: 'hidden',
-                                  border: selectedItemDetail?.id === item.id ? '3px solid #5A45D1' : '1px solid #ddd',
+                                  border: selectedItemDetail?.id === item.id ? '3px solid #B28A67' : '1px solid #ddd',
                                   transition: 'all 0.3s ease',
                                   transform: selectedItemDetail?.id === item.id ? 'scale(1.05)' : 'scale(1)',
                                   backgroundColor: '#fff'
@@ -1404,7 +1502,7 @@ export default function HomePageClient() {
                                       margin: '0', 
                                       fontSize: '11px', 
                                       fontWeight: '600',
-                                      color: '#5A45D1'
+                                      color: '#B28A67'
                                     }}>
                                       Rp {item.hargaPcs ? Number(item.hargaPcs).toLocaleString('id-ID') : Number(item.hargaSesi).toLocaleString('id-ID')}
                                     </p>
@@ -1486,7 +1584,7 @@ export default function HomePageClient() {
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                                 <div>
                                   <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Harga</p>
-                                  <p style={{ margin: '0', fontSize: '16px', fontWeight: 'bold', color: '#5A45D1' }}>
+                                  <p style={{ margin: '0', fontSize: '16px', fontWeight: 'bold', color: '#B28A67' }}>
                                     Rp {selectedItemDetail.hargaPcs ? Number(selectedItemDetail.hargaPcs).toLocaleString('id-ID') : Number(selectedItemDetail.hargaSesi).toLocaleString('id-ID')}
                                     {selectedItemDetail.hargaSesi ? ' / Hari' : ' / Pcs'}
                                   </p>
@@ -1525,7 +1623,7 @@ export default function HomePageClient() {
                                 style={{
                                   width: '100%',
                                   padding: '10px',
-                                  backgroundColor: isUnavailable ? '#d1d5db' : '#5A45D1',
+                                  backgroundColor: isUnavailable ? '#d1d5db' : '#B28A67',
                                   color: 'white',
                                   border: 'none',
                                   borderRadius: '6px',
@@ -1558,11 +1656,11 @@ export default function HomePageClient() {
                             padding: '14px',
                             border: '1px solid #bfdbfe',
                             borderRadius: '14px',
-                            background: 'linear-gradient(135deg, #eff6ff, #f8fafc)'
+                            background: 'linear-gradient(135deg, #fff8f2, #fff3ea)'
                           }}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                            <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#1d4ed8' }}>
+                            <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#B28A67' }}>
                               Promo Vendor
                             </h4>
                             <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
@@ -1679,7 +1777,7 @@ export default function HomePageClient() {
                                     style={{
                                       border: 'none',
                                       borderRadius: '10px',
-                                      background: activeServicePromoCanCheckout ? '#2563eb' : '#cbd5e1',
+                                      background: activeServicePromoCanCheckout ? '#B28A67' : '#cbd5e1',
                                       color: activeServicePromoCanCheckout ? '#fff' : '#64748b',
                                       padding: '11px 14px',
                                       fontSize: '13px',
@@ -1705,7 +1803,7 @@ export default function HomePageClient() {
                                           borderRadius: '999px',
                                           border: 'none',
                                           cursor: 'pointer',
-                                          background: index === normalizedPromoIndex ? '#2563eb' : '#cbd5e1',
+                                          background: index === normalizedPromoIndex ? '#B28A67' : '#cbd5e1',
                                           padding: 0
                                         }}
                                         aria-label={`Lihat promo ${index + 1}`}
@@ -1891,7 +1989,7 @@ export default function HomePageClient() {
                       <div className="info-section">
                         <h4>⭐ Rating & Review</h4>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#5A45D1' }}>
+                          <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#B28A67' }}>
                             {selectedService.rating?.toFixed?.(1) ?? selectedService.rating}
                           </span>
                           <span style={{ color: '#666' }}>{selectedService.rentCount} orang telah menyewa</span>
@@ -2020,7 +2118,7 @@ export default function HomePageClient() {
                   {selectedService.title}
                 </p>
                 {activeChatItem && (
-                  <p style={{ margin: '2px 0 0 0', color: '#5A45D1', fontSize: '12px', fontWeight: 600 }}>
+                  <p style={{ margin: '2px 0 0 0', color: '#B28A67', fontSize: '12px', fontWeight: 600 }}>
                     Paket: {activeChatItem.namaBarang || activeChatItem.namaJasa}
                   </p>
                 )}
@@ -2064,8 +2162,8 @@ export default function HomePageClient() {
                 {(() => {
                   const statusConfig = getDealStatusConfig();
                   const finalPrice = dealData?.finalPrice || dealData?.originalPrice || 0;
-                  // Buttons disabled jika: agreed, cancelled, closed, atau completed tapi belum rating
-                  const dealDisabled = dealData?.status === 'agreed' || dealData?.status === 'cancelled' || chatData?.dealStatus === 'closed' || chatData?.closedAt;
+                  // Buttons disabled jika: pending, agreed, cancelled, closed, atau completed tapi belum rating
+                  const dealDisabled = dealData?.status === 'pending' || dealData?.status === 'agreed' || dealData?.status === 'cancelled' || chatData?.dealStatus === 'closed' || chatData?.closedAt;
 
                   return (
                     <div
@@ -2092,21 +2190,21 @@ export default function HomePageClient() {
                         <button
                           type="button"
                           onClick={() => handleDealAction('accept')}
-                          disabled={dealDisabled}
+                          disabled={dealDisabled || dealProcessing}
                           style={{
                             flex: 1,
                             padding: '8px 10px',
                             borderRadius: '8px',
-                            border: messages.length === 0 ? '1px solid #7c3aed' : '1px solid #10b981',
-                            background: messages.length === 0 ? 'rgba(124, 58, 237, 0.15)' : 'rgba(16, 185, 129, 0.08)',
-                            color: messages.length === 0 ? '#5b21b6' : '#047857',
+                            border: messages.length === 0 ? '1px solid #B28A67' : '1px solid #10b981',
+                            background: messages.length === 0 ? 'rgba(178, 138, 103, 0.15)' : 'rgba(16, 185, 129, 0.08)',
+                            color: messages.length === 0 ? '#8F6B4A' : '#047857',
                             fontWeight: '700',
-                            cursor: dealDisabled ? 'not-allowed' : 'pointer',
-                            opacity: dealDisabled ? 0.55 : 1,
+                            cursor: dealDisabled || dealProcessing ? 'not-allowed' : 'pointer',
+                            opacity: dealDisabled || dealProcessing ? 0.55 : 1,
                             transition: 'all 0.3s ease'
                           }}
                         >
-                          {dealData?.status === 'agreed' ? 'Deal Diterima' : 'Terima Deal'}
+                          {dealProcessing ? 'Memproses...' : dealData?.status === 'agreed' ? 'Deal Diterima' : 'Terima Deal'}
                         </button>
                         <button
                           type="button"
@@ -2122,9 +2220,9 @@ export default function HomePageClient() {
                             flex: 1,
                             padding: '8px 10px',
                             borderRadius: '8px',
-                            border: dealData?.status === 'cancelled' ? '1px solid #7c3aed' : '1px solid #ef4444',
-                            background: dealData?.status === 'cancelled' ? 'rgba(124, 58, 237, 0.15)' : 'rgba(239, 68, 68, 0.08)',
-                            color: dealData?.status === 'cancelled' ? '#5b21b6' : '#b91c1c',
+                            border: dealData?.status === 'cancelled' ? '1px solid #B28A67' : '1px solid #ef4444',
+                            background: dealData?.status === 'cancelled' ? 'rgba(178, 138, 103, 0.15)' : 'rgba(239, 68, 68, 0.08)',
+                            color: dealData?.status === 'cancelled' ? '#8F6B4A' : '#b91c1c',
                             fontWeight: '700',
                             cursor: 'pointer',
                             opacity: 1,
@@ -2152,10 +2250,10 @@ export default function HomePageClient() {
                               style={{
                                 marginTop: '7px',
                                 padding: '7px 10px',
-                                border: '1px solid #1d4ed8',
+                                border: '1px solid #B28A67',
                                 borderRadius: '8px',
-                                background: 'rgba(29, 78, 216, 0.09)',
-                                color: '#1d4ed8',
+                                background: 'rgba(178, 138, 103, 0.09)',
+                                color: '#B28A67',
                                 fontWeight: '700',
                                 fontSize: '12px',
                                 cursor: 'pointer'
@@ -2210,6 +2308,296 @@ export default function HomePageClient() {
           font-family: system-ui, -apple-system, sans-serif;
         }
 
+        .hero-section {
+          padding: 80px 40px 40px;
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
+          color: white;
+        }
+
+        .hero-inner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 36px;
+          max-width: 1180px;
+          margin: 0 auto;
+          flex-wrap: wrap;
+        }
+
+        .hero-content {
+          flex: 1 1 420px;
+          min-width: 280px;
+        }
+
+        .hero-content h1 {
+          font-size: clamp(2.8rem, 5vw, 4.8rem);
+          line-height: 1.05;
+          margin: 0;
+          letter-spacing: -0.03em;
+        }
+
+        .hero-content p {
+          color: rgba(255,255,255,0.88);
+          font-size: 1.05rem;
+          margin: 24px 0 30px;
+          max-width: 540px;
+          line-height: 1.7;
+        }
+
+        .hero-buttons {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          align-items: center;
+        }
+
+        .hero-carousel {
+          flex: 0 0 420px;
+          min-width: 280px;
+          width: 100%;
+          max-width: 480px;
+        }
+
+        .hero-carousel-frame {
+          position: relative;
+          overflow: hidden;
+          border-radius: 26px;
+          box-shadow: 0 28px 80px rgba(17, 12, 8, 0.22);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
+        }
+
+        .hero-carousel-frame img {
+          width: 100%;
+          height: 420px;
+          object-fit: cover;
+          display: block;
+          transition: transform 0.4s ease;
+        }
+
+        .hero-carousel-frame:hover img {
+          transform: scale(1.03);
+        }
+
+        .hero-carousel-overlay {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          padding: 18px 20px;
+          background: linear-gradient(180deg, transparent 0%, rgba(17, 12, 8, 0.82) 100%);
+          display: flex;
+          align-items: flex-end;
+          color: white;
+          font-weight: 700;
+          letter-spacing: 0.01em;
+          font-size: 14px;
+        }
+
+        /* Featured Card in Hero */
+        .hero-featured-card {
+          position: relative;
+          width: 100%;
+          border-radius: 26px;
+          overflow: hidden;
+          box-shadow: 0 28px 80px rgba(15, 23, 42, 0.22);
+          background: white;
+        }
+
+        .featured-card-content {
+          cursor: pointer;
+          transition: transform 0.3s ease;
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+        }
+
+        .featured-card-content:hover {
+          transform: translateY(-4px);
+        }
+
+        .featured-card-image {
+          position: relative;
+          width: 100%;
+          height: 240px;
+          overflow: hidden;
+          background: #f3f4f6;
+        }
+
+        .featured-card-image img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: transform 0.4s ease;
+        }
+
+        .featured-card-content:hover .featured-card-image img {
+          transform: scale(1.08);
+        }
+
+        .featured-card-favorite {
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          background: rgba(255, 255, 255, 0.92);
+          border: none;
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          cursor: pointer;
+          font-size: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+          transition: all 0.3s ease;
+          z-index: 3;
+        }
+
+        .featured-card-favorite:hover:not(:disabled) {
+          transform: scale(1.12);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .featured-card-favorite:disabled {
+          opacity: 0.6;
+        }
+
+        .featured-card-info {
+          padding: 20px;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .featured-card-info h3 {
+          font-size: 18px;
+          font-weight: 700;
+          color: #1a1a1a;
+          margin: 0 0 6px 0;
+          line-height: 1.3;
+        }
+
+        .featured-vendor {
+          font-size: 14px;
+          color: #B28A67;
+          margin: 0 0 10px 0;
+          font-weight: 600;
+        }
+
+        .featured-stats {
+          display: flex;
+          gap: 14px;
+          margin-bottom: 12px;
+          font-size: 14px;
+          color: #666;
+        }
+
+        .featured-price {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          margin: 10px 0;
+        }
+
+        .featured-price span {
+          font-size: 12px;
+          color: #999;
+        }
+
+        .featured-price strong {
+          font-size: 18px;
+          font-weight: 700;
+          color: #B28A67;
+        }
+
+        .btn-featured-detail {
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
+          color: white;
+          border: none;
+          padding: 10px 16px;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          margin-top: auto;
+        }
+
+        .btn-featured-detail:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(178, 138, 103, 0.3);
+        }
+
+        .hero-carousel-dots {
+          position: relative;
+          display: flex;
+          gap: 8px;
+          justify-content: center;
+          padding: 12px;
+          z-index: 3;
+        }
+
+        .hero-carousel-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          border: none;
+          background: rgba(255,255,255,0.45);
+          cursor: pointer;
+          transition: transform 0.2s ease, background 0.2s ease;
+        }
+
+        .hero-carousel-dot.active {
+          background: white;
+          transform: scale(1.2);
+        }
+
+        .hero-carousel-placeholder {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 360px;
+          border-radius: 26px;
+          background: rgba(255,255,255,0.08);
+          border: 1px dashed rgba(255,255,255,0.3);
+          color: rgba(255,255,255,0.8);
+          text-align: center;
+          padding: 24px;
+        }
+
+        @media (max-width: 900px) {
+          .hero-inner {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .hero-carousel {
+            max-width: 100%;
+          }
+
+          .hero-carousel-frame img {
+            height: 320px;
+          }
+        }
+
+        @media (max-width: 620px) {
+          .hero-section {
+            padding: 60px 20px 30px;
+          }
+
+          .hero-content h1 {
+            font-size: 2.6rem;
+          }
+
+          .hero-content p {
+            font-size: 1rem;
+          }
+
+          .hero-carousel-frame img {
+            height: 260px;
+          }
+        }
+
         .nav-left {
           display: flex;
           align-items: center;
@@ -2220,7 +2608,7 @@ export default function HomePageClient() {
         .nav-logo {
           font-size: 20px;
           font-weight: 700;
-          color: #7c3aed;
+          color: #B28A67;
           text-decoration: none;
           display: flex;
           align-items: center;
@@ -2306,8 +2694,8 @@ export default function HomePageClient() {
         }
 
         .notification-item.unread {
-          background: #f0f4ff;
-          border-left: 4px solid #7c3aed;
+          background: rgba(178, 138, 103, 0.06);
+          border-left: 4px solid #B28A67;
           padding-left: 12px;
         }
 
@@ -2443,14 +2831,14 @@ export default function HomePageClient() {
           margin-top: 10px;
           padding: 10px 12px;
           border-radius: 8px;
-          background: #eff6ff;
+          background: rgba(178, 138, 103, 0.06);
           border: 1px solid #bfdbfe;
         }
 
         .vendor-reply-label {
           font-size: 12px;
           font-weight: 700;
-          color: #1d4ed8;
+          color: #B28A67;
           margin-bottom: 4px;
         }
 
@@ -2479,15 +2867,15 @@ export default function HomePageClient() {
 
         .vendor-reply-input:focus {
           outline: none;
-          border-color: #5A45D1;
-          box-shadow: 0 0 0 3px rgba(90, 69, 209, 0.12);
+          border-color: #B28A67;
+          box-shadow: 0 0 0 3px rgba(178, 138, 103, 0.12);
         }
 
         .vendor-reply-btn {
           justify-self: start;
           border: none;
           border-radius: 8px;
-          background: #5A45D1;
+          background: #B28A67;
           color: #fff;
           padding: 8px 12px;
           font-size: 12px;
@@ -2516,7 +2904,7 @@ export default function HomePageClient() {
 
         .review-page-btn {
           border: none;
-          background: #1d4ed8;
+          background: #B28A67;
           color: #fff;
           border-radius: 6px;
           padding: 6px 10px;
@@ -2538,7 +2926,7 @@ export default function HomePageClient() {
 
         .btn-nav-vendor {
           padding: 8px 14px;
-          background: linear-gradient(135deg, #7c3aed, #a855f7);
+          background: linear-gradient(135deg, #C8A587, #B28A67);
           color: white;
           border: none;
           border-radius: 8px;
@@ -2554,7 +2942,7 @@ export default function HomePageClient() {
         }
 
         .btn-nav-vendor:hover {
-          background: linear-gradient(135deg, #6d28d9, #9333ea);
+          background: linear-gradient(135deg, #B28A67, #8F6B4A);
           transform: scale(1.05);
         }
 
@@ -2617,7 +3005,7 @@ export default function HomePageClient() {
         .user-avatar {
           width: 32px;
           height: 32px;
-          background: linear-gradient(135deg, #7c3aed, #a855f7);
+          background: linear-gradient(135deg, #C8A587, #B28A67);
           color: white;
           border-radius: 50%;
           display: flex;
@@ -2672,7 +3060,7 @@ export default function HomePageClient() {
 
         .btn-login {
           padding: 8px 16px;
-          background: linear-gradient(135deg, #7c3aed, #a855f7);
+          background: linear-gradient(135deg, #C8A587, #B28A67);
           color: white;
           border: none;
           border-radius: 8px;
@@ -2686,7 +3074,7 @@ export default function HomePageClient() {
 
         .btn-login:hover {
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 4px 12px rgba(178, 138, 103, 0.3);
         }
 
         @media (max-width: 1024px) {
@@ -2706,7 +3094,7 @@ export default function HomePageClient() {
         }
 
         .jadi-vendor-btn {
-          background-color: #5A45D1;
+          background-color: #B28A67;
           color: white;
           padding: 8px 14px;
           border-radius: 6px;
@@ -2720,7 +3108,7 @@ export default function HomePageClient() {
         }
 
         .jadi-vendor-btn:hover {
-          background-color: #3B2B85;
+          background-color: #8F6B4A;
         }
 
         .jadi-vendor-btn.admin-btn {
@@ -2729,6 +3117,215 @@ export default function HomePageClient() {
 
         .jadi-vendor-btn.admin-btn:hover {
           background-color: #d97706;
+        }
+
+        /* Featured Section - Layanan Unggulan */
+        .featured-section {
+          padding: 60px 40px;
+          background: #f9fafb;
+          border-top: 1px solid #e5e7eb;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .featured-section h2 {
+          font-size: 32px;
+          font-weight: 700;
+          margin: 0 0 36px 0;
+          color: #1a1a1a;
+          text-align: center;
+        }
+
+        .featured-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+          gap: 24px;
+          max-width: 1180px;
+          margin: 0 auto;
+        }
+
+        /* Home Card Styles */
+        .home-card {
+          background: white;
+          border-radius: 16px;
+          overflow: hidden;
+          border: 1px solid #e5e7eb;
+          box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .home-card:hover {
+          box-shadow: 0 16px 32px rgba(178, 138, 103, 0.15);
+          transform: translateY(-8px);
+          border-color: #B28A67;
+        }
+
+        .home-card-image {
+          position: relative;
+          width: 100%;
+          height: 200px;
+          overflow: hidden;
+          background: #f3f4f6;
+        }
+
+        .home-card-image img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: transform 0.4s ease;
+        }
+
+        .home-card:hover .home-card-image img {
+          transform: scale(1.08);
+        }
+
+        .home-card-favorite {
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          background: rgba(255, 255, 255, 0.92);
+          border: none;
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          cursor: pointer;
+          font-size: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+          transition: all 0.3s ease;
+          z-index: 3;
+        }
+
+        .home-card-favorite:hover:not(:disabled) {
+          transform: scale(1.12);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .home-card-favorite:disabled {
+          opacity: 0.6;
+        }
+
+        .home-card-content {
+          padding: 16px;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .home-card-title {
+          font-size: 16px;
+          font-weight: 700;
+          color: #1a1a1a;
+          margin: 0 0 6px 0;
+          line-height: 1.35;
+        }
+
+        .home-card-vendor {
+          font-size: 13px;
+          color: #B28A67;
+          margin: 0 0 12px 0;
+          font-weight: 600;
+        }
+
+        .home-card-stats {
+          display: flex;
+          gap: 16px;
+          margin-bottom: 12px;
+          padding-bottom: 12px;
+          border-bottom: 1px solid #f0f0f0;
+        }
+
+        .home-card-stats .stat {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .stat-label {
+          font-size: 11px;
+          color: #999;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: 0.02em;
+        }
+
+        .stat-value {
+          font-size: 15px;
+          font-weight: 700;
+          color: #1a1a1a;
+        }
+
+        .home-card-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          gap: 12px;
+          margin-top: auto;
+        }
+
+        .home-card-price {
+          flex: 1;
+        }
+
+        .price-text {
+          font-size: 11px;
+          color: #999;
+          font-weight: 500;
+          margin-bottom: 4px;
+        }
+
+        .price-amount {
+          font-size: 15px;
+          font-weight: 700;
+          color: #B28A67;
+          line-height: 1.2;
+        }
+
+        .btn-home-detail {
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
+          color: white;
+          border: none;
+          padding: 8px 14px;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+
+        .btn-home-detail:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(178, 138, 103, 0.3);
+        }
+
+        .btn-home-detail:active {
+          transform: translateY(0);
+        }
+
+        @media (max-width: 768px) {
+          .featured-section {
+            padding: 40px 20px;
+          }
+
+          .featured-section h2 {
+            font-size: 24px;
+            margin-bottom: 24px;
+          }
+
+          .featured-grid {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+          }
+
+          .home-card-image {
+            height: 160px;
+          }
         }
 
         /* Refined Card Styles */
@@ -2747,7 +3344,7 @@ export default function HomePageClient() {
         .vendor-card:hover {
           box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
           transform: translateY(-4px);
-          border-color: #7c3aed;
+          border-color: #B28A67;
         }
 
         .popular-badge {
@@ -2812,7 +3409,7 @@ export default function HomePageClient() {
 
         .vendor-vendor-name {
           font-size: 14px;
-          color: #7c3aed;
+          color: #B28A67;
           margin: 0 0 12px 0;
           font-weight: 600;
         }
@@ -2870,7 +3467,7 @@ export default function HomePageClient() {
         .vendor-price {
           font-size: 16px;
           font-weight: 700;
-          color: #7c3aed;
+          color: #B28A67;
           margin-bottom: 12px;
           display: flex;
           align-items: baseline;
@@ -2879,14 +3476,14 @@ export default function HomePageClient() {
 
         .price-label {
           font-size: 12px;
-          color: #7c3aed;
+          color: #B28A67;
           font-weight: 600;
         }
 
         .price-amount {
           font-size: 18px;
           font-weight: 700;
-          color: #7c3aed;
+          color: #B28A67;
         }
 
         .price-period {
@@ -2902,7 +3499,7 @@ export default function HomePageClient() {
         }
 
         .btn-detail {
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
           color: white;
           border: none;
           padding: 10px 16px;
@@ -2917,7 +3514,7 @@ export default function HomePageClient() {
 
         .btn-detail:hover {
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 4px 12px rgba(178, 138, 103, 0.3);
         }
 
         .btn-detail:active {
@@ -3131,7 +3728,7 @@ export default function HomePageClient() {
         .modal-image-dot.active {
           width: 22px;
           border-radius: 999px;
-          background: #5A45D1;
+          background: #B28A67;
         }
 
         .modal-info {
@@ -3145,7 +3742,7 @@ export default function HomePageClient() {
           flex-direction: column;
           gap: 8px;
           padding: 16px;
-          background: #f8f5ff;
+          background: rgba(178, 138, 103, 0.04);
           border: 1px solid #e5e7eb;
           border-radius: 16px;
           margin-bottom: 20px;
@@ -3166,7 +3763,7 @@ export default function HomePageClient() {
         .modal-price-label {
           font-size: 14px;
           font-weight: 700;
-          color: #7c3aed;
+          color: #B28A67;
         }
 
         .modal-price-amount {
@@ -3215,7 +3812,7 @@ export default function HomePageClient() {
 
         .btn-primary-modal {
           flex: 1;
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
           color: white;
           border: none;
           padding: 12px;
@@ -3228,7 +3825,7 @@ export default function HomePageClient() {
 
         .btn-primary-modal:hover {
           transform: translateY(-2px);
-          box-shadow: 0 8px 20px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 8px 20px rgba(178, 138, 103, 0.3);
         }
 
         .btn-primary-modal:active {
@@ -3390,9 +3987,9 @@ export default function HomePageClient() {
           max-width: 70%;
           padding: 12px 16px;
           border-radius: 12px;
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
           color: white;
-          box-shadow: 0 2px 8px rgba(124, 58, 237, 0.2);
+          box-shadow: 0 2px 8px rgba(178, 138, 103, 0.2);
         }
 
         .chat-message.vendor .message-content {
@@ -3436,15 +4033,15 @@ export default function HomePageClient() {
 
         .chat-input:focus {
           outline: none;
-          border-color: #7c3aed;
-          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+          border-color: #B28A67;
+          box-shadow: 0 0 0 3px rgba(178, 138, 103, 0.1);
         }
 
         .btn-send {
           padding: 10px 16px;
           border: none;
           border-radius: 8px;
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
           color: white;
           font-weight: 600;
           cursor: pointer;
@@ -3453,7 +4050,7 @@ export default function HomePageClient() {
 
         .btn-send:hover {
           transform: translateY(-2px);
-          box-shadow: 0 8px 16px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 8px 16px rgba(178, 138, 103, 0.3);
         }
 
         .btn-send:active {
@@ -3516,8 +4113,8 @@ export default function HomePageClient() {
 
         .rating-textarea:focus {
           outline: none;
-          border-color: #7c3aed;
-          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+          border-color: #B28A67;
+          box-shadow: 0 0 0 3px rgba(178, 138, 103, 0.1);
         }
 
         .btn-submit-rating {
@@ -3525,7 +4122,7 @@ export default function HomePageClient() {
           padding: 12px;
           border: none;
           border-radius: 8px;
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
           color: white;
           font-weight: 600;
           font-size: 16px;
@@ -3535,7 +4132,7 @@ export default function HomePageClient() {
 
         .btn-submit-rating:hover {
           transform: translateY(-2px);
-          box-shadow: 0 8px 16px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 8px 16px rgba(178, 138, 103, 0.3);
         }
 
         .btn-submit-rating:active {
@@ -3570,7 +4167,7 @@ export default function HomePageClient() {
         .tab.active {
           background: white;
           color: #1f2937;
-          box-shadow: inset 0 -2px 0 #7c3aed;
+          box-shadow: inset 0 -2px 0 #B28A67;
         }
 
         .tab-panel {

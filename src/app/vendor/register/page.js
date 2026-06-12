@@ -386,7 +386,7 @@ export default function VendorRegisterPage() {
 
         .btn-primary {
           padding: 12px 24px;
-          background-color: #5A45D1;
+          background-color: #B28A67;
           color: white;
           border: none;
           border-radius: 6px;
@@ -397,7 +397,7 @@ export default function VendorRegisterPage() {
         }
 
         .btn-primary:hover:not(:disabled) {
-          background-color: #3B2B85;
+          background-color: #8F6B4A;
         }
 
         .btn-primary:disabled {
@@ -406,7 +406,7 @@ export default function VendorRegisterPage() {
         }
 
         .btn-link {
-          color: #5A45D1;
+          color: #B28A67;
           text-decoration: none;
           font-weight: 600;
           cursor: pointer;

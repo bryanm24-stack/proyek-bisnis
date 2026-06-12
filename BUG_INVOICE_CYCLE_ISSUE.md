@@ -1,5 +1,9 @@
 # 🐛 BUG REPORT: Invoice Data Loss in Purchase Cycle
 
+## ✅ CURRENT STATUS NOTE
+
+Dokumen ini adalah laporan historis. Beberapa alur yang dibahas di sini sudah punya tindak lanjut di dokumen fix lain, jadi gunakan ini sebagai jejak audit, bukan satu-satunya sumber status terbaru.
+
 ## Test Date
 May 6, 2026 - 03:15 AM
 
