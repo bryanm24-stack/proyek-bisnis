@@ -1,3 +1,20 @@
+// A simple key/value JSON store table: json_store(key PRIMARY, value LONGTEXT)
+async function ensureTable() {
+  if (!isServer) return;
+  const sql = `CREATE TABLE IF NOT EXISTS json_store (
+    \`key\` VARCHAR(191) PRIMARY KEY,
+    \`value\` LONGTEXT
+  )`;
+  try {
+    const mod = await import('@/lib/db');
+    const db = mod.default || mod;
+    await db.query(sql);
+  } catch (e) {
+    // ignore DB errors here
+  }
+}
+
+
 const isServer = typeof window === 'undefined';
 
 // Avoid importing Node-only modules at top-level so this file can be bundled
@@ -7,7 +24,6 @@ const isServer = typeof window === 'undefined';
 
 const fileMap = {
   users: 'users.json',
-  services: 'services.json',
   chats: 'chats.json',
   deals: 'deals.json',
   transactions: 'transactions.json',
@@ -66,16 +82,7 @@ function getDatasetName(name) {
   return datasetMap[normalized] || normalized;
 }
 
-function filePathFor(name) {
-  if (!isServer) throw new Error('filePathFor is only available on server');
-  const file = fileMap[name];
-  if (!file) throw new Error(`No file mapping for ${name}`);
-  // dynamic import of path to avoid bundling it into client
-  // path.join is synchronous so import then call
-  // eslint-disable-next-line no-undef
-  const p = require('path');
-  return p.join(process.cwd(), file);
-}
+// filePathFor removed to avoid top-level requires; use dynamic import('path') where needed
 
 async function hasTable(tableName) {
   if (!isServer) return false;
@@ -89,7 +96,7 @@ async function hasTable(tableName) {
       `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?) AS exists`,
       [tableName]
     );
-    const exists = !!result.rows[0]?.exists;
+    const exists = !!result[0]?.exists;
     dbTableCache.set(tableName, exists);
     return exists;
   } catch (error) {
@@ -115,16 +122,16 @@ async function readFromAppData(dataset) {
     `SELECT data FROM ${APP_DATA_TABLE} WHERE dataset = ? ORDER BY record_id`,
     [dataset]
   );
-  return res.rows.map((row) => row.data || {});
+  return res.map((row) => row.data || {});
 }
 
 async function writeToAppData(dataset, data) {
   const records = Array.isArray(data) ? data : [data];
-  const rows = records.map((item) => ({
-    dataset,
-    record_id: String(item?.id || item?.record_id || (isServer ? require('crypto').randomUUID() : `client-${Date.now()}`)),
-    data: item
-  }));
+  const rows = records.map((item) => {
+    const id = item?.id || item?.record_id;
+    const record_id = id ? String(id) : (isServer && globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `client-${Date.now()}-${Math.random().toString(36).slice(2,8)}`);
+    return { dataset, record_id, data: item };
+  });
   if (!isServer) {
     // No DB on client — can't write to server-side app_data
     return false;
@@ -159,7 +166,38 @@ async function readFromTable(tableName) {
   if (!isServer) return [];
   const { query } = await import('@/lib/db');
   const res = await query(`SELECT * FROM ${tableName} ORDER BY id`);
-  return res.rows;
+  return res;
+}
+
+async function writeToTable(tableName, data) {
+  if (!isServer) return false;
+  const records = Array.isArray(data) ? data : [data];
+  const { query } = await import('@/lib/db');
+
+  await query('BEGIN');
+  try {
+    for (const rec of records) {
+      const keys = Object.keys(rec || {});
+      if (keys.length === 0) continue;
+
+      const cols = keys.map((k) => `\`${k}\``).join(', ');
+      const placeholders = keys.map(() => '?').join(', ');
+      const values = keys.map((k) => {
+        const v = rec[k];
+        return v === undefined ? null : (typeof v === 'object' && v !== null ? JSON.stringify(v) : v);
+      });
+      const updates = keys.map((k) => `\`${k}\` = VALUES(\`${k}\`)`).join(', ');
+
+      const sql = `INSERT INTO ${tableName} (${cols}) VALUES (${placeholders}) ON DUPLICATE KEY UPDATE ${updates}`;
+      await query(sql, values);
+    }
+
+    await query('COMMIT');
+    return true;
+  } catch (err) {
+    await query('ROLLBACK');
+    throw err;
+  }
 }
 
 export async function readData(name) {
@@ -167,21 +205,26 @@ export async function readData(name) {
 
   try {
     if (isServer) {
-      if (await hasTable(APP_DATA_TABLE)) {
-        return await readFromAppData(dataset);
-      }
-
+      // Prefer a table named after the dataset (e.g. `services`) if available
       if (await hasTable(dataset)) {
         return await readFromTable(dataset);
       }
+
+      // Fallback to generic `app_data` store
+      if (await hasTable(APP_DATA_TABLE)) {
+        return await readFromAppData(dataset);
+      }
     }
-  } catch {
+  } catch (error) {
     // DB fallback to JSON file
   }
 
   try {
     if (!isServer) return [];
-    const p = filePathFor(dataset);
+    const file = fileMap[dataset];
+    if (!file) return [];
+    const pathMod = await import('path');
+    const p = pathMod.join(process.cwd(), file);
     const { readFile } = await import('fs/promises');
     const raw = await readFile(p, 'utf-8');
     return normalizeJsonData(raw);
@@ -193,6 +236,16 @@ export async function readData(name) {
 export async function writeData(name, data) {
   const dataset = getDatasetName(name);
 
+  // Prefer writing directly into the dataset table when available
+  try {
+    if (await hasTable(dataset)) {
+      return await writeToTable(dataset, data);
+    }
+  } catch (error) {
+    console.error(`SQL writeData to table failed for ${name}:`, error.message);
+  }
+
+  // Fallback to generic app_data table
   try {
     if (await hasTable(APP_DATA_TABLE)) {
       return await writeToAppData(dataset, data);
@@ -201,13 +254,17 @@ export async function writeData(name, data) {
     console.error(`SQL writeData failed for ${name}:`, error.message);
   }
 
+  // Final fallback: write to JSON file
   try {
     if (!isServer) {
       // client can't write files
       return false;
     }
 
-    const p = filePathFor(dataset);
+    const file = fileMap[dataset];
+    if (!file) throw new Error(`No file mapping for ${dataset}`);
+    const pathMod = await import('path');
+    const p = pathMod.join(process.cwd(), file);
     const { writeFile } = await import('fs/promises');
     await writeFile(p, JSON.stringify(data, null, 2), 'utf-8');
     return true;

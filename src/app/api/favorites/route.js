@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+
+import { readData, writeData } from '@/lib/storage';
 // Helper: Normalize ID for consistent comparison
 const normalizeId = (id) => String(id || '').trim();
 const SERVICE_FAVORITE_TYPE = 'service';
@@ -11,7 +13,7 @@ async function getFavoritesByUser(userId) {
     'SELECT id, user_id AS userId, service_id AS serviceId, created_at AS createdAt FROM favorites WHERE user_id = ? ORDER BY created_at',
     [userId]
   );
-  return result.rows;
+  return result;
 }
 
 async function findFavorite(userId, serviceId) {
@@ -19,7 +21,7 @@ async function findFavorite(userId, serviceId) {
     'SELECT id, user_id AS userId, service_id AS serviceId, created_at AS createdAt FROM favorites WHERE user_id = ? AND service_id = ? LIMIT 1',
     [userId, serviceId]
   );
-  return result.rows[0];
+  return result[0];
 }
 
 async function insertFavorite(userId, serviceId) {
@@ -30,7 +32,7 @@ async function insertFavorite(userId, serviceId) {
 
 async function removeFavorite(userId, serviceId) {
   const result = await query('DELETE FROM favorites WHERE user_id = ? AND service_id = ?', [userId, serviceId]);
-  return result.rows?.affectedRows || 0;
+  return result.affectedRows || 0;
 }
 
 // GET - Fetch user's favorites
