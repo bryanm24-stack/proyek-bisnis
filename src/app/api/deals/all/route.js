@@ -1,30 +1,16 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
-const readJsonFile = async (filePath) => {
-  try {
-    const data = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error(`Error reading ${filePath}:`, error);
-    return [];
-  }
-};
+
+import { readData } from '@/lib/storage';
 
 export async function GET(request) {
   try {
-    const dealsPath = path.join(process.cwd(), 'deals.json');
-    const chatsPath = path.join(process.cwd(), 'chats.json');
-    const servicesPath = path.join(process.cwd(), 'services.json');
-    const vendorRegistrationsPath = path.join(process.cwd(), 'vendor_registrations.json');
-    const usersPath = path.join(process.cwd(), 'users.json');
 
-    const deals = await readJsonFile(dealsPath);
-    const chats = await readJsonFile(chatsPath);
-    const services = await readJsonFile(servicesPath);
-    const vendorRegistrations = await readJsonFile(vendorRegistrationsPath);
-    const users = await readJsonFile(usersPath);
+    const deals = await readData('deals');
+    const chats = await readData('chats');
+    const services = await readData('services');
+    const vendorRegistrations = await readData('vendor_registrations');
+    const users = await readData('users');
 
     console.log('API: Services loaded:', services.length, 'services');
     console.log('API: Services sample:', services.slice(0, 2).map(s => ({ id: s.id, title: s.title, price: s.price })));

@@ -1,7 +1,7 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
+
+import { readData, writeData } from '@/lib/storage';
 function normalizeServiceCapacity(service) {
   if (!service) return service;
 
@@ -24,10 +24,8 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const vendorId = searchParams.get('vendorId');
 
-    const filePath = path.join(process.cwd(), 'services.json');
-    let fileData = await fs.readFile(filePath, 'utf-8');
-    fileData = fileData.replace(/^\uFEFF/, '').trim();
-    let services = JSON.parse(fileData).map(normalizeServiceCapacity);
+    let services = await readData('services');
+    services = services.map(normalizeServiceCapacity);
 
     // Filter berdasarkan vendorId jika diberikan
     if (vendorId) {
@@ -106,10 +104,7 @@ export async function POST(request) {
 
     const hasModernPayload = Boolean(title || mainCategory || location);
 
-    const filePath = path.join(process.cwd(), 'services.json');
-    let fileData = await fs.readFile(filePath, 'utf-8');
-    fileData = fileData.replace(/^\uFEFF/, '').trim();
-    const services = JSON.parse(fileData);
+    const services = await readData('services');
 
     // Support payload baru dari halaman /vendor/tambah-produk dan /vendor
     if (hasModernPayload) {
@@ -182,7 +177,7 @@ export async function POST(request) {
       };
 
       services.push(newService);
-      await fs.writeFile(filePath, JSON.stringify(services, null, 2));
+      await writeData('services', services);
 
       return NextResponse.json({
         success: true,
@@ -271,7 +266,7 @@ export async function POST(request) {
     }
 
     services.push(newService);
-    await fs.writeFile(filePath, JSON.stringify(services, null, 2));
+    await writeData('services', services);
 
     return NextResponse.json({
       success: true,
@@ -322,10 +317,8 @@ export async function PUT(request) {
       }, { status: 400 });
     }
 
-    const filePath = path.join(process.cwd(), 'services.json');
-    let fileData = await fs.readFile(filePath, 'utf-8');
-    fileData = fileData.replace(/^\uFEFF/, '').trim();
-    let services = JSON.parse(fileData).map(normalizeServiceCapacity);
+    let services = await readData('services');
+    services = services.map(normalizeServiceCapacity);
 
     // Cari dan update service
     const serviceIndex = services.findIndex(s => s.id === id && s.vendorId === vendorId);
@@ -382,7 +375,7 @@ export async function PUT(request) {
 
     services[serviceIndex] = normalizeServiceCapacity(services[serviceIndex]);
 
-    await fs.writeFile(filePath, JSON.stringify(services, null, 2));
+    await writeData('services', services);
 
     return NextResponse.json({
       success: true,
@@ -414,10 +407,7 @@ export async function DELETE(request) {
       }, { status: 400 });
     }
 
-    const filePath = path.join(process.cwd(), 'services.json');
-    let fileData = await fs.readFile(filePath, 'utf-8');
-    fileData = fileData.replace(/^\uFEFF/, '').trim();
-    let services = JSON.parse(fileData);
+    let services = await readData('services');
 
     // Cari service
     const serviceIndex = services.findIndex(s => s.id === id && s.vendorId === vendorId);
@@ -431,7 +421,7 @@ export async function DELETE(request) {
 
     // Hapus service
     services.splice(serviceIndex, 1);
-    await fs.writeFile(filePath, JSON.stringify(services, null, 2));
+    await writeData('services', services);
 
     return NextResponse.json({
       success: true,

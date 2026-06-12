@@ -1,30 +1,7 @@
 'use server';
 
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
-
-const readJsonFile = async (filePath) => {
-  try {
-    const data = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error(`Error reading ${filePath}:`, error);
-    return [];
-  }
-};
-
-const writeJsonFile = async (filePath, data) => {
-  try {
-    const utf8 = new TextEncoder();
-    const jsonString = JSON.stringify(data, null, 2);
-    await fs.writeFile(filePath, jsonString, 'utf-8');
-    return true;
-  } catch (error) {
-    console.error(`Error writing ${filePath}:`, error);
-    return false;
-  }
-};
+import { readData, writeData } from '@/lib/storage';
 
 export async function POST(request) {
   try {
@@ -48,8 +25,7 @@ export async function POST(request) {
       );
     }
 
-    const dealsPath = path.join(process.cwd(), 'deals.json');
-    const deals = await readJsonFile(dealsPath);
+    const deals = await readData('deals');
 
     const dealIndex = deals.findIndex(d => d.id === orderId);
     if (dealIndex === -1) {
@@ -171,7 +147,7 @@ export async function POST(request) {
     }
 
     // Save updated deals
-    const success = await writeJsonFile(dealsPath, deals);
+    const success = await writeData('deals', deals);
     if (!success) {
       return NextResponse.json(
         { success: false, message: 'Gagal menyimpan perubahan' },

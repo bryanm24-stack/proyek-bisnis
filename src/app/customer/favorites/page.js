@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import SharedNavbar from '../../components/SharedNavbar';
 
+
+import { readData, writeData } from '@/lib/storage';
 export default function FavoritesPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);

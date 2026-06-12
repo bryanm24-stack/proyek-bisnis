@@ -1,7 +1,7 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
+
+import { readData, writeData } from '@/lib/storage';
 // POST - Submit vendor registration
 export async function POST(request) {
   try {
@@ -24,21 +24,9 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const registrationsPath = path.join(process.cwd(), 'vendor_registrations.json');
-    const usersPath = path.join(process.cwd(), 'users.json');
 
     // Baca users dengan fallback jika file corrupt/tidak ada
-    let users = [];
-    try {
-      const usersData = await fs.readFile(usersPath, 'utf-8');
-      users = JSON.parse(usersData);
-    } catch (err) {
-      console.error('[vendor register] Error reading users.json:', err);
-      return NextResponse.json({
-        success: false,
-        message: 'Gagal membaca data pengguna. Silakan coba lagi.'
-      }, { status: 500 });
-    }
+    const users = await readData('users');
 
     const user = users.find(u => u.id === userId);
 
@@ -57,15 +45,7 @@ export async function POST(request) {
     }
 
     // Cek apakah user sudah pernah mendaftar sebagai vendor
-    let registrations = [];
-    try {
-      const registrationsData = await fs.readFile(registrationsPath, 'utf-8');
-      registrations = JSON.parse(registrationsData);
-    } catch (err) {
-      console.error('[vendor register] Error reading registrations.json:', err);
-      // Fallback ke array kosong jika file tidak ada atau corrupt
-      registrations = [];
-    }
+    const registrations = await readData('registrations');
     
     const existingRegistration = registrations.find(r => r.userId === userId);
     
@@ -94,7 +74,7 @@ export async function POST(request) {
       
       registrations[registrationIndex] = updatedRegistration;
       try {
-        await fs.writeFile(registrationsPath, JSON.stringify(registrations, null, 2));
+        await writeData('registration', registrations);
       } catch (err) {
         console.error('[vendor register] Error writing registrations.json:', err);
         return NextResponse.json({
@@ -128,7 +108,7 @@ export async function POST(request) {
 
     registrations.push(newRegistration);
     try {
-      await fs.writeFile(registrationsPath, JSON.stringify(registrations, null, 2));
+      await writeData('registration', registrations);
     } catch (err) {
       console.error('[vendor register] Error writing registrations.json:', err);
       return NextResponse.json({
@@ -164,9 +144,8 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    const registrationsPath = path.join(process.cwd(), 'vendor_registrations.json');
-    const registrationsData = await fs.readFile(registrationsPath, 'utf-8');
-    const registrations = JSON.parse(registrationsData);
+    const registrationsData = await readData('registrations');
+    const registrations = registrationsData;
 
     const registration = registrations.find(r => r.userId === userId);
 

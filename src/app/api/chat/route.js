@@ -1,28 +1,22 @@
-import fs from 'fs/promises';
 import { randomUUID } from 'crypto';
-import path from 'path';
 import { NextResponse } from 'next/server';
+import { readData, writeData } from '@/lib/storage';
 
-const CHATS_FILE = path.join(process.cwd(), 'chats.json');
-
-// HELPER: Baca chats.json
 async function readChatsFile() {
   try {
-    const data = await fs.readFile(CHATS_FILE, 'utf-8');
-    return JSON.parse(data);
+    return await readData('chats');
   } catch (error) {
-    console.error('[chat] Failed to read chats file:', error.message);
+    console.error('[chat] Failed to read chats:', error.message);
     return [];
   }
 }
 
-// HELPER: Simpan chats.json
 async function writeChatsFile(chats) {
   try {
-    await fs.writeFile(CHATS_FILE, JSON.stringify(chats, null, 2));
+    await writeData('chats', chats);
     return true;
   } catch (error) {
-    console.error('[chat] Failed to write chats file:', error.message);
+    console.error('[chat] Failed to write chats:', error.message);
     throw error;
   }
 }

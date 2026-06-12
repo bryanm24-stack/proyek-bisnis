@@ -1,23 +1,12 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
-const transactionsPath = path.join(process.cwd(), 'transactions.json');
-const usersPath = path.join(process.cwd(), 'users.json');
 
-async function readJsonFile(filePath, fallback = []) {
-  try {
-    const raw = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(raw);
-  } catch (error) {
-    return fallback;
-  }
-}
+import { readData, writeData } from '@/lib/storage';
 
 export async function GET() {
   try {
-    const transactions = await readJsonFile(transactionsPath, []);
-    const users = await readJsonFile(usersPath, []);
+    const transactions = await readData('transactions');
+    const users = await readData('users');
 
     const data = transactions
       .filter((trx) => trx.identityVerification)
@@ -51,7 +40,7 @@ export async function POST(request) {
       );
     }
 
-    const transactions = await readJsonFile(transactionsPath, []);
+    const transactions = await readData('transactions');
     const trxIndex = transactions.findIndex((trx) => trx.id === transactionId);
 
     if (trxIndex === -1) {
@@ -73,7 +62,7 @@ export async function POST(request) {
     };
     transactions[trxIndex].identityVerification.adminNotes = adminNotes || '';
 
-    await fs.writeFile(transactionsPath, JSON.stringify(transactions, null, 2));
+    await writeData('transactions', transactions);
 
     return NextResponse.json(
       {

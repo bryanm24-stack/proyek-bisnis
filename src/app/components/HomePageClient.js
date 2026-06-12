@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import SearchBar from './SearchBar';
 import SharedNavbar from './SharedNavbar';
 
+
+import { readData, writeData } from '@/lib/storage';
 export default function HomePageClient() {
   const router = useRouter();
   const [services, setServices] = useState([]);

@@ -1,7 +1,7 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
+
+import { readData, writeData } from '@/lib/storage';
 /**
  * GET /api/returns/extension?dealId=xxx
  * Get extension request status for a deal
@@ -18,9 +18,8 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    const dealsPath = path.join(process.cwd(), 'deals.json');
-    const dealsData = await fs.readFile(dealsPath, 'utf-8');
-    const deals = JSON.parse(dealsData);
+    const dealsData = await readData('deals');
+    const deals = dealsData;
 
     const deal = deals.find(d => d.id === dealId);
     if (!deal) {
@@ -65,9 +64,7 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const dealsPath = path.join(process.cwd(), 'deals.json');
-    const dealsData = await fs.readFile(dealsPath, 'utf-8');
-    let deals = JSON.parse(dealsData);
+    const deals = await readData('deals');
 
     const dealIndex = deals.findIndex(d => d.id === dealId);
     if (dealIndex === -1) {
@@ -123,7 +120,7 @@ export async function POST(request) {
     deal.extensionRequests.push(extensionRequest);
     deal.extensionRequest = extensionRequest; // Current active request
 
-    await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+    await writeData('deal', deals);
 
     return NextResponse.json({
       success: true,
@@ -162,9 +159,7 @@ export async function PUT(request) {
       }, { status: 400 });
     }
 
-    const dealsPath = path.join(process.cwd(), 'deals.json');
-    const dealsData = await fs.readFile(dealsPath, 'utf-8');
-    let deals = JSON.parse(dealsData);
+    const deals = await readData('deals');
 
     const dealIndex = deals.findIndex(d => d.id === dealId);
     if (dealIndex === -1) {
@@ -224,7 +219,7 @@ export async function PUT(request) {
       deal.extensionRequest = extRequest;
     }
 
-    await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+    await writeData('deal', deals);
 
     return NextResponse.json({
       success: true,

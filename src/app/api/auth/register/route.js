@@ -1,20 +1,15 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
+
+import { readData, writeData } from '@/lib/storage';
 export async function POST(request) {
   try {
     const body = await request.json(); // Ambil data dari form React
     const { username, name, email, password } = body;
 
     // Lokasi file users.json di root folder
-    const filePath = path.join(process.cwd(), 'users.json');
     
-    // Baca isi file
-    let fileData = await fs.readFile(filePath, 'utf-8');
-    // Remove BOM if present
-    fileData = fileData.replace(/^\uFEFF/, '').trim();
-    const users = JSON.parse(fileData);
+    const users = await readData('users');
 
     // Cek apakah username sudah terdaftar
     const usernameExists = users.find(u => u.username === username);
@@ -46,7 +41,7 @@ export async function POST(request) {
     users.push(newUser);
 
     // Simpan kembali ke file
-    await fs.writeFile(filePath, JSON.stringify(users, null, 2));
+    await writeData('users', users);
 
     return NextResponse.json({ 
       success: true, 

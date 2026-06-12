@@ -4,6 +4,8 @@ import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
+
+import { readData, writeData } from '@/lib/storage';
 let cachedUserRaw = null;
 let cachedUserSnapshot = null;
 
