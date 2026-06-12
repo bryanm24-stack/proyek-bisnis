@@ -303,20 +303,23 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    // Determine flow type: 'issue' (report problem during rental) or 'end_of_use' (retur akhir)
-    const returnType = (type || '').toString().toLowerCase() === 'issue' ? 'issue' : 'end_of_use';
+    // Determine flow type: 'issue' or 'complaint' (report problem during rental) or 'end_of_use' (retur akhir)
+    const normalizedType = (type || '').toString().toLowerCase();
+    const returnType = normalizedType === 'complaint' ? 'complaint' : (normalizedType === 'issue' ? 'issue' : 'end_of_use');
 
-    if (returnType === 'issue') {
-      // Issue report flow: do not finalize actual return date, just mark as reported for vendor inspection
-      deal.returnType = 'issue';
+    if (returnType === 'complaint' || returnType === 'issue') {
+      // Issue/complaint report flow: do not finalize actual return date, just mark as reported for vendor inspection
+      deal.returnType = returnType;
       deal.reportedAt = new Date().toISOString();
-      // Store basic reported info
-      deal.itemCondition = itemCondition; // reported condition
-      deal.damageDescription = damageDescription || '';
+      deal.complaintDate = new Date().toISOString();
+      deal.complaintCategory = itemCondition;
+      deal.complaintDescription = damageDescription || '';
       deal.returnPhotos = Array.isArray(deal.returnPhotos) ? deal.returnPhotos.concat(returnPhotos || []) : (returnPhotos || []);
       deal.returnStatus = 'reported';
-      // Keep deal.status as-is (likely 'active') so rental continues until resolved
-      deal.issueReported = true;
+      deal.daysLate = 0;
+      deal.lateCharge = 0;
+      deal.issueReported = returnType === 'issue';
+      deal.complaintReported = returnType === 'complaint';
     } else {
       // End-of-use retur flow: set actual return date and calculate late/deductions (existing logic)
       deal.returnType = 'end_of_use';
@@ -415,12 +418,12 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const body = await request.json();
-    const { dealId, vendorId, damageStatus, damageCharge, notes } = body;
+    const { dealId, vendorId, damageStatus, damageCharge, notes, complaintResolution, complaintPenalty } = body;
 
-    if (!dealId || !vendorId || !damageStatus) {
+    if (!dealId || !vendorId) {
       return NextResponse.json({
         success: false,
-        message: 'dealId, vendorId, dan damageStatus wajib diisi'
+        message: 'dealId dan vendorId wajib diisi'
       }, { status: 400 });
     }
 
@@ -483,18 +486,57 @@ export async function PUT(request) {
     deal.inspectionNotes = notes || '';
     deal.vendorConfirmed = true;
 
-    if (deal.damageCharge > 0) {
-      await syncDamageInvoice(deal, deal.damageCharge);
+    if (deal.returnType === 'complaint' || deal.returnType === 'issue') {
+      const normalizedResolution = (complaintResolution || '').toString().toLowerCase();
+      const penaltyAmount = Number(complaintPenalty || 0) || 0;
+      const allowedResolutions = ['confirm', 'partial_refund', 'penalty', 'reject'];
+      if (!allowedResolutions.includes(normalizedResolution)) {
+        return NextResponse.json({
+          success: false,
+          message: 'complaintResolution harus salah satu: confirm, partial_refund, penalty, reject'
+        }, { status: 400 });
+      }
+
+      deal.complaintResolution = normalizedResolution;
+      deal.complaintPenalty = penaltyAmount;
+      deal.complaintResolutionNotes = notes || '';
+
+      if (normalizedResolution === 'confirm') {
+        deal.totalRefund = deal.totalPrice || 0;
+        deal.refundStatus = 'processed';
+        deal.returnStatus = 'complaint_confirmed';
+        deal.status = 'completed';
+      } else if (normalizedResolution === 'partial_refund') {
+        deal.totalRefund = Math.max(0, (deal.totalPrice || 0) - penaltyAmount);
+        deal.refundStatus = 'processed';
+        deal.returnStatus = 'complaint_partial';
+        deal.status = 'completed';
+      } else if (normalizedResolution === 'penalty') {
+        deal.totalRefund = Math.max(0, (deal.totalPrice || 0) - penaltyAmount);
+        deal.refundStatus = 'processed';
+        deal.returnStatus = 'complaint_penalty';
+        deal.status = 'completed';
+      } else if (normalizedResolution === 'reject') {
+        deal.totalRefund = 0;
+        deal.refundStatus = 'processed';
+        deal.returnStatus = 'complaint_rejected';
+        deal.status = 'completed';
+      }
+    } else {
+      if (deal.damageCharge > 0) {
+        await syncDamageInvoice(deal, deal.damageCharge);
+      }
+
+      // Calculate total refund (same formula applies)
+      const basePrice = deal.totalPrice || 0;
+      const totalDeductions = (deal.damageCharge || 0) + (deal.lateCharge || 0);
+      deal.totalRefund = Math.max(0, basePrice - totalDeductions);
+      deal.refundStatus = 'pending_payment'; // Ready for refund processing
+
+      
+      // Set return status to inspected
+      deal.returnStatus = 'inspected';
     }
-
-    // Calculate total refund (same formula applies)
-    const basePrice = deal.totalPrice || 0;
-    const totalDeductions = (deal.damageCharge || 0) + (deal.lateCharge || 0);
-    deal.totalRefund = Math.max(0, basePrice - totalDeductions);
-    deal.refundStatus = 'pending_payment'; // Ready for refund processing
-
-    // Set return status to inspected
-    deal.returnStatus = 'inspected';
 
     // ✅ FIX #2: Update booking status to 'pending_return' (awaiting return confirmation) only for end_of_use flow
     if (deal.returnType === 'end_of_use' && deal.bookingId) {
@@ -522,16 +564,16 @@ export async function PUT(request) {
     // If no issues and on-time, auto-complete. Ensure we mark refund processed and settlement date.
     if (deal.returnType === 'end_of_use') {
       if (damageStatus === 'none' && deal.daysLate === 0 && deal.customerConfirmed) {
-      deal.status = 'completed';
-      deal.returnStatus = 'completed';
-      deal.refundStatus = 'processed';
-      deal.settlementDate = todayDateString();
-      if (deal.totalRefund === undefined || deal.totalRefund === null) {
-        const basePrice = deal.totalPrice || 0;
-        const totalDeductions = (deal.damageCharge || 0) + (deal.lateCharge || 0);
-        deal.totalRefund = Math.max(0, basePrice - totalDeductions);
+        deal.status = 'completed';
+        deal.returnStatus = 'completed';
+        deal.refundStatus = 'processed';
+        deal.settlementDate = todayDateString();
+        if (deal.totalRefund === undefined || deal.totalRefund === null) {
+          const basePrice = deal.totalPrice || 0;
+          const totalDeductions = (deal.damageCharge || 0) + (deal.lateCharge || 0);
+          deal.totalRefund = Math.max(0, basePrice - totalDeductions);
+        }
       }
-    }
     }
 
     // If vendor confirms now and customer has already confirmed earlier, finalize the return (both flows)

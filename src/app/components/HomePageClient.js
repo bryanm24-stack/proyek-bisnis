@@ -27,6 +27,7 @@ export default function HomePageClient() {
   const [newMessage, setNewMessage] = useState('');
   const [dealData, setDealData] = useState(null);
   const [showRatingForm, setShowRatingForm] = useState(false);
+  const [dealProcessing, setDealProcessing] = useState(false);
   const [ratingValue, setRatingValue] = useState(5);
   const [ratingReview, setRatingReview] = useState('');
   const [notifications, setNotifications] = useState([]);
@@ -524,8 +525,10 @@ export default function HomePageClient() {
   };
 
   const handleDealAction = async (action) => {
+    if (dealProcessing) return;
     if (!selectedService || !user || !chatData?.id) return;
 
+    setDealProcessing(true);
     try {
       const response = await fetch('/api/deals', {
         method: 'POST',
@@ -560,6 +563,8 @@ export default function HomePageClient() {
     } catch (error) {
       console.error('Error processing deal:', error);
       alert('Gagal memproses deal: ' + error.message);
+    } finally {
+      setDealProcessing(false);
     }
   };
 
@@ -2157,8 +2162,8 @@ export default function HomePageClient() {
                 {(() => {
                   const statusConfig = getDealStatusConfig();
                   const finalPrice = dealData?.finalPrice || dealData?.originalPrice || 0;
-                  // Buttons disabled jika: agreed, cancelled, closed, atau completed tapi belum rating
-                  const dealDisabled = dealData?.status === 'agreed' || dealData?.status === 'cancelled' || chatData?.dealStatus === 'closed' || chatData?.closedAt;
+                  // Buttons disabled jika: pending, agreed, cancelled, closed, atau completed tapi belum rating
+                  const dealDisabled = dealData?.status === 'pending' || dealData?.status === 'agreed' || dealData?.status === 'cancelled' || chatData?.dealStatus === 'closed' || chatData?.closedAt;
 
                   return (
                     <div
@@ -2185,7 +2190,7 @@ export default function HomePageClient() {
                         <button
                           type="button"
                           onClick={() => handleDealAction('accept')}
-                          disabled={dealDisabled}
+                          disabled={dealDisabled || dealProcessing}
                           style={{
                             flex: 1,
                             padding: '8px 10px',
@@ -2194,12 +2199,12 @@ export default function HomePageClient() {
                             background: messages.length === 0 ? 'rgba(178, 138, 103, 0.15)' : 'rgba(16, 185, 129, 0.08)',
                             color: messages.length === 0 ? '#8F6B4A' : '#047857',
                             fontWeight: '700',
-                            cursor: dealDisabled ? 'not-allowed' : 'pointer',
-                            opacity: dealDisabled ? 0.55 : 1,
+                            cursor: dealDisabled || dealProcessing ? 'not-allowed' : 'pointer',
+                            opacity: dealDisabled || dealProcessing ? 0.55 : 1,
                             transition: 'all 0.3s ease'
                           }}
                         >
-                          {dealData?.status === 'agreed' ? 'Deal Diterima' : 'Terima Deal'}
+                          {dealProcessing ? 'Memproses...' : dealData?.status === 'agreed' ? 'Deal Diterima' : 'Terima Deal'}
                         </button>
                         <button
                           type="button"

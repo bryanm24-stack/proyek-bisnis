@@ -315,6 +315,32 @@ export async function POST(request) {
     }
     
     // Add new transaction
+    // ✅ NEW: If transaction is tied to a deal, verify the deal exists and is in correct state
+    if (body.dealId) {
+      try {
+        const dealsData = fs.readFileSync(dealsFile, 'utf-8');
+        const deals = JSON.parse(dealsData || '[]');
+        const deal = deals.find(d => String(d.id) === String(body.dealId));
+        if (!deal) {
+          return Response.json({ success: false, error: 'Deal tidak ditemukan', message: 'Deal tidak ditemukan untuk pembayaran ini' }, { status: 404 });
+        }
+
+        // Only allow payment when deal is in 'agreed' state (both sides accepted) or explicit vendor payment flow
+        if (!['agreed', 'active', 'pending'].includes(deal.status)) {
+          return Response.json({ success: false, error: 'Deal tidak siap untuk pembayaran', message: `Deal status '${deal.status}' tidak memperbolehkan pembayaran` }, { status: 400 });
+        }
+
+        // If UI removed pay_after option, enforce full payment server-side when configured
+        if (body.paymentType === 'pay_after') {
+          // reject pay_after by default to avoid unexpected credit flows
+          return Response.json({ success: false, error: 'Pay after tidak diizinkan', message: 'Metode pembayaran "pay_after" tidak diizinkan. Gunakan pembayaran penuh.' }, { status: 400 });
+        }
+      } catch (dealVerifyError) {
+        console.warn('Deal verification warning:', dealVerifyError.message);
+        return Response.json({ success: false, error: 'Gagal memverifikasi deal', message: 'Gagal memverifikasi deal sebelum pembayaran' }, { status: 500 });
+      }
+    }
+
     const identityVerification = body.identityVerification
       ? {
           ...body.identityVerification,
