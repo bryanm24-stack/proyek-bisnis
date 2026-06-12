@@ -1,7 +1,7 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
+
+import { readData, writeData } from '@/lib/storage';
 function getChatContextKey(chat) {
   return [
     String(chat.serviceId || ''),
@@ -73,9 +73,8 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    const chatsPath = path.join(process.cwd(), 'chats.json');
-    const chatsData = await fs.readFile(chatsPath, 'utf-8');
-    const chats = JSON.parse(chatsData);
+    const chatsData = await readData('chats');
+    const chats = chatsData;
 
     // Filter chats untuk customer ini
     const customerChats = dedupeChats(

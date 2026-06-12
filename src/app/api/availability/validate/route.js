@@ -1,7 +1,7 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
+
+import { readData, writeData } from '@/lib/storage';
 function getServiceCapacity(service) {
   return Number(service?.availableQuantity ?? service?.availability ?? service?.quantity ?? 0) || 0;
 }
@@ -20,13 +20,9 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const servicesPath = path.join(process.cwd(), 'services.json');
-    const dealsPath = path.join(process.cwd(), 'deals.json');
 
     // Read services
-    let servicesData = await fs.readFile(servicesPath, 'utf-8');
-    servicesData = servicesData.replace(/^\uFEFF/, '').trim();
-    const services = JSON.parse(servicesData);
+    const services = await readData('services');
 
     // Find service
     const service = services.find(s => String(s.id) === String(serviceId));
@@ -78,9 +74,7 @@ export async function POST(request) {
     }
 
     // Read deals to get active bookings
-    let dealsData = await fs.readFile(dealsPath, 'utf-8');
-    dealsData = dealsData.replace(/^\uFEFF/, '').trim();
-    const deals = JSON.parse(dealsData);
+    const deals = await readData('deals');
 
     // Find overlapping bookings for this service
     // Get bookings from service's bookings array or reconstruct from completed deals

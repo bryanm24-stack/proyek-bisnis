@@ -1,7 +1,7 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
+
+import { readData, writeData } from '@/lib/storage';
 // GET - Get ongoing deals
 export async function GET(request) {
   try {
@@ -16,20 +16,16 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    const dealsPath = path.join(process.cwd(), 'deals.json');
-    const servicesPath = path.join(process.cwd(), 'services.json');
-    const chatsPath = path.join(process.cwd(), 'chats.json');
-    const usersPath = path.join(process.cwd(), 'users.json');
 
-    const dealsData = await fs.readFile(dealsPath, 'utf-8');
-    const servicesData = await fs.readFile(servicesPath, 'utf-8');
-    const chatsData = await fs.readFile(chatsPath, 'utf-8');
-    const usersData = await fs.readFile(usersPath, 'utf-8');
+    const dealsData = await readData('deals');
+    const servicesData = await readData('services');
+    const chatsData = await readData('chats');
+    const usersData = await readData('users');
 
-    const deals = JSON.parse(dealsData);
-    const services = JSON.parse(servicesData);
-    const chats = JSON.parse(chatsData);
-    const users = JSON.parse(usersData);
+    const deals = dealsData;
+    const services = servicesData;
+    const chats = chatsData;
+    const users = usersData;
 
     let ongoingDeals = [];
 
@@ -107,9 +103,7 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const dealsPath = path.join(process.cwd(), 'deals.json');
-    const dealsData = await fs.readFile(dealsPath, 'utf-8');
-    let deals = JSON.parse(dealsData);
+    const deals = await readData('deals');
 
     // Find the deal
     const dealIndex = deals.findIndex(d => d.id === dealId);
@@ -141,7 +135,7 @@ export async function POST(request) {
       deals[dealIndex].status = 'complain';
     }
 
-    await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+    await writeData('deal', deals);
 
     return NextResponse.json({
       success: true,
@@ -177,9 +171,7 @@ export async function PUT(request) {
       }, { status: 400 });
     }
 
-    const dealsPath = path.join(process.cwd(), 'deals.json');
-    const dealsData = await fs.readFile(dealsPath, 'utf-8');
-    let deals = JSON.parse(dealsData);
+    const deals = await readData('deals');
 
     // Find the deal
     const dealIndex = deals.findIndex(d => d.id === dealId);
@@ -216,7 +208,7 @@ export async function PUT(request) {
       deal.status = 'completed';
     }
 
-    await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+    await writeData('deal', deals);
 
     return NextResponse.json({
       success: true,

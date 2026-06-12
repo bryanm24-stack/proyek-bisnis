@@ -4,6 +4,8 @@ import { useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
+
+import { readData, writeData } from '@/lib/storage';
 function IdentityCheckContent() {
   const router = useRouter();
   const searchParams = useSearchParams();

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import styles from './page.module.css';
 import SharedNavbar from '../../components/SharedNavbar';
 
+
+import { readData, writeData } from '@/lib/storage';
 export default function VendorOngoingPage() {
   const [user, setUser] = useState(null);
   const [ongoingDeals, setOngoingDeals] = useState([]);

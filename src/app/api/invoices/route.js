@@ -1,37 +1,32 @@
-import fs from 'fs';
 import path from 'path';
 
-const invoicesFile = path.join(process.cwd(), 'invoices.json');
-const transactionsFile = path.join(process.cwd(), 'transactions.json');
-const dealsFile = path.join(process.cwd(), 'deals.json');
-const servicesFile = path.join(process.cwd(), 'services.json');
-const promosFile = path.join(process.cwd(), 'promos.json');
-const ratingsFile = path.join(process.cwd(), 'ratings.json');
-const usersFile = path.join(process.cwd(), 'users.json');
+
+import { readData, writeData } from '@/lib/storage';
 
 // Global invoice counter file (simple persistent counter)
-const invoiceCounterFile = path.join(process.cwd(), 'invoice_counter.json');
 
-function ensureInvoiceCounter() {
+async function ensureInvoiceCounter() {
   try {
-    if (!fs.existsSync(invoiceCounterFile)) {
-      fs.writeFileSync(invoiceCounterFile, JSON.stringify({ next: 1 }, null, 2), 'utf-8');
+    const raw = await readData('invoice_counter');
+    const current = Array.isArray(raw) ? raw[0] ?? {} : raw ?? {};
+    if (!current || current.next === undefined) {
+      await writeData('invoice_counter', { next: 1 });
     }
   } catch (e) {
     console.warn('Could not ensure invoice counter file:', e?.message || e);
   }
 }
 
-function getNextInvoiceId() {
+async function getNextInvoiceId() {
   try {
-    ensureInvoiceCounter();
-    const raw = fs.readFileSync(invoiceCounterFile, 'utf-8');
-    const obj = raw ? JSON.parse(raw.replace(/^\uFEFF/, '').trim() || '{}') : {};
+    await ensureInvoiceCounter();
+    const raw = await readData('invoice_counter');
+    const obj = Array.isArray(raw) ? raw[0] ?? {} : raw ?? {};
     let next = Number(obj.next || 1);
     const id = 'INV-' + String(next).padStart(6, '0');
     // increment and persist
     obj.next = next + 1;
-    fs.writeFileSync(invoiceCounterFile, JSON.stringify(obj, null, 2), 'utf-8');
+    await writeData('invoice_counter', obj);
     return id;
   } catch (e) {
     console.warn('Could not read/write invoice counter, falling back to timestamp id:', e?.message || e);
@@ -42,55 +37,38 @@ function getNextInvoiceId() {
 // Helper: Normalize ID for consistent comparison
 const normalizeId = (id) => String(id || '').trim();
 
-const parseJsonFile = (filePath, fallback = []) => {
+const parseJsonFile = async (filePath, fallback = []) => {
   try {
-    const raw = fs.readFileSync(filePath, 'utf-8');
-    const sanitized = raw.replace(/^\uFEFF/, '').trim();
-    if (!sanitized) {
-      return fallback;
-    }
-    return JSON.parse(sanitized);
+    const dataset = path.basename(filePath, '.json');
+    const data = await readData(dataset);
+    return Array.isArray(data) ? data : fallback;
   } catch (error) {
     console.warn(`Failed parsing JSON file ${path.basename(filePath)}:`, error.message);
     return fallback;
   }
 };
 
-// Ensure invoices.json exists
-const ensureInvoicesFile = () => {
-  if (!fs.existsSync(invoicesFile)) {
-    fs.writeFileSync(invoicesFile, JSON.stringify([], null, 2));
-  }
+// Ensure invoices dataset exists in DB or fallback JSON
+const ensureInvoicesFile = async () => {
+  await readData('invoices');
 };
 
 export async function GET(request) {
   try {
-    ensureInvoicesFile();
-    const ensureFile = (filePath) => {
-      if (!fs.existsSync(filePath)) {
-        fs.writeFileSync(filePath, JSON.stringify([], null, 2));
-      }
-    };
-
-    ensureFile(transactionsFile);
-    ensureFile(dealsFile);
-    ensureFile(servicesFile);
-    ensureFile(promosFile);
-    ensureFile(ratingsFile);
-    ensureFile(usersFile);
+    await ensureInvoicesFile();
     
     const searchParams = request.nextUrl.searchParams;
     const customerId = searchParams.get('customerId');
     const vendorId = searchParams.get('vendorId');
     const status = searchParams.get('status');
 
-    let invoices = parseJsonFile(invoicesFile, []);
-    const transactions = parseJsonFile(transactionsFile, []);
-    const deals = parseJsonFile(dealsFile, []);
-    const services = parseJsonFile(servicesFile, []);
-    const promos = parseJsonFile(promosFile, []);
-    const ratings = parseJsonFile(ratingsFile, []);
-    const users = parseJsonFile(usersFile, []);
+    let invoices = await readData('invoices');
+    const transactions = await readData('transactions');
+    const deals = await readData('deals');
+    const services = await readData('services');
+    const promos = await readData('promos');
+    const ratings = await readData('ratings');
+    const users = await readData('users');
 
     const findUserName = (id, fallbackLabel) => {
       if (!id) return fallbackLabel;
@@ -205,7 +183,7 @@ export async function GET(request) {
       });
 
     if (hasGeneratedInvoices) {
-      fs.writeFileSync(invoicesFile, JSON.stringify(invoices, null, 2));
+      await writeData('invoices', invoices);
     }
 
     const enrichInvoice = (invoice) => {
@@ -309,8 +287,8 @@ export async function POST(request) {
   try {
     const body = await request.json();
 
-    ensureInvoicesFile();
-    let invoices = parseJsonFile(invoicesFile, []);
+    await ensureInvoicesFile();
+    let invoices = await readData('invoices');
 
     // Create new invoice
     const newInvoice = {
@@ -330,7 +308,7 @@ export async function POST(request) {
     };
 
     invoices.push(newInvoice);
-    fs.writeFileSync(invoicesFile, JSON.stringify(invoices, null, 2));
+    await writeData('invoices', invoices);
 
     return Response.json({ success: true, invoice: newInvoice }, { status: 201 });
   } catch (error) {
@@ -344,8 +322,8 @@ export async function PUT(request) {
     const body = await request.json();
     const { invoiceId, status, paymentMethod, transactionId } = body;
 
-    ensureInvoicesFile();
-    let invoices = parseJsonFile(invoicesFile, []);
+    await ensureInvoicesFile();
+    let invoices = await readData('invoices');
 
     const invoiceIndex = invoices.findIndex(inv => inv.id === invoiceId);
     if (invoiceIndex === -1) {
@@ -362,14 +340,13 @@ export async function PUT(request) {
     };
 
     invoices[invoiceIndex] = updatedInvoice;
-    fs.writeFileSync(invoicesFile, JSON.stringify(invoices, null, 2));
+    await writeData('invoices', invoices);
 
     // Update deal to mark invoice as paid, but do NOT mark the whole deal as completed here.
     // Completion should only occur after the return/inspection flow completes.
     if (status === 'paid') {
       try {
-        const dealsData = fs.readFileSync(dealsFile, 'utf-8');
-        let deals = JSON.parse(dealsData);
+        const deals = await readData('deals');
 
         const dealIndex = deals.findIndex(d => d.id === updatedInvoice.dealId);
         if (dealIndex !== -1) {
@@ -391,12 +368,11 @@ export async function PUT(request) {
           }
 
           deals[dealIndex] = updated;
-          fs.writeFileSync(dealsFile, JSON.stringify(deals, null, 2));
+          await writeData('deals', deals);
 
           // Also reserve/decrease stock in services.json if there is a matching booking
           try {
-            const servicesRaw = fs.readFileSync(servicesFile, 'utf-8');
-            const services = servicesRaw ? JSON.parse(servicesRaw.replace(/^\uFEFF/, '').trim() || '[]') : [];
+            const services = await readData('services');
             const svcIndex = services.findIndex(s => String(s.id) === String(existing.serviceId));
             if (svcIndex !== -1) {
               const svc = services[svcIndex];
@@ -411,9 +387,7 @@ export async function PUT(request) {
 
                 // Try to also decrement specific item stock if chat->itemId exists and service.items contains it
                 try {
-                  const chatsFile = path.join(process.cwd(), 'chats.json');
-                  const chatsRaw = fs.readFileSync(chatsFile, 'utf-8');
-                  const chats = chatsRaw ? JSON.parse(chatsRaw.replace(/^\uFEFF/, '').trim() || '[]') : [];
+                  const chats = await readData('chats');
                   const chat = chats.find(c => String(c.id) === String(existing.chatId));
                   const itemId = chat?.itemId || existing.itemId || null;
                   if (itemId && Array.isArray(svc.items)) {
@@ -429,13 +403,12 @@ export async function PUT(request) {
                 // (Not implemented here - we update overall availableQuantity)
                 // persist
                 services[svcIndex] = svc;
-                fs.writeFileSync(servicesFile, JSON.stringify(services, null, 2));
+                await writeData('services', services);
               }
                 else {
                   // Fallback: booking not found or already reserved. Try to derive quantity from transactions.
                   try {
-                    const transactionsRaw = fs.readFileSync(transactionsFile, 'utf-8');
-                    const transactions = transactionsRaw ? JSON.parse(transactionsRaw.replace(/^\uFEFF/, '').trim() || '[]') : [];
+                    const transactions = await readData('transactions');
                     const trx = transactions.find(t => String(t.id) === String(updatedInvoice.paymentTransactionId) || String(t.dealId) === String(existing.id));
                     const qtyFromTrx = trx ? Number(trx.quantity || trx.requestedQuantity || 1) : 0;
                     const qtyUse = qtyFromTrx > 0 ? qtyFromTrx : 0;
@@ -445,9 +418,7 @@ export async function PUT(request) {
 
                       // Try to decrement item stok using deal/chat mapping as before
                       try {
-                        const chatsFile = path.join(process.cwd(), 'chats.json');
-                        const chatsRaw = fs.readFileSync(chatsFile, 'utf-8');
-                        const chats = chatsRaw ? JSON.parse(chatsRaw.replace(/^\uFEFF/, '').trim() || '[]') : [];
+                        const chats = await readData('chats');
                         const chat = chats.find(c => String(c.id) === String(existing.chatId));
                         const itemId = chat?.itemId || existing.itemId || null;
                         if (itemId && Array.isArray(svc.items)) {
@@ -461,7 +432,7 @@ export async function PUT(request) {
                       }
 
                       services[svcIndex] = svc;
-                      fs.writeFileSync(servicesFile, JSON.stringify(services, null, 2));
+                      await writeData('services', services);
                     }
                   } catch (e) {
                     // ignore

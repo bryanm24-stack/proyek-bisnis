@@ -1,13 +1,12 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
+
+import { readData, writeData } from '@/lib/storage';
 // GET - Get all vendor registrations (admin only)
 export async function GET(request) {
   try {
-    const registrationsPath = path.join(process.cwd(), 'vendor_registrations.json');
-    const registrationsData = await fs.readFile(registrationsPath, 'utf-8');
-    const registrations = JSON.parse(registrationsData);
+    const registrationsData = await readData('registrations');
+    const registrations = registrationsData;
 
     // Sort by createdAt descending
     registrations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -38,12 +37,10 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const registrationsPath = path.join(process.cwd(), 'vendor_registrations.json');
-    const usersPath = path.join(process.cwd(), 'users.json');
 
     // Baca registrations
-    const registrationsData = await fs.readFile(registrationsPath, 'utf-8');
-    const registrations = JSON.parse(registrationsData);
+    const registrationsData = await readData('registrations');
+    const registrations = registrationsData;
 
     const registration = registrations.find(r => r.id === registrationId);
     if (!registration) {
@@ -62,8 +59,8 @@ export async function POST(request) {
 
     if (action === 'approve') {
       // Update user role to vendor
-      const usersData = await fs.readFile(usersPath, 'utf-8');
-      const users = JSON.parse(usersData);
+      const usersData = await readData('users');
+      const users = usersData;
 
       const userIndex = users.findIndex(u => u.id === registration.userId);
       if (userIndex === -1) {
@@ -81,8 +78,8 @@ export async function POST(request) {
       registration.status = 'approved';
       registration.approvedAt = new Date().toISOString();
 
-      await fs.writeFile(usersPath, JSON.stringify(users, null, 2));
-      await fs.writeFile(registrationsPath, JSON.stringify(registrations, null, 2));
+      await writeData('users', users);
+      await writeData('registrations', registrations);
 
       return NextResponse.json({
         success: true,
@@ -102,7 +99,7 @@ export async function POST(request) {
       registration.rejectionReason = rejectionReason;
       registration.approvedAt = new Date().toISOString();
 
-      await fs.writeFile(registrationsPath, JSON.stringify(registrations, null, 2));
+      await writeData('registration', registrations);
 
       return NextResponse.json({
         success: true,

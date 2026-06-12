@@ -1,7 +1,7 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
+
+import { readData, writeData } from '@/lib/storage';
 function getServiceCapacity(service) {
   return Number(service?.availableQuantity ?? service?.availability ?? service?.quantity ?? 0) || 0;
 }
@@ -19,12 +19,9 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const servicesPath = path.join(process.cwd(), 'services.json');
 
     // Read services
-    let servicesData = await fs.readFile(servicesPath, 'utf-8');
-    servicesData = servicesData.replace(/^\uFEFF/, '').trim();
-    const services = JSON.parse(servicesData);
+    const services = await readData('services');
 
     // Find service
     const serviceIndex = services.findIndex(s => String(s.id) === String(serviceId));
@@ -98,7 +95,7 @@ export async function POST(request) {
     }
 
     // Save updated services
-    await fs.writeFile(servicesPath, JSON.stringify(services, null, 2));
+    await writeData('service', services);
 
     // Calculate bookedQuantity for response
     let responseBookedQty = 0;
@@ -142,12 +139,9 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    const servicesPath = path.join(process.cwd(), 'services.json');
 
     // Read services
-    let servicesData = await fs.readFile(servicesPath, 'utf-8');
-    servicesData = servicesData.replace(/^\uFEFF/, '').trim();
-    const services = JSON.parse(servicesData);
+    const services = await readData('services');
 
     const service = services.find(s => String(s.id) === String(serviceId));
     if (!service) {
@@ -212,12 +206,9 @@ export async function PUT(request) {
       }, { status: 400 });
     }
 
-    const servicesPath = path.join(process.cwd(), 'services.json');
 
     // Read services
-    let servicesData = await fs.readFile(servicesPath, 'utf-8');
-    servicesData = servicesData.replace(/^\uFEFF/, '').trim();
-    const services = JSON.parse(servicesData);
+    const services = await readData('services');
 
     // Find service
     const serviceIndex = services.findIndex(s => String(s.id) === String(serviceId));
@@ -264,7 +255,7 @@ export async function PUT(request) {
     service.availableQuantity = Math.max(0, totalQuantity - bookedQuantity);
 
     // Save updated services
-    await fs.writeFile(servicesPath, JSON.stringify(services, null, 2));
+    await writeData('service', services);
 
     return NextResponse.json({
       success: true,

@@ -1,7 +1,7 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
+
+import { readData, writeData } from '@/lib/storage';
 export async function PUT(request) {
   try {
     const body = await request.json();
@@ -15,10 +15,7 @@ export async function PUT(request) {
       return NextResponse.json({ success: false, message: 'Password baru harus minimal 6 karakter.' }, { status: 400 });
     }
 
-    const filePath = path.join(process.cwd(), 'users.json');
-    let fileData = await fs.readFile(filePath, 'utf-8');
-    fileData = fileData.replace(/^\uFEFF/, '').trim();
-    const users = JSON.parse(fileData);
+    const users = await readData('users');
 
     const userIndex = users.findIndex((u) => String(u.id) === String(id));
     if (userIndex === -1) {
@@ -30,7 +27,7 @@ export async function PUT(request) {
     }
 
     users[userIndex].password = newPassword;
-    await fs.writeFile(filePath, JSON.stringify(users, null, 2));
+    await writeData('users', users);
 
     return NextResponse.json({ success: true, message: 'Password berhasil diubah.' }, { status: 200 });
   } catch (error) {
