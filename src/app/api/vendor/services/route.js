@@ -1,7 +1,26 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+
+function parseJsonSafe(value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value !== 'string') return value;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
 function normalizeServiceCapacity(service) {
   if (!service) return service;
+
+  const parsedImages = parseJsonSafe(service.images, []);
+  const parsedSpecifications = parseJsonSafe(service.specifications, {});
+  const parsedDescriptionTable = parseJsonSafe(service.description_table, {});
+  const parsedChecklist = parseJsonSafe(service.checklist, {});
+  const parsedItems = parseJsonSafe(service.items, []);
+  const parsedVariations = parseJsonSafe(service.variations, {});
 
   if (service.type === 'jasa') {
     const capacity = Number(service.availableQuantity ?? service.availability ?? service.quantity ?? 0);
@@ -9,11 +28,25 @@ function normalizeServiceCapacity(service) {
       ...service,
       availableQuantity: capacity,
       availability: capacity,
-      quantity: capacity
+      quantity: capacity,
+      images: Array.isArray(parsedImages) ? parsedImages : [],
+      specifications: parsedSpecifications,
+      description_table: parsedDescriptionTable,
+      checklist: parsedChecklist,
+      items: parsedItems,
+      variations: parsedVariations
     };
   }
 
-  return service;
+  return {
+    ...service,
+    images: Array.isArray(parsedImages) ? parsedImages : [],
+    specifications: parsedSpecifications,
+    description_table: parsedDescriptionTable,
+    checklist: parsedChecklist,
+    items: parsedItems,
+    variations: parsedVariations
+  };
 }
 
 // GET - Mengambil services dengan filter vendorId
