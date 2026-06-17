@@ -1,21 +1,63 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
+import { query } from '@/lib/db';
+
+function parseJsonSafe(value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value !== 'string') return value;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function snakeToCamel(str) {
+  return str.replace(/_([a-z])/g, (_, char) => char.toUpperCase());
+}
 
 function normalizeServiceCapacity(service) {
   if (!service) return service;
 
-  if (service.type === 'jasa') {
-    const capacity = Number(service.availableQuantity ?? service.availability ?? service.quantity ?? 0);
+  // Convert all keys from snake_case to camelCase
+  const normalized = {};
+  for (const [key, value] of Object.entries(service)) {
+    const camelKey = snakeToCamel(key);
+    normalized[camelKey] = value;
+  }
+
+  const parsedImages = parseJsonSafe(normalized.images, []);
+  const parsedSpecifications = parseJsonSafe(normalized.specifications, {});
+  const parsedDescriptionTable = parseJsonSafe(normalized.descriptionTable, {});
+  const parsedChecklist = parseJsonSafe(normalized.checklist, {});
+  const parsedItems = parseJsonSafe(normalized.items, []);
+  const parsedVariations = parseJsonSafe(normalized.variations, {});
+
+  if (normalized.type === 'jasa') {
+    const capacity = Number(normalized.availableQuantity ?? normalized.availability ?? normalized.quantity ?? 0);
     return {
-      ...service,
+      ...normalized,
       availableQuantity: capacity,
       availability: capacity,
-      quantity: capacity
+      quantity: capacity,
+      images: Array.isArray(parsedImages) ? parsedImages : [],
+      specifications: parsedSpecifications,
+      descriptionTable: parsedDescriptionTable,
+      checklist: parsedChecklist,
+      items: parsedItems,
+      variations: parsedVariations
     };
   }
 
-  return service;
+  return {
+    ...normalized,
+    images: Array.isArray(parsedImages) ? parsedImages : [],
+    specifications: parsedSpecifications,
+    descriptionTable: parsedDescriptionTable,
+    checklist: parsedChecklist,
+    items: parsedItems,
+    variations: parsedVariations
+  };
 }
 
 // GET - Mengambil services dengan filter vendorId
@@ -24,15 +66,13 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const vendorId = searchParams.get('vendorId');
 
-    const filePath = path.join(process.cwd(), 'services.json');
-    let fileData = await fs.readFile(filePath, 'utf-8');
-    fileData = fileData.replace(/^\uFEFF/, '').trim();
-    let services = JSON.parse(fileData).map(normalizeServiceCapacity);
-
-    // Filter berdasarkan vendorId jika diberikan
+    let services;
     if (vendorId) {
-      services = services.filter(service => service.vendorId === vendorId);
+      services = await query('SELECT * FROM services WHERE vendor_id = ? ORDER BY id', [vendorId]);
+    } else {
+      services = await query('SELECT * FROM services ORDER BY id');
     }
+    services = services.map(normalizeServiceCapacity);
 
     return NextResponse.json({ success: true, data: services }, { status: 200 });
   } catch (error) {
@@ -48,7 +88,6 @@ export async function POST(request) {
     const {
       vendorId,
       vendorName,
-      // Modern payload fields (used by VendorProductForm)
       mainCategory,
       subCategory,
       superSubCategory,
@@ -69,34 +108,9 @@ export async function POST(request) {
       checklist,
       items,
       variations,
-      // Fields untuk barang
-      namaBarang,
-      jenisBarang,
-      spesifikBarang,
-      jumlahBarang,
-      hargaBarang,
-      deskripsiProduk,
-      availability: legacyAvailability,
-      lokasi,
-      latitude,
-      longitude,
-      kebijakanKerusakan,
-      denda,
-      syaratSewa,
-      // Fields untuk jasa
-      spesialisasi,
-      deskripsi,
-      benefit,
-      tarif,
-      jangkauanWilayah,
-      jamOperasional,
-      estimasiPengerjaan,
-      garansiLayanan,
-      // Common
       images
     } = body;
 
-    // Validasi input
     if (!vendorId || !vendorName) {
       return NextResponse.json({
         success: false,
@@ -106,12 +120,6 @@ export async function POST(request) {
 
     const hasModernPayload = Boolean(title || mainCategory || location);
 
-    const filePath = path.join(process.cwd(), 'services.json');
-    let fileData = await fs.readFile(filePath, 'utf-8');
-    fileData = fileData.replace(/^\uFEFF/, '').trim();
-    const services = JSON.parse(fileData);
-
-    // Support payload baru dari halaman /vendor/tambah-produk dan /vendor
     if (hasModernPayload) {
       const resolvedType = type || (mainCategory && mainCategory.toLowerCase().includes('jasa') ? 'jasa' : 'barang');
       const missingFields = [];
@@ -145,44 +153,76 @@ export async function POST(request) {
         ? (Number.isNaN(parsedAvailability) ? 0 : parsedAvailability)
         : 0;
 
-      // ✅ Validasi: Maximum 5 images
       const validatedImages = images && Array.isArray(images)
         ? images.slice(0, 5)
         : [];
 
       const newService = {
         id: Date.now().toString(),
-        vendorId,
-        vendorName,
-        mainCategory,
-        subCategory,
-        superSubCategory: superSubCategory || '',
+        vendor_id: vendorId,
+        vendor_name: vendorName,
+        main_category: mainCategory,
+        sub_category: subCategory,
+        super_sub_category: superSubCategory || '',
         category: category || mainCategory,
         title,
-        shortDescription,
+        short_description: shortDescription,
         description: description || detailDescription || '',
-        detailDescription: detailDescription || description || '',
+        detail_description: detailDescription || description || '',
         price: Number.isNaN(parsedPrice) ? 0 : parsedPrice,
-        minimumDays: Number.isNaN(parsedMinimumDays) ? 1 : parsedMinimumDays,
-        availableQuantity: normalizedAvailability,
+        minimum_days: Number.isNaN(parsedMinimumDays) ? 1 : parsedMinimumDays,
+        available_quantity: normalizedAvailability,
         quantity: normalizedQuantity,
-        rentalPolicy: rentalPolicy || '',
+        rental_policy: rentalPolicy || '',
         location,
         specifications: specifications && typeof specifications === 'object' ? specifications : {},
-        descriptionTable: descriptionTable && typeof descriptionTable === 'object' ? descriptionTable : {},
+        description_table: descriptionTable && typeof descriptionTable === 'object' ? descriptionTable : {},
         checklist: checklist && typeof checklist === 'object' ? checklist : {},
         items: items && Array.isArray(items) ? items : [],
         variations: variations && typeof variations === 'object' ? variations : {},
         type: resolvedType,
         rating: 0,
-        rentCount: 0,
+        rent_count: 0,
         images: validatedImages && validatedImages.length > 0
           ? validatedImages
-          : ['https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=150&q=80']
+          : ['https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=150&q=80'],
+        availability: normalizedAvailability
       };
 
-      services.push(newService);
-      await fs.writeFile(filePath, JSON.stringify(services, null, 2));
+      const sql = `INSERT INTO services (id, vendor_id, vendor_name, main_category, sub_category, super_sub_category, category, title, short_description, description, detail_description, price, minimum_days, available_quantity, quantity, rental_policy, location, specifications, description_table, checklist, items, variations, type, rating, rent_count, images, availability)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      
+      const values = [
+        newService.id,
+        newService.vendor_id,
+        newService.vendor_name,
+        newService.main_category,
+        newService.sub_category,
+        newService.super_sub_category,
+        newService.category,
+        newService.title,
+        newService.short_description,
+        newService.description,
+        newService.detail_description,
+        newService.price,
+        newService.minimum_days,
+        newService.available_quantity,
+        newService.quantity,
+        newService.rental_policy,
+        newService.location,
+        JSON.stringify(newService.specifications),
+        JSON.stringify(newService.description_table),
+        JSON.stringify(newService.checklist),
+        JSON.stringify(newService.items),
+        JSON.stringify(newService.variations),
+        newService.type,
+        newService.rating,
+        newService.rent_count,
+        JSON.stringify(newService.images),
+        newService.availability
+      ];
+
+      await query(sql, values);
 
       return NextResponse.json({
         success: true,
@@ -191,95 +231,12 @@ export async function POST(request) {
       }, { status: 201 });
     }
 
-    if (!type) {
-      return NextResponse.json({
-        success: false,
-        message: 'type wajib diisi untuk format payload lama'
-      }, { status: 400 });
-    }
-
-    // Validasi berdasarkan tipe
-    if (type === 'barang') {
-      if (!namaBarang || !jenisBarang || !spesifikBarang || !jumlahBarang || 
-          !hargaBarang || !deskripsiProduk || !lokasi || !kebijakanKerusakan || 
-          !denda || !syaratSewa) {
-        return NextResponse.json({
-          success: false,
-          message: 'Semua field barang wajib diisi!'
-        }, { status: 400 });
-      }
-    } else if (type === 'jasa') {
-      if (!spesialisasi || !deskripsi || !benefit || !tarif || 
-          !jangkauanWilayah || jangkauanWilayah.length === 0 ||
-          !jamOperasional || !estimasiPengerjaan || !garansiLayanan) {
-        return NextResponse.json({
-          success: false,
-          message: 'Semua field jasa wajib diisi!'
-        }, { status: 400 });
-      }
-    }
-
-    // Buat service baru berdasarkan tipe
-    let newService;
-    if (type === 'barang') {
-      newService = {
-        id: Date.now().toString(),
-        vendorId,
-        vendorName,
-        category: 'barang',
-        title: namaBarang,
-        shortDescription: spesifikBarang,
-        description: deskripsiProduk,
-        price: parseInt(hargaBarang),
-        type: 'barang',
-        jenisBarang,
-        jumlahBarang: parseInt(jumlahBarang),
-        availableQuantity: legacyAvailability,
-        lokasi,
-        latitude,
-        longitude,
-        kebijakanKerusakan,
-        denda: parseInt(denda),
-        syaratSewa,
-        rating: 5.0,
-        rentCount: '0',
-        images: images && images.length > 0 ? images : ['https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=150&q=80']
-      };
-    } else if (type === 'jasa') {
-      newService = {
-        id: Date.now().toString(),
-        vendorId,
-        vendorName,
-        category: 'jasa',
-        title: spesialisasi,
-        shortDescription: benefit,
-        description: deskripsi,
-        price: parseInt(tarif),
-        type: 'jasa',
-        spesialisasi,
-        jangkauanWilayah,
-        jamOperasional,
-        estimasiPengerjaan,
-        garansiLayanan,
-        rating: 5.0,
-        rentCount: '0',
-        availability: 0,
-        availableQuantity: 0,
-        quantity: 0,
-        images: images && images.length > 0 ? images : ['https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=150&q=80']
-      };
-    }
-
-    services.push(newService);
-    await fs.writeFile(filePath, JSON.stringify(services, null, 2));
-
     return NextResponse.json({
-      success: true,
-      message: `${type === 'barang' ? 'Barang' : 'Jasa'} berhasil ditambahkan!`,
-      data: newService
-    }, { status: 201 });
+      success: false,
+      message: 'Payload tidak valid'
+    }, { status: 400 });
   } catch (error) {
-    console.error('Error di API Vendor Services:', error);
+    console.error('Error di API Vendor Services POST:', error);
     return NextResponse.json({
       success: false,
       message: 'Terjadi kesalahan server: ' + error.message
@@ -322,72 +279,59 @@ export async function PUT(request) {
       }, { status: 400 });
     }
 
-    const filePath = path.join(process.cwd(), 'services.json');
-    let fileData = await fs.readFile(filePath, 'utf-8');
-    fileData = fileData.replace(/^\uFEFF/, '').trim();
-    let services = JSON.parse(fileData).map(normalizeServiceCapacity);
-
-    // Cari dan update service
-    const serviceIndex = services.findIndex(s => s.id === id && s.vendorId === vendorId);
-    
-    if (serviceIndex === -1) {
+    // Cek apakah service ada
+    const existing = await query('SELECT * FROM services WHERE id = ? AND vendor_id = ? LIMIT 1', [id, vendorId]);
+    if (!existing || existing.length === 0) {
       return NextResponse.json({
         success: false,
         message: 'Service tidak ditemukan'
       }, { status: 404 });
     }
 
-    // Update service
-    services[serviceIndex] = {
-      ...services[serviceIndex],
-      mainCategory: mainCategory || services[serviceIndex].mainCategory,
-      subCategory: subCategory || services[serviceIndex].subCategory,
-      superSubCategory: superSubCategory !== undefined ? superSubCategory : (services[serviceIndex].superSubCategory || ''),
-      title: title || services[serviceIndex].title,
-      shortDescription: shortDescription || services[serviceIndex].shortDescription,
-      description: description || services[serviceIndex].description,
-      price: price !== undefined ? price : services[serviceIndex].price,
-      minimumDays: minimumDays || services[serviceIndex].minimumDays,
-      availability: availability !== undefined
-        ? availability
-        : (services[serviceIndex].availability ?? 0),
-      availableQuantity: availability !== undefined
-        ? availability
-        : (services[serviceIndex].availableQuantity ?? services[serviceIndex].availability ?? 0),
-      quantity: quantity !== undefined
-        ? quantity
-        : (
-            availability !== undefined
-              ? availability
-              : services[serviceIndex].quantity
-          ),
-      rentalPolicy: rentalPolicy || services[serviceIndex].rentalPolicy,
-      location: location || services[serviceIndex].location,
-      type: type || services[serviceIndex].type,
-      images: images && images.length > 0 ? images : services[serviceIndex].images,
-      category: category || services[serviceIndex].category,
-      specifications: specifications && typeof specifications === 'object'
-        ? specifications
-        : (services[serviceIndex].specifications || {}),
-      descriptionTable: descriptionTable && typeof descriptionTable === 'object'
-        ? descriptionTable
-        : (services[serviceIndex].descriptionTable || {}),
-      checklist: checklist && typeof checklist === 'object'
-        ? checklist
-        : (services[serviceIndex].checklist || {}),
-      items: items && Array.isArray(items)
-        ? items
-        : (services[serviceIndex].items || [])
-    };
+    const service = existing[0];
 
-    services[serviceIndex] = normalizeServiceCapacity(services[serviceIndex]);
+    // Update SQL
+    const updateSql = `UPDATE services SET 
+      main_category = ?, sub_category = ?, super_sub_category = ?, title = ?,
+      short_description = ?, description = ?, price = ?, minimum_days = ?,
+      availability = ?, available_quantity = ?, quantity = ?, rental_policy = ?,
+      location = ?, type = ?, images = ?, category = ?, specifications = ?,
+      description_table = ?, checklist = ?, items = ?
+      WHERE id = ? AND vendor_id = ?`;
 
-    await fs.writeFile(filePath, JSON.stringify(services, null, 2));
+    const updateValues = [
+      mainCategory || service.main_category,
+      subCategory || service.sub_category,
+      superSubCategory !== undefined ? superSubCategory : (service.super_sub_category || ''),
+      title || service.title,
+      shortDescription || service.short_description,
+      description || service.description,
+      price !== undefined ? price : service.price,
+      minimumDays || service.minimum_days,
+      availability !== undefined ? availability : (service.availability ?? 0),
+      availability !== undefined ? availability : (service.available_quantity ?? service.availability ?? 0),
+      quantity !== undefined ? quantity : (availability !== undefined ? availability : service.quantity),
+      rentalPolicy || service.rental_policy,
+      location || service.location,
+      type || service.type,
+      JSON.stringify(images && images.length > 0 ? images : JSON.parse(service.images || '[]')),
+      category || service.category,
+      JSON.stringify(specifications || JSON.parse(service.specifications || '{}')),
+      JSON.stringify(descriptionTable || JSON.parse(service.description_table || '{}')),
+      JSON.stringify(checklist || JSON.parse(service.checklist || '{}')),
+      JSON.stringify(items || JSON.parse(service.items || '[]')),
+      id,
+      vendorId
+    ];
+
+    await query(updateSql, updateValues);
+
+    const updated = await query('SELECT * FROM services WHERE id = ? AND vendor_id = ? LIMIT 1', [id, vendorId]);
 
     return NextResponse.json({
       success: true,
       message: 'Service berhasil diperbarui!',
-      data: services[serviceIndex]
+      data: normalizeServiceCapacity(updated[0])
     }, { status: 200 });
   } catch (error) {
     console.error('Error di API PUT Vendor Services:', error);
@@ -414,15 +358,9 @@ export async function DELETE(request) {
       }, { status: 400 });
     }
 
-    const filePath = path.join(process.cwd(), 'services.json');
-    let fileData = await fs.readFile(filePath, 'utf-8');
-    fileData = fileData.replace(/^\uFEFF/, '').trim();
-    let services = JSON.parse(fileData);
-
-    // Cari service
-    const serviceIndex = services.findIndex(s => s.id === id && s.vendorId === vendorId);
-    
-    if (serviceIndex === -1) {
+    // Cek apakah service ada
+    const existing = await query('SELECT * FROM services WHERE id = ? AND vendor_id = ? LIMIT 1', [id, vendorId]);
+    if (!existing || existing.length === 0) {
       return NextResponse.json({
         success: false,
         message: 'Service tidak ditemukan'
@@ -430,8 +368,7 @@ export async function DELETE(request) {
     }
 
     // Hapus service
-    services.splice(serviceIndex, 1);
-    await fs.writeFile(filePath, JSON.stringify(services, null, 2));
+    await query('DELETE FROM services WHERE id = ? AND vendor_id = ?', [id, vendorId]);
 
     return NextResponse.json({
       success: true,

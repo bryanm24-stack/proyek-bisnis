@@ -1,7 +1,7 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
+
+import { readData, writeData } from '@/lib/storage';
 /**
  * POST /api/bookings/return-confirmed
  * Called by vendor after return is approved
@@ -20,10 +20,7 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const servicesPath = path.join(process.cwd(), 'services.json');
-    let servicesData = await fs.readFile(servicesPath, 'utf-8');
-    servicesData = servicesData.replace(/^\uFEFF/, '').trim();
-    const services = JSON.parse(servicesData);
+    const services = await readData('services');
 
     // Find service
     const serviceIndex = services.findIndex(s => String(s.id) === String(serviceId));
@@ -100,7 +97,7 @@ export async function POST(request) {
     service.availableQuantity = Math.max(0, currentStock - bookedQuantity);
 
     // Save updated services
-    await fs.writeFile(servicesPath, JSON.stringify(services, null, 2));
+    await writeData('service', services);
 
     console.log(`✅ Return confirmed for booking ${bookingId}. Stock incremented by ${booking.quantity}.`);
 

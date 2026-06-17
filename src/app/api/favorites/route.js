@@ -1,9 +1,39 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
+import { query } from '@/lib/db';
 
+
+import { readData, writeData } from '@/lib/storage';
 // Helper: Normalize ID for consistent comparison
 const normalizeId = (id) => String(id || '').trim();
+const SERVICE_FAVORITE_TYPE = 'service';
+const SUPPORTED_FAVORITE_TYPES = [SERVICE_FAVORITE_TYPE];
+
+async function getFavoritesByUser(userId) {
+  const result = await query(
+    'SELECT id, user_id AS userId, service_id AS serviceId, created_at AS createdAt FROM favorites WHERE user_id = ? ORDER BY created_at',
+    [userId]
+  );
+  return result;
+}
+
+async function findFavorite(userId, serviceId) {
+  const result = await query(
+    'SELECT id, user_id AS userId, service_id AS serviceId, created_at AS createdAt FROM favorites WHERE user_id = ? AND service_id = ? LIMIT 1',
+    [userId, serviceId]
+  );
+  return result[0];
+}
+
+async function insertFavorite(userId, serviceId) {
+  const id = `fav_${Date.now()}`;
+  await query('INSERT INTO favorites (id, user_id, service_id) VALUES (?, ?, ?)', [id, userId, serviceId]);
+  return { id, userId, serviceId, createdAt: new Date().toISOString() };
+}
+
+async function removeFavorite(userId, serviceId) {
+  const result = await query('DELETE FROM favorites WHERE user_id = ? AND service_id = ?', [userId, serviceId]);
+  return result.affectedRows || 0;
+}
 
 // GET - Fetch user's favorites
 export async function GET(request) {
@@ -18,14 +48,7 @@ export async function GET(request) {
       );
     }
 
-    const favoritesPath = path.join(process.cwd(), 'favorites.json');
-    const data = await fs.readFile(favoritesPath, 'utf-8');
-    const favorites = JSON.parse(data);
-
-    // Filter favorites by userId
-    const userFavorites = favorites.filter(
-      (fav) => normalizeId(fav.userId) === normalizeId(userId)
-    );
+    const userFavorites = await getFavoritesByUser(userId);
 
     return NextResponse.json(
       {
@@ -48,85 +71,48 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { userId, serviceId, vendorId, type } = body;
+    const { userId, serviceId, type } = body;
 
-    if (!userId || !type || (!serviceId && !vendorId)) {
+    if (!userId || !type || !serviceId) {
       return NextResponse.json(
-        { success: false, message: 'userId, type, dan serviceId/vendorId diperlukan' },
+        { success: false, message: 'userId, type, dan serviceId diperlukan' },
         { status: 400 }
       );
     }
 
-    // type harus 'service' atau 'vendor'
-    if (!['service', 'vendor'].includes(type)) {
+    if (!SUPPORTED_FAVORITE_TYPES.includes(type)) {
       return NextResponse.json(
-        { success: false, message: "type harus 'service' atau 'vendor'" },
+        { success: false, message: "Hanya type 'service' yang didukung untuk SQL favorites" },
         { status: 400 }
       );
     }
 
-    const favoritesPath = path.join(process.cwd(), 'favorites.json');
-    const data = await fs.readFile(favoritesPath, 'utf-8');
-    const favorites = JSON.parse(data);
-
-    const itemId = type === 'service' ? serviceId : vendorId;
-
-    // Cek apakah sudah di-favorite
-    const existingFavorite = favorites.find(
-      (fav) =>
-        normalizeId(fav.userId) === normalizeId(userId) &&
-        normalizeId(fav[type === 'service' ? 'serviceId' : 'vendorId']) === normalizeId(itemId)
-    );
+    const itemId = serviceId;
+    const existingFavorite = await findFavorite(userId, itemId);
 
     if (existingFavorite) {
-      // Hapus favorite (toggle off)
-      const updatedFavorites = favorites.filter(
-        (fav) =>
-          !(
-            normalizeId(fav.userId) === normalizeId(userId) &&
-            normalizeId(fav[type === 'service' ? 'serviceId' : 'vendorId']) === normalizeId(itemId)
-          )
-      );
-
-      await fs.writeFile(
-        favoritesPath,
-        JSON.stringify(updatedFavorites, null, 2)
-      );
-
+      const deletedCount = await removeFavorite(userId, itemId);
       return NextResponse.json(
         {
           success: true,
-          message: `${type === 'service' ? 'Layanan' : 'Vendor'} dihapus dari favorit`,
-          isFavorite: false
+          message: 'Layanan dihapus dari favorit',
+          isFavorite: false,
+          deletedCount
         },
         { status: 200 }
       );
-    } else {
-      // Tambah favorite
-      const newFavorite = {
-        id: `fav_${Date.now()}`,
-        userId,
-        ...(type === 'service' ? { serviceId } : { vendorId }),
-        type,
-        createdAt: new Date().toISOString()
-      };
-
-      favorites.push(newFavorite);
-      await fs.writeFile(
-        favoritesPath,
-        JSON.stringify(favorites, null, 2)
-      );
-
-      return NextResponse.json(
-        {
-          success: true,
-          message: `${type === 'service' ? 'Layanan' : 'Vendor'} ditambahkan ke favorit`,
-          data: newFavorite,
-          isFavorite: true
-        },
-        { status: 201 }
-      );
     }
+
+    const newFavorite = await insertFavorite(userId, itemId);
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Layanan ditambahkan ke favorit',
+        data: newFavorite,
+        isFavorite: true
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('Error managing favorite:', error);
     return NextResponse.json(
@@ -140,46 +126,34 @@ export async function POST(request) {
 export async function DELETE(request) {
   try {
     const body = await request.json();
-    const { userId, serviceId, vendorId, type } = body;
+    const { userId, serviceId, type } = body;
 
-    if (!userId || !type || (!serviceId && !vendorId)) {
+    if (!userId || !type || !serviceId) {
       return NextResponse.json(
-        { success: false, message: 'userId, type, dan serviceId/vendorId diperlukan' },
+        { success: false, message: 'userId, type, dan serviceId diperlukan' },
         { status: 400 }
       );
     }
 
-    const favoritesPath = path.join(process.cwd(), 'favorites.json');
-    const data = await fs.readFile(favoritesPath, 'utf-8');
-    let favorites = JSON.parse(data);
+    if (!SUPPORTED_FAVORITE_TYPES.includes(type)) {
+      return NextResponse.json(
+        { success: false, message: "Hanya type 'service' yang didukung untuk SQL favorites" },
+        { status: 400 }
+      );
+    }
 
-    const itemId = type === 'service' ? serviceId : vendorId;
-
-    const favoriteCount = favorites.length;
-    favorites = favorites.filter(
-      (fav) =>
-        !(
-          normalizeId(fav.userId) === normalizeId(userId) &&
-          normalizeId(fav[type === 'service' ? 'serviceId' : 'vendorId']) === normalizeId(itemId)
-        )
-    );
-
-    if (favorites.length === favoriteCount) {
+    const deletedCount = await removeFavorite(userId, serviceId);
+    if (deletedCount === 0) {
       return NextResponse.json(
         { success: false, message: 'Favorite tidak ditemukan' },
         { status: 404 }
       );
     }
 
-    await fs.writeFile(
-      favoritesPath,
-      JSON.stringify(favorites, null, 2)
-    );
-
     return NextResponse.json(
       {
         success: true,
-        message: `${type === 'service' ? 'Layanan' : 'Vendor'} dihapus dari favorit`
+        message: 'Layanan dihapus dari favorit'
       },
       { status: 200 }
     );

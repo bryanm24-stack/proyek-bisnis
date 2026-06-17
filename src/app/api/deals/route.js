@@ -1,7 +1,7 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
+
+import { readData, writeData } from '@/lib/storage';
 // Helper: Normalize ID for consistent comparison
 const normalizeId = (id) => String(id || '').trim();
 
@@ -58,9 +58,8 @@ const enrichDealWithItemContext = (deal, chatRoom, service) => {
 // Helper function to create notification
 async function createNotification(userId, type, message, relatedId, relatedData = {}) {
   try {
-    const notificationsPath = path.join(process.cwd(), 'notifications.json');
-    const data = await fs.readFile(notificationsPath, 'utf-8');
-    const notifications = JSON.parse(data);
+    const data = await readData('notifications');
+    const notifications = data;
 
     const newNotification = {
       id: `notif_${Date.now()}`,
@@ -74,7 +73,7 @@ async function createNotification(userId, type, message, relatedId, relatedData 
     };
 
     notifications.push(newNotification);
-    await fs.writeFile(notificationsPath, JSON.stringify(notifications, null, 2));
+    await writeData('notification', notifications);
 
     return newNotification;
   } catch (error) {
@@ -92,15 +91,11 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Action diperlukan' }, { status: 400 });
     }
 
-    const chatsPath = path.join(process.cwd(), 'chats.json');
-    const dealsPath = path.join(process.cwd(), 'deals.json');
-    const servicesPath = path.join(process.cwd(), 'services.json');
-    const invoicesPath = path.join(process.cwd(), 'invoices.json');
 
-    const chatsData = await fs.readFile(chatsPath, 'utf-8');
-    const chats = JSON.parse(chatsData);
-    const dealsData = await fs.readFile(dealsPath, 'utf-8');
-    const deals = JSON.parse(dealsData);
+    const chatsData = await readData('chats');
+    const chats = chatsData;
+    const dealsData = await readData('deals');
+    const deals = dealsData;
 
     // Handle vendor discount after deal is agreed
     if (action === 'apply-discount') {
@@ -132,8 +127,8 @@ export async function POST(request) {
       }
 
       if (typeof deal.originalPrice === 'undefined' || deal.originalPrice === null) {
-        const servicesData = await fs.readFile(servicesPath, 'utf-8');
-        const services = JSON.parse(servicesData);
+        const servicesData = await readData('services');
+        const services = servicesData;
         const svc = services.find(s => normalizeId(s.id) === normalizeId(deal.serviceId));
         const chatRoom = chats.find(c => normalizeId(c.id) === normalizeId(chatId));
         deal.originalPrice = resolveDealPrice(svc, deal.itemId || chatRoom?.itemId || null);
@@ -171,17 +166,11 @@ export async function POST(request) {
       deal.finalPrice = finalPrice;
       deal.discountUpdatedAt = new Date().toISOString();
 
-      await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+      await writeData('deal', deals);
 
       // Ensure invoice pending exists right after deal + discount so vendor can track waiting payment.
       try {
-        let invoices = [];
-        try {
-          const invoicesData = await fs.readFile(invoicesPath, 'utf-8');
-          invoices = JSON.parse(invoicesData);
-        } catch {
-          invoices = [];
-        }
+        const invoices = await readData('invoices');
 
         const now = new Date();
         const deadline = new Date(now);
@@ -220,7 +209,7 @@ export async function POST(request) {
           });
         }
 
-        await fs.writeFile(invoicesPath, JSON.stringify(invoices, null, 2));
+        await writeData('invoices', invoices);
       } catch (invoiceError) {
         console.warn('Could not create pending invoice after discount:', invoiceError);
       }
@@ -267,8 +256,8 @@ export async function POST(request) {
         existingDeal.vendorAccepted = false;
         existingDeal.ratingCompleted = false;
         chatRoom.dealStatus = 'pending';
-        await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
-        await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
+        await writeData('deal', deals);
+        await writeData('chat', chats);
 
         await createNotification(vendorId, 'deal_pending', 'Ada penawaran baru dari customer', chatId, { customerId, serviceId });
 
@@ -277,13 +266,13 @@ export async function POST(request) {
 
       // Otherwise, cancel the deal normally
       chatRoom.dealStatus = 'cancelled';
-      await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
+      await writeData('chat', chats);
 
       // Find and update deal status if exists
       if (existingDeal) {
         existingDeal.status = 'cancelled';
       }
-      await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+      await writeData('deal', deals);
 
       await createNotification(vendorId, 'deal_cancelled', 'Deal dibatalkan oleh customer', chatId, { customerId, serviceId });
 
@@ -322,8 +311,8 @@ export async function POST(request) {
         // load service price if available
         let originalPrice = null;
         try {
-          const servicesData = await fs.readFile(servicesPath, 'utf-8');
-          const services = JSON.parse(servicesData);
+          const servicesData = await readData('services');
+          const services = servicesData;
           const svc = services.find(s => s.id === serviceId);
           originalPrice = resolveDealPrice(svc, chatRoom.itemId || null) || null;
         } catch (e) {
@@ -369,8 +358,8 @@ export async function POST(request) {
         chatRoom.dealStatus = 'pending';
         chatRoom.closedAt = null;
         chatRoom.closedReason = null;
-        await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
-        await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
+        await writeData('deal', deals);
+        await writeData('chat', chats);
 
         // Create notification untuk vendor
         await createNotification(vendorId, 'deal_pending', 'Ada penawaran baru dari customer', chatId, { customerId, serviceId });
@@ -385,8 +374,8 @@ export async function POST(request) {
           // Create FRESH deal with reset dates
           let originalPrice = null;
           try {
-            const servicesData = await fs.readFile(servicesPath, 'utf-8');
-            const services = JSON.parse(servicesData);
+            const servicesData = await readData('services');
+            const services = servicesData;
             const svc = services.find(s => s.id === existingDeal.serviceId);
             originalPrice = resolveDealPrice(svc, existingDeal.itemId || chatRoom.itemId || null) || null;
           } catch (e) {
@@ -439,8 +428,8 @@ export async function POST(request) {
           chatRoom.dealStatus = 'pending';
           chatRoom.closedAt = null;
           chatRoom.closedReason = null;
-          await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
-          await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
+          await writeData('deal', deals);
+          await writeData('chat', chats);
 
           // Notify vendor to accept this new cycle
           await createNotification(vendorId, 'deal_pending', 'Ada penawaran baru dari customer', chatId, { customerId, serviceId });
@@ -473,8 +462,8 @@ export async function POST(request) {
         // load original price if missing
         if (typeof existingDeal.originalPrice === 'undefined' || existingDeal.originalPrice === null) {
           try {
-            const servicesData = await fs.readFile(servicesPath, 'utf-8');
-            const services = JSON.parse(servicesData);
+            const servicesData = await readData('services');
+            const services = servicesData;
             const svc = services.find(s => s.id === existingDeal.serviceId);
             existingDeal.originalPrice = resolveDealPrice(svc, existingDeal.itemId || chatRoom.itemId || null) || null;
             existingDeal.finalPrice = existingDeal.originalPrice;
@@ -485,8 +474,7 @@ export async function POST(request) {
 
         // ✅ FIX #2: Create booking record when deal is agreed (BEFORE payment)
         try {
-          const servicesData = await fs.readFile(servicesPath, 'utf-8');
-          let parsedServices = JSON.parse(servicesData);
+          const parsedServices = await readData('services');
           const serviceIndex = parsedServices.findIndex(s => String(s.id) === String(existingDeal.serviceId));
           
           if (serviceIndex !== -1) {
@@ -508,7 +496,7 @@ export async function POST(request) {
             };
             
             service.bookings.push(newBooking);
-            await fs.writeFile(servicesPath, JSON.stringify(parsedServices, null, 2));
+            await writeData('parsedService', parsedServices);
             
             // Store bookingId in deal for reference
             existingDeal.bookingId = newBooking.id;
@@ -521,8 +509,8 @@ export async function POST(request) {
         chatRoom.dealStatus = 'agreed';
         chatRoom.closedAt = null;
         chatRoom.closedReason = null;
-        await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
-        await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
+        await writeData('deal', deals);
+        await writeData('chat', chats);
 
         // Create notification untuk customer
         await createNotification(customerId, 'deal_accepted', 'Vendor menerima penawaran Anda!', chatId, { vendorId, serviceId });
@@ -552,15 +540,12 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    const dealsPath = path.join(process.cwd(), 'deals.json');
-    const chatsPath = path.join(process.cwd(), 'chats.json');
-    const servicesPath = path.join(process.cwd(), 'services.json');
-    const dealsData = await fs.readFile(dealsPath, 'utf-8');
-    const deals = JSON.parse(dealsData);
-    const chatsData = await fs.readFile(chatsPath, 'utf-8');
-    const chats = JSON.parse(chatsData);
-    const servicesData = await fs.readFile(servicesPath, 'utf-8');
-    const services = JSON.parse(servicesData);
+    const dealsData = await readData('deals');
+    const deals = dealsData;
+    const chatsData = await readData('chats');
+    const chats = chatsData;
+    const servicesData = await readData('services');
+    const services = servicesData;
 
     const deal = findLatestDealByChatId(deals, chatId);
     const chatRoom = chats.find((chat) => normalizeId(chat.id) === normalizeId(chatId));

@@ -1,7 +1,7 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
+
+import { readData, writeData } from '@/lib/storage';
 // POST - Submit rating and increment rentCount
 export async function POST(request) {
   try {
@@ -22,16 +22,9 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const ratingsPath = path.join(process.cwd(), 'ratings.json');
-    const servicesPath = path.join(process.cwd(), 'services.json');
-    const dealsPath = path.join(process.cwd(), 'deals.json');
-    const chatsPath = path.join(process.cwd(), 'chats.json');
-    const usersPath = path.join(process.cwd(), 'users.json');
 
-    const ratingsData = await fs.readFile(ratingsPath, 'utf-8');
-    const ratings = JSON.parse(ratingsData.trim());
-    const servicesData = await fs.readFile(servicesPath, 'utf-8');
-    const services = JSON.parse(servicesData.trim());
+    const ratings = await readData('ratings');
+    const services = await readData('services');
 
     // Cari service
     const service = services.find(s => s.id === serviceId);
@@ -95,8 +88,7 @@ export async function POST(request) {
     let chatResetAfterRating = false;
     if (dealId) {
       try {
-        const dealsData = await fs.readFile(dealsPath, 'utf-8');
-        const deals = JSON.parse(dealsData.trim());
+        const deals = await readData('deals');
         const deal = deals.find(d => d.id === dealId);
         if (deal) {
           deal.ratingCompleted = true;
@@ -105,28 +97,26 @@ export async function POST(request) {
           const shouldResetForNewCycle = serviceType === 'barang';
 
           // Barang: setelah rating, buka kembali deal/chat agar siap siklus beli berikutnya.
-          const usersData = await fs.readFile(usersPath, 'utf-8');
-          const users = JSON.parse(usersData.trim());
+          const users = await readData('users');
           const customerUser = users.find((u) => String(u.id) === String(deal.customerId));
           const vendorUser = users.find((u) => String(u.id) === String(deal.vendorId));
           const isVendorToVendor = customerUser?.role === 'vendor' && vendorUser?.role === 'vendor';
 
           if ((shouldResetForNewCycle || isVendorToVendor) && deal.chatId) {
-            const chatsData = await fs.readFile(chatsPath, 'utf-8');
-            const chats = JSON.parse(chatsData.trim());
+            const chats = await readData('chats');
             const chat = chats.find((c) => String(c.id) === String(deal.chatId));
 
             if (chat) {
               chat.dealStatus = 'pending';
               chat.closedAt = null;
               chat.closedReason = null;
-              await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2));
+              await writeData('chat', chats);
               updatedChat = chat;
               chatResetAfterRating = true;
             }
           }
 
-          await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+          await writeData('deal', deals);
         }
       } catch (e) {
         console.warn('Could not update deal ratingCompleted:', e);
@@ -134,8 +124,8 @@ export async function POST(request) {
     }
 
     // Simpan perubahan
-    await fs.writeFile(ratingsPath, JSON.stringify(ratings, null, 2));
-    await fs.writeFile(servicesPath, JSON.stringify(services, null, 2));
+    await writeData('rating', ratings);
+    await writeData('service', services);
 
     return NextResponse.json({
       success: true,
@@ -170,13 +160,9 @@ export async function PUT(request) {
       }, { status: 400 });
     }
 
-    const ratingsPath = path.join(process.cwd(), 'ratings.json');
-    const servicesPath = path.join(process.cwd(), 'services.json');
 
-    const ratingsData = await fs.readFile(ratingsPath, 'utf-8');
-    const ratings = JSON.parse(ratingsData.trim());
-    const servicesData = await fs.readFile(servicesPath, 'utf-8');
-    const services = JSON.parse(servicesData.trim());
+    const ratings = await readData('ratings');
+    const services = await readData('services');
 
     const service = services.find((item) => item.id === serviceId);
     if (!service || service.vendorId !== vendorId) {
@@ -198,7 +184,7 @@ export async function PUT(request) {
     targetRating.vendorReplyAt = targetRating.vendorReply ? new Date().toISOString() : null;
     targetRating.vendorReplyBy = vendorId;
 
-    await fs.writeFile(ratingsPath, JSON.stringify(ratings, null, 2));
+    await writeData('rating', ratings);
 
     return NextResponse.json({
       success: true,
@@ -227,12 +213,8 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    const ratingsPath = path.join(process.cwd(), 'ratings.json');
-    const usersPath = path.join(process.cwd(), 'users.json');
-    const ratingsData = await fs.readFile(ratingsPath, 'utf-8');
-    const ratings = JSON.parse(ratingsData.trim());
-    const usersData = await fs.readFile(usersPath, 'utf-8');
-    const users = JSON.parse(usersData.trim());
+    const ratings = await readData('ratings');
+    const users = await readData('users');
 
     const serviceRatings = ratings
       .filter(r => r.serviceId === serviceId)

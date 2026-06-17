@@ -1,14 +1,12 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
 
-const promosPath = path.join(process.cwd(), 'promos.json');
-const transactionsPath = path.join(process.cwd(), 'transactions.json');
+
+import { readData, writeData } from '@/lib/storage';
 
 async function readPromos() {
   try {
-    const raw = await fs.readFile(promosPath, 'utf-8');
-    const parsed = JSON.parse(raw);
+    const raw = await readData('promos');
+    const parsed = raw;
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -16,13 +14,13 @@ async function readPromos() {
 }
 
 async function writePromos(promos) {
-  await fs.writeFile(promosPath, JSON.stringify(promos, null, 2));
+  await writeData('promos', promos);
 }
 
 async function readTransactions() {
   try {
-    const raw = await fs.readFile(transactionsPath, 'utf-8');
-    const parsed = JSON.parse(raw);
+    const raw = await readData('transactions');
+    const parsed = raw;
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];

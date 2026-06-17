@@ -1,22 +1,15 @@
-import fs from 'fs';
-import path from 'path';
 import { NextResponse } from 'next/server';
-
-const servicesFile = path.join(process.cwd(), 'services.json');
+import { query } from '@/lib/db';
 
 export async function GET(request) {
   try {
-    // Read services.json
-    let servicesData = fs.readFileSync(servicesFile, 'utf-8');
-    servicesData = servicesData.replace(/^\uFEFF/, '').trim();
-    const services = JSON.parse(servicesData);
-    
+    const services = await query('SELECT * FROM services');
     return NextResponse.json(services, { status: 200 });
   } catch (error) {
-    console.error('Error reading services:', error);
+    console.error('Error fetching services from SQL:', error);
     return NextResponse.json({
       success: false,
-      message: 'Gagal membaca data services',
+      message: 'Gagal mengambil data services dari SQL',
       error: error.message
     }, { status: 500 });
   }

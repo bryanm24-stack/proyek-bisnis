@@ -2,7 +2,9 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // Ini router khusus Next.js
+import { useRouter } from 'next/navigation'; 
+import { readData, writeData } from '@/lib/storage';
+// Ini router khusus Next.js
 
 export default function RegisterPage() {
   const router = useRouter(); 

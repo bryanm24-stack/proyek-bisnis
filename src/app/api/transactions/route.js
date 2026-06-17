@@ -1,11 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-
-const transactionsFile = path.join(process.cwd(), 'transactions.json');
-const invoicesFile = path.join(process.cwd(), 'invoices.json');
-const dealsFile = path.join(process.cwd(), 'deals.json');
-const chatsFile = path.join(process.cwd(), 'chats.json');
-const promosFile = path.join(process.cwd(), 'promos.json');
+import { readData, writeData } from '@/lib/storage';
 
 const buildRentalTimeline = (startDate, durationDays) => {
   const parsedStartDate = startDate ? new Date(`${startDate}T00:00:00.000Z`) : null;
@@ -97,12 +90,10 @@ const validatePromoAvailability = (promo, userId, transactions) => {
   return null;
 };
 
-const markPromoClaimed = (promoId, userId) => {
+async function markPromoClaimed(promoId, userId) {
   if (!promoId || !userId) return;
 
-  ensurePromosFile();
-  const raw = fs.readFileSync(promosFile, 'utf-8');
-  const promos = JSON.parse(raw);
+  const promos = await readData('promos');
   const promoIndex = promos.findIndex((item) => String(item.id) === String(promoId));
 
   if (promoIndex === -1) return;
@@ -118,39 +109,20 @@ const markPromoClaimed = (promoId, userId) => {
     updatedAt: new Date().toISOString()
   };
 
-  fs.writeFileSync(promosFile, JSON.stringify(promos, null, 2));
-};
+  await writeData('promos', promos);
+}
 
-// Ensure JSON files exist
-const ensureTransactionsFile = () => {
-  if (!fs.existsSync(transactionsFile)) {
-    fs.writeFileSync(transactionsFile, JSON.stringify([], null, 2));
-  }
-};
-
-const ensureInvoicesFile = () => {
-  if (!fs.existsSync(invoicesFile)) {
-    fs.writeFileSync(invoicesFile, JSON.stringify([], null, 2));
-  }
-};
-
-const ensureDealsFile = () => {
-  if (!fs.existsSync(dealsFile)) {
-    fs.writeFileSync(dealsFile, JSON.stringify([], null, 2));
-  }
-};
-
-const ensurePromosFile = () => {
-  if (!fs.existsSync(promosFile)) {
-    fs.writeFileSync(promosFile, JSON.stringify([], null, 2));
-  }
-};
+// Storage setup helpers are no-ops when using database or storage abstraction.
+const ensureTransactionsFile = async () => {};
+const ensureInvoicesFile = async () => {};
+const ensureDealsFile = async () => {};
+const ensurePromosFile = async () => {};
 
 export async function GET(request) {
   try {
     ensureTransactionsFile();
-    const data = fs.readFileSync(transactionsFile, 'utf-8');
-    const transactions = JSON.parse(data);
+    const data = await readData('transactions');
+    const transactions = data;
     
     return Response.json(transactions);
   } catch (error) {
@@ -168,14 +140,13 @@ export async function POST(request) {
     ensureDealsFile();
     ensurePromosFile();
     
-    const transactionsData = fs.readFileSync(transactionsFile, 'utf-8');
-    let transactions = JSON.parse(transactionsData);
+    let transactions = await readData('transactions');
 
     // PROMO CHECK - Validate promo rules before writing the transaction
     if (body.promoId) {
       try {
-        const promosData = fs.readFileSync(promosFile, 'utf-8');
-        const promos = JSON.parse(promosData);
+        const promosData = await readData('promos');
+        const promos = promosData;
         const promo = promos.find((item) => String(item.id) === String(body.promoId));
 
         if (!promo) {
@@ -209,10 +180,7 @@ export async function POST(request) {
     // AVAILABILITY CHECK - Validasi stok sebelum payment diproses
     if (body.serviceId && body.quantity && body.startDate) {
       try {
-        const servicesFile = path.join(process.cwd(), 'services.json');
-        let servicesData = fs.readFileSync(servicesFile, 'utf-8');
-        servicesData = servicesData.replace(/^\uFEFF/, '').trim();
-        const services = JSON.parse(servicesData);
+        const services = await readData('services');
 
         const service = services.find(s => String(s.id) === String(body.serviceId));
         if (service) {
@@ -282,10 +250,7 @@ export async function POST(request) {
     
     if (body.serviceId && body.itemId) {
       try {
-        const servicesFile = path.join(process.cwd(), 'services.json');
-        let servicesData = fs.readFileSync(servicesFile, 'utf-8');
-        servicesData = servicesData.replace(/^\uFEFF/, '').trim();
-        const services = JSON.parse(servicesData);
+        const services = await readData('services');
         
         const service = services.find(s => String(s.id) === String(body.serviceId));
         if (service && service.items && Array.isArray(service.items)) {
@@ -318,8 +283,7 @@ export async function POST(request) {
     // ✅ NEW: If transaction is tied to a deal, verify the deal exists and is in correct state
     if (body.dealId) {
       try {
-        const dealsData = fs.readFileSync(dealsFile, 'utf-8');
-        const deals = JSON.parse(dealsData || '[]');
+        const deals = await readData('deals');
         const deal = deals.find(d => String(d.id) === String(body.dealId));
         if (!deal) {
           return Response.json({ success: false, error: 'Deal tidak ditemukan', message: 'Deal tidak ditemukan untuk pembayaran ini' }, { status: 404 });
@@ -375,7 +339,7 @@ export async function POST(request) {
     transactions.push(newTransaction);
     
     // Write transaction
-    fs.writeFileSync(transactionsFile, JSON.stringify(transactions, null, 2));
+    await writeData('transactions', transactions);
 
     if (body.promoId && body.status === 'success') {
       try {
@@ -387,8 +351,8 @@ export async function POST(request) {
 
     let currentDeal = null;
     try {
-      const dealsData = fs.readFileSync(dealsFile, 'utf-8');
-      const deals = JSON.parse(dealsData);
+      const dealsData = await readData('deals');
+      const deals = dealsData;
       currentDeal = deals.find((item) => item.id === body.dealId) || null;
     } catch (dealReadError) {
       console.warn('Could not read deal for invoice metadata:', dealReadError);
@@ -397,8 +361,8 @@ export async function POST(request) {
     let currentPromo = null;
     if (body.promoId) {
       try {
-        const promosData = fs.readFileSync(promosFile, 'utf-8');
-        const promos = JSON.parse(promosData);
+        const promosData = await readData('promos');
+        const promos = promosData;
         currentPromo = promos.find((item) => String(item.id) === String(body.promoId)) || null;
       } catch (promoReadError) {
         console.warn('Could not read promo for invoice metadata:', promoReadError);
@@ -407,8 +371,7 @@ export async function POST(request) {
 
     // Create invoice for deal/promo payments (exclude invoice settlement transactions)
     if ((body.dealId || body.promoId) && body.paymentType !== 'invoice_payment') {
-      const invoicesData = fs.readFileSync(invoicesFile, 'utf-8');
-      let invoices = JSON.parse(invoicesData);
+      let invoices = await readData('invoices');
 
       const isPayAfter = body.paymentType === 'pay_after';
       const createdAt = new Date().toISOString();
@@ -450,7 +413,7 @@ export async function POST(request) {
           description: currentPromo.description
         } : null);
         upsertedInvoiceId = existingInvoice.id;
-        fs.writeFileSync(invoicesFile, JSON.stringify(invoices, null, 2));
+        await writeData('invoices', invoices);
       } else {
 
       const newInvoice = {
@@ -484,14 +447,13 @@ export async function POST(request) {
 
       invoices.push(newInvoice);
       upsertedInvoiceId = newInvoice.id;
-      fs.writeFileSync(invoicesFile, JSON.stringify(invoices, null, 2));
+      await writeData('invoices', invoices);
       }
 
       // Update deal with payment info
       try {
-        const dealsData = fs.readFileSync(dealsFile, 'utf-8');
-        let deals = JSON.parse(dealsData);
-        
+        const deals = await readData('deals');
+
         const dealIndex = deals.findIndex(d => d.id === body.dealId);
         if (dealIndex !== -1) {
           deals[dealIndex] = {
@@ -517,7 +479,7 @@ export async function POST(request) {
             durationDays: body.durationDays,
             startDate: body.startDate
           };
-          fs.writeFileSync(dealsFile, JSON.stringify(deals, null, 2));
+          await writeData('deals', deals);
         }
       } catch (dealError) {
         console.warn('Could not update deal:', dealError);
@@ -526,9 +488,9 @@ export async function POST(request) {
         // Keep chat open after payment; only progress status so the flow can continue to rating/new cycle.
         try {
           if (body.dealId) {
-            const chatsData = fs.readFileSync(chatsFile, 'utf-8');
-            const chats = JSON.parse(chatsData);
-            const relatedDeal = JSON.parse(fs.readFileSync(dealsFile, 'utf-8')).find((item) => item.id === body.dealId);
+            const chats = await readData('chats');
+            const deals = await readData('deals');
+            const relatedDeal = deals.find((item) => item.id === body.dealId);
             const chatIndex = chats.findIndex((item) => item.id === relatedDeal?.chatId);
 
             if (chatIndex !== -1) {
@@ -538,7 +500,7 @@ export async function POST(request) {
                 closedAt: null,
                 closedReason: null
               };
-              fs.writeFileSync(chatsFile, JSON.stringify(chats, null, 2));
+              await writeData('chats', chats);
             }
           }
         } catch (chatError) {
@@ -549,10 +511,7 @@ export async function POST(request) {
     // RESERVE BOOKING - Buat booking record saat payment sukses (full payment atau down payment)
     if (body.status === 'success' && body.serviceId && body.quantity && body.startDate) {
       try {
-        const servicesFile = path.join(process.cwd(), 'services.json');
-        let servicesData = fs.readFileSync(servicesFile, 'utf-8');
-        servicesData = servicesData.replace(/^\uFEFF/, '').trim();
-        const services = JSON.parse(servicesData);
+        const services = await readData('services');
 
         const serviceIndex = services.findIndex(s => String(s.id) === String(body.serviceId));
         if (serviceIndex !== -1) {
@@ -626,7 +585,7 @@ export async function POST(request) {
           }
           service.availableQuantity = Math.max(0, totalQuantity - bookedQuantity);
 
-          fs.writeFileSync(servicesFile, JSON.stringify(services, null, 2));
+          await writeData('services', services);
           console.log(`Booking reserved: Transaction ${body.id}, Service ${body.serviceId}, Qty: ${body.quantity}`);
         }
       } catch (reservationError) {

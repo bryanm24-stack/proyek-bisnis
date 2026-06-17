@@ -2,9 +2,10 @@ import fs from 'fs/promises';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
+
+import { readData, writeData } from '@/lib/storage';
 // Helpers: date-only UTC handling to avoid timezone off-by-one
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const invoicesPath = path.join(process.cwd(), 'invoices.json');
 
 async function ensureInvoicesFile() {
   try {
@@ -14,19 +15,12 @@ async function ensureInvoicesFile() {
   }
 }
 
-async function readJsonFile(filePath) {
-  const fileData = await fs.readFile(filePath, 'utf-8');
-  return JSON.parse(fileData.replace(/^\uFEFF/, '').trim());
-}
-
 async function readInvoicesFile() {
-  await ensureInvoicesFile();
-  const fileData = await fs.readFile(invoicesPath, 'utf-8');
-  return JSON.parse(fileData.replace(/^\uFEFF/, '').trim() || '[]');
+  return await readData('invoices');
 }
 
 async function writeInvoicesFile(invoices) {
-  await fs.writeFile(invoicesPath, JSON.stringify(invoices, null, 2), 'utf-8');
+  await writeData('invoices', invoices);
 }
 
 function getCurrentISOString() {
@@ -110,12 +104,9 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    const dealsPath = path.join(process.cwd(), 'deals.json');
-    const servicesPath = path.join(process.cwd(), 'services.json');
-    const usersPath = path.join(process.cwd(), 'users.json');
-    const deals = await readJsonFile(dealsPath);
-    const services = await readJsonFile(servicesPath);
-    const users = await readJsonFile(usersPath);
+    const deals = await readData('deals');
+    const services = await readData('services');
+    const users = await readData('users');
 
     if (userId && userRole) {
       const normalizedUserId = String(userId);
@@ -264,9 +255,7 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const dealsPath = path.join(process.cwd(), 'deals.json');
-    const dealsData = await fs.readFile(dealsPath, 'utf-8');
-    let deals = JSON.parse(dealsData);
+    const deals = await readData('deals');
 
     const dealIndex = deals.findIndex(d => d.id === dealId);
     if (dealIndex === -1) {
@@ -372,14 +361,12 @@ export async function POST(request) {
 
       if (deal.chatId) {
         try {
-          const chatsPath = path.join(process.cwd(), 'chats.json');
-          const chatsData = await fs.readFile(chatsPath, 'utf-8');
-          const chats = JSON.parse(chatsData.replace(/^\uFEFF/, '').trim() || '[]');
+          const chats = await readData('chats');
           const chatIndex = chats.findIndex((c) => String(c.id) === String(deal.chatId));
           if (chatIndex !== -1) {
             chats[chatIndex].dealStatus = 'returning';
             chats[chatIndex].returnRequestedAt = new Date().toISOString();
-            await fs.writeFile(chatsPath, JSON.stringify(chats, null, 2), 'utf-8');
+            await writeData('chat', chats);
           }
         } catch (chatErr) {
           console.warn('Could not update chat status on return initiation:', chatErr.message || chatErr);
@@ -387,7 +374,7 @@ export async function POST(request) {
       }
     }
 
-    await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+    await writeData('deal', deals);
 
     return NextResponse.json({
       success: true,
@@ -434,9 +421,7 @@ export async function PUT(request) {
       }, { status: 400 });
     }
 
-    const dealsPath = path.join(process.cwd(), 'deals.json');
-    const dealsData = await fs.readFile(dealsPath, 'utf-8');
-    let deals = JSON.parse(dealsData);
+    const deals = await readData('deals');
 
     const dealIndex = deals.findIndex(d => d.id === dealId);
     if (dealIndex === -1) {
@@ -541,10 +526,7 @@ export async function PUT(request) {
     // ✅ FIX #2: Update booking status to 'pending_return' (awaiting return confirmation) only for end_of_use flow
     if (deal.returnType === 'end_of_use' && deal.bookingId) {
       try {
-        const servicesPath = path.join(process.cwd(), 'services.json');
-        let servicesData = await fs.readFile(servicesPath, 'utf-8');
-        servicesData = servicesData.replace(/^\uFEFF/, '').trim();
-        const services = JSON.parse(servicesData);
+        const services = await readData('services');
         
         const serviceIndex = services.findIndex(s => s.bookings && s.bookings.find(b => b.id === deal.bookingId));
         if (serviceIndex !== -1) {
@@ -552,7 +534,7 @@ export async function PUT(request) {
           if (booking && booking.status === 'active') {
             booking.status = 'pending_return'; // Item is returned, awaiting vendor inspection
             booking.returnRequestedAt = new Date().toISOString();
-            await fs.writeFile(servicesPath, JSON.stringify(services, null, 2));
+            await writeData('service', services);
           }
         }
       } catch (e) {
@@ -591,7 +573,7 @@ export async function PUT(request) {
       }
     }
 
-    await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+    await writeData('deal', deals);
 
     return NextResponse.json({
       success: true,
@@ -632,9 +614,7 @@ export async function DELETE(request) {
       }, { status: 400 });
     }
 
-    const dealsPath = path.join(process.cwd(), 'deals.json');
-    const dealsData = await fs.readFile(dealsPath, 'utf-8');
-    let deals = JSON.parse(dealsData);
+    const deals = await readData('deals');
 
     const dealIndex = deals.findIndex(d => d.id === dealId);
     if (dealIndex === -1) {
@@ -674,7 +654,7 @@ export async function DELETE(request) {
       }
     }
 
-    await fs.writeFile(dealsPath, JSON.stringify(deals, null, 2));
+    await writeData('deal', deals);
 
     return NextResponse.json({
       success: true,
