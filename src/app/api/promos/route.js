@@ -1,31 +1,7 @@
 import { NextResponse } from 'next/server';
+import { query } from '@/lib/db';
 
-
-import { readData, writeData } from '@/lib/storage';
-
-async function readPromos() {
-  try {
-    const raw = await readData('promos');
-    const parsed = raw;
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-async function writePromos(promos) {
-  await writeData('promos', promos);
-}
-
-async function readTransactions() {
-  try {
-    const raw = await readData('transactions');
-    const parsed = raw;
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
+// Removed - using SQL queries directly
 
 function toValidDate(value) {
   if (!value) return null;
@@ -33,35 +9,31 @@ function toValidDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function normalizePromo(promo, now = Date.now()) {
-  const startAtDate = toValidDate(promo.startAt);
-  const endAtDate = toValidDate(promo.endAt);
-  const claimedUserIds = Array.isArray(promo.claimedUserIds)
-    ? promo.claimedUserIds.map((userId) => String(userId))
-    : [];
-  const maxApplicants = promo.maxApplicants === undefined || promo.maxApplicants === null || promo.maxApplicants === ''
-    ? null
-    : Number(promo.maxApplicants);
-  const claimedCount = Number.isFinite(Number(promo.claimedCount))
-    ? Number(promo.claimedCount)
-    : claimedUserIds.length;
-  const hasStarted = !startAtDate || startAtDate.getTime() <= now;
-  const hasEnded = !endAtDate || endAtDate.getTime() > now;
-  const remainingApplicants = Number.isFinite(maxApplicants)
-    ? Math.max(0, maxApplicants - claimedCount)
-    : null;
+function normalizePromo(promo) {
+  const startAtDate = toValidDate(promo.start_at || promo.startAt);
+  const endAtDate = toValidDate(promo.end_at || promo.endAt);
+  const maxApplicants = promo.max_applicants || promo.maxApplicants;
+  const claimedCount = promo.claimed_count || 0;
+  const now = Date.now();
 
   return {
-    ...promo,
-    startAt: startAtDate ? startAtDate.toISOString() : (promo.startAt || null),
-    endAt: endAtDate ? endAtDate.toISOString() : (promo.endAt || null),
-    maxApplicants: Number.isFinite(maxApplicants) ? maxApplicants : null,
+    id: promo.id,
+    vendorId: promo.vendor_id,
+    vendorName: promo.vendor_name,
+    title: promo.title,
+    image: promo.image,
+    promoPrice: promo.promo_price,
+    description: promo.description,
+    active: Boolean(promo.active),
+    startAt: startAtDate ? startAtDate.toISOString() : null,
+    endAt: endAtDate ? endAtDate.toISOString() : null,
+    maxApplicants: maxApplicants ? Number(maxApplicants) : null,
     claimedCount,
-    claimedUserIds,
-    remainingApplicants,
-    isUpcoming: Boolean(startAtDate && startAtDate.getTime() > now),
-    isExpired: Boolean(endAtDate && endAtDate.getTime() <= now),
-    isActiveNow: promo.active !== false && hasStarted && hasEnded && (remainingApplicants === null || remainingApplicants > 0)
+    createdAt: promo.created_at,
+    updatedAt: promo.updated_at,
+    isUpcoming: startAtDate && startAtDate.getTime() > now,
+    isExpired: endAtDate && endAtDate.getTime() <= now,
+    isActiveNow: promo.active && (!startAtDate || startAtDate.getTime() <= now) && (!endAtDate || endAtDate.getTime() > now)
   };
 }
 
@@ -73,41 +45,30 @@ export async function GET(request) {
     const vendorId = searchParams.get('vendorId');
     const active = searchParams.get('active');
     const promoId = searchParams.get('promoId');
-    const userId = searchParams.get('userId');
 
-    const transactions = userId ? await readTransactions() : [];
-    let promos = (await readPromos()).map((promo) => {
-      const normalizedPromo = normalizePromo(promo);
-
-      if (userId) {
-        const hasClaimedInTransactions = transactions.some(
-          (transaction) =>
-            String(transaction.promoId) === String(promo.id) &&
-            String(transaction.userId) === String(userId) &&
-            transaction.status === 'success'
-        );
-
-        normalizedPromo.userHasClaimed = normalizedPromo.claimedUserIds.includes(String(userId)) || hasClaimedInTransactions;
-      }
-
-      return normalizedPromo;
-    });
+    let sql = 'SELECT * FROM promos WHERE 1=1';
+    const params = [];
 
     if (promoId) {
-      promos = promos.filter((promo) => String(promo.id) === String(promoId));
+      sql += ' AND id = ?';
+      params.push(promoId);
     }
 
     if (vendorId) {
-      promos = promos.filter((promo) => promo.vendorId === vendorId);
+      sql += ' AND vendor_id = ?';
+      params.push(vendorId);
     }
+
+    sql += ' ORDER BY created_at DESC';
+
+    const promos = await query(sql, params);
+    let processedPromos = promos.map(normalizePromo);
 
     if (active === 'true') {
-      promos = promos.filter((promo) => promo.isActiveNow);
+      processedPromos = processedPromos.filter(p => p.isActiveNow);
     }
 
-    promos.sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
-
-    return NextResponse.json({ success: true, data: promos }, { status: 200 });
+    return NextResponse.json({ success: true, data: processedPromos }, { status: 200 });
   } catch (error) {
     console.error('Error reading promos:', error);
     return NextResponse.json({ success: false, message: 'Gagal membaca promo.' }, { status: 500 });
@@ -182,28 +143,46 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const promos = await readPromos();
+    const promoId = Date.now().toString();
+    const now = new Date().toISOString();
+
+    await query(
+      `INSERT INTO promos (id, vendor_id, vendor_name, title, image, promo_price, description, active, start_at, end_at, max_applicants, claimed_count, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        promoId,
+        vendorId,
+        vendorName,
+        String(title).trim(),
+        String(image).trim(),
+        parsedPrice,
+        String(description || '').trim(),
+        Boolean(active) ? 1 : 0,
+        startDate ? startDate.toISOString() : null,
+        endDate ? endDate.toISOString() : null,
+        parsedMaxApplicants,
+        0,
+        now,
+        now
+      ]
+    );
+
     const newPromo = {
-      id: Date.now().toString(),
+      id: promoId,
       vendorId,
       vendorName,
-      title: String(title || '').trim(),
-      image: String(image || '').trim(),
+      title: String(title).trim(),
+      image: String(image).trim(),
       promoPrice: parsedPrice,
       description: String(description || '').trim(),
       active: Boolean(active),
       startAt: startDate ? startDate.toISOString() : null,
       endAt: endDate ? endDate.toISOString() : null,
       maxApplicants: parsedMaxApplicants,
-      claimLimitPerUser: 1,
       claimedCount: 0,
-      claimedUserIds: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      createdAt: now,
+      updatedAt: now
     };
-
-    promos.push(newPromo);
-    await writePromos(promos);
 
     return NextResponse.json({ success: true, message: 'Promo berhasil dibuat.', data: newPromo }, { status: 201 });
   } catch (error) {
@@ -215,53 +194,38 @@ export async function POST(request) {
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const promoIdFromQuery = searchParams.get('id') || searchParams.get('promoId');
-    const vendorIdFromQuery = searchParams.get('vendorId');
+    const promoId = searchParams.get('id') || searchParams.get('promoId');
+    const vendorId = searchParams.get('vendorId');
 
-    let body = {};
-    try {
-      body = await request.json();
-    } catch {
-      body = {};
-    }
-
-    const promoId = promoIdFromQuery || body.promoId || body.id;
-    const vendorId = vendorIdFromQuery || body.vendorId;
-
-    if (!promoId || !vendorId) {
+    if (!promoId) {
       return NextResponse.json({
         success: false,
-        message: 'promoId dan vendorId wajib diisi.'
+        message: 'promoId diperlukan'
       }, { status: 400 });
     }
 
-    const promos = await readPromos();
-    const promoIndex = promos.findIndex((promo) => String(promo.id) === String(promoId));
-
-    if (promoIndex === -1) {
-      return NextResponse.json({
-        success: false,
-        message: 'Promo tidak ditemukan.'
-      }, { status: 404 });
+    // Verify ownership if vendorId provided
+    if (vendorId) {
+      const promo = await query('SELECT vendor_id FROM promos WHERE id = ?', [promoId]);
+      if (promo.length === 0 || String(promo[0].vendor_id) !== String(vendorId)) {
+        return NextResponse.json({
+          success: false,
+          message: 'Anda tidak memiliki izin menghapus promo ini'
+        }, { status: 403 });
+      }
     }
 
-    if (String(promos[promoIndex].vendorId) !== String(vendorId)) {
-      return NextResponse.json({
-        success: false,
-        message: 'Anda tidak berhak menghapus promo ini.'
-      }, { status: 403 });
-    }
-
-    const [deletedPromo] = promos.splice(promoIndex, 1);
-    await writePromos(promos);
+    await query('DELETE FROM promos WHERE id = ?', [promoId]);
 
     return NextResponse.json({
       success: true,
-      message: 'Promo berhasil dihapus.',
-      data: deletedPromo
+      message: 'Promo berhasil dihapus'
     }, { status: 200 });
   } catch (error) {
     console.error('Error deleting promo:', error);
-    return NextResponse.json({ success: false, message: 'Gagal menghapus promo.' }, { status: 500 });
+    return NextResponse.json({
+      success: false,
+      message: 'Gagal menghapus promo'
+    }, { status: 500 });
   }
 }
