@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 
-import { readData, writeData } from '@/lib/storage';
+import { readData, writeData, deleteData } from '@/lib/storage';
 
 async function readPromos() {
   try {
@@ -14,7 +14,14 @@ async function readPromos() {
 }
 
 async function writePromos(promos) {
-  await writeData('promos', promos);
+  try {
+    const result = await writeData('promos', promos);
+    console.debug('promos API: writeData result for promos:', result);
+    return result;
+  } catch (err) {
+    console.error('promos API: writePromos error:', err);
+    throw err;
+  }
 }
 
 async function readTransactions() {
@@ -29,7 +36,16 @@ async function readTransactions() {
 
 function toValidDate(value) {
   if (!value) return null;
-  const date = new Date(value);
+  let normalized = value;
+  if (typeof normalized === 'string') {
+    normalized = normalized.trim();
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(normalized)) {
+      normalized = `${normalized.replace(' ', 'T')}Z`;
+    } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?$/.test(normalized) && !normalized.endsWith('Z')) {
+      normalized = `${normalized.replace(/Z?$/, '')}Z`;
+    }
+  }
+  const date = new Date(normalized);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -46,7 +62,7 @@ function normalizePromo(promo, now = Date.now()) {
     ? Number(promo.claimedCount)
     : claimedUserIds.length;
   const hasStarted = !startAtDate || startAtDate.getTime() <= now;
-  const hasEnded = !endAtDate || endAtDate.getTime() > now;
+  const hasEnded = !endAtDate || endAtDate.getTime() >= now;
   const remainingApplicants = Number.isFinite(maxApplicants)
     ? Math.max(0, maxApplicants - claimedCount)
     : null;
@@ -60,7 +76,7 @@ function normalizePromo(promo, now = Date.now()) {
     claimedUserIds,
     remainingApplicants,
     isUpcoming: Boolean(startAtDate && startAtDate.getTime() > now),
-    isExpired: Boolean(endAtDate && endAtDate.getTime() <= now),
+    isExpired: Boolean(endAtDate && endAtDate.getTime() < now),
     isActiveNow: promo.active !== false && hasStarted && hasEnded && (remainingApplicants === null || remainingApplicants > 0)
   };
 }
@@ -98,7 +114,8 @@ export async function GET(request) {
     }
 
     if (vendorId) {
-      promos = promos.filter((promo) => promo.vendorId === vendorId);
+      // Compare as strings to handle both number and string IDs from database
+      promos = promos.filter((promo) => String(promo.vendorId) === String(vendorId));
     }
 
     if (active === 'true') {
@@ -116,7 +133,19 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    const body = await request.json();
+    const rawText = await request.text();
+    console.debug('promos POST raw body:', rawText);
+    let body;
+    try {
+      body = rawText ? JSON.parse(rawText) : {};
+    } catch (parseErr) {
+      console.error('JSON parse error in promos POST:', parseErr.message);
+      console.error('Raw body was:', rawText);
+      return NextResponse.json({
+        success: false,
+        message: `Invalid JSON: ${parseErr.message}`
+      }, { status: 400 });
+    }
     const {
       vendorId,
       vendorName,
@@ -208,7 +237,9 @@ export async function POST(request) {
     return NextResponse.json({ success: true, message: 'Promo berhasil dibuat.', data: newPromo }, { status: 201 });
   } catch (error) {
     console.error('Error creating promo:', error);
-    return NextResponse.json({ success: false, message: 'Gagal membuat promo.' }, { status: 500 });
+    const message = error && error.message ? String(error.message) : 'Gagal membuat promo.';
+    const stack = error && error.stack ? String(error.stack) : '';
+    return NextResponse.json({ success: false, message: `${message}\n${stack}` }, { status: 500 });
   }
 }
 
@@ -253,7 +284,15 @@ export async function DELETE(request) {
     }
 
     const [deletedPromo] = promos.splice(promoIndex, 1);
-    await writePromos(promos);
+    try {
+      await deleteData('promos', { id: deletedPromo.id });
+    } catch (err) {
+      console.error('Error deleting promo from SQL:', err);
+      return NextResponse.json({
+        success: false,
+        message: 'Gagal menghapus promo dari database.'
+      }, { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,

@@ -136,8 +136,8 @@ export default function HomePageClient() {
     try {
       const cachedUser = JSON.parse(localStorage.getItem('user') || 'null');
       const promoQuery = cachedUser?.id
-        ? `/api/promos?active=true&userId=${encodeURIComponent(cachedUser.id)}`
-        : '/api/promos?active=true';
+        ? `/api/promos?userId=${encodeURIComponent(cachedUser.id)}`
+        : '/api/promos';
       const response = await fetch(promoQuery, { cache: 'no-store' });
       const data = await response.json();
       if (data.success) {
@@ -837,7 +837,7 @@ export default function HomePageClient() {
   // Derive a featured services list for the hero carousel (safe fallback)
   const featuredServices = Array.isArray(filteredServices) ? filteredServices.slice(0, 5) : [];
   const visiblePromos = Array.isArray(promos)
-    ? promos.filter((promo) => Number(promo?.promoPrice) > 0)
+    ? promos.filter((promo) => Number(promo?.promoPrice) > 0 && isPromoActiveNow(promo))
     : [];
 
   const handlePromoCheckout = (promoId) => {
@@ -859,7 +859,7 @@ export default function HomePageClient() {
       return;
     }
 
-    if (promo?.endAt && new Date(promo.endAt).getTime() <= promoNow) {
+    if (promo?.endAt && new Date(promo.endAt).getTime() < promoNow) {
       alert('Promo sudah berakhir.');
       return;
     }
@@ -882,7 +882,7 @@ export default function HomePageClient() {
     if (Number.isNaN(endTime)) return 'Tanpa batas waktu';
 
     const diff = endTime - promoNow;
-    if (diff <= 0) return 'Berakhir';
+    if (diff < 0) return 'Berakhir';
 
     const totalSeconds = Math.floor(diff / 1000);
     const days = Math.floor(totalSeconds / 86400);
@@ -892,6 +892,31 @@ export default function HomePageClient() {
 
     return `${days > 0 ? `${days}d ` : ''}${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`.trim();
   };
+
+  const getImageSrc = (img) => {
+    if (!img) return 'https://via.placeholder.com/800x500?text=Promo';
+    if (typeof img === 'string') return img;
+    if (typeof img === 'object') {
+      if (typeof img.url === 'string' && img.url.trim()) return img.url;
+      if (typeof img.src === 'string' && img.src.trim()) return img.src;
+      if (typeof img.data === 'string' && img.data.trim()) return img.data;
+    }
+    return 'https://via.placeholder.com/800x500?text=Promo';
+  };
+
+  function isPromoActiveNow(promo) {
+    if (!promo) return false;
+    // Check if active field is disabled (0 or false)
+    if (promo.active === 0 || promo.active === false) return false;
+    // If API already calculated isActiveNow, use that (trust API)
+    if (promo.isActiveNow !== undefined) return Boolean(promo.isActiveNow);
+    // Otherwise calculate locally
+    const nowTime = Number.isFinite(Number(promoNow)) ? promoNow : Date.now();
+    const startTime = promo?.startAt ? new Date(promo.startAt).getTime() : -Infinity;
+    const endTime = promo?.endAt ? new Date(promo.endAt).getTime() : Infinity;
+    if (Number.isNaN(startTime) || Number.isNaN(endTime)) return false;
+    return startTime <= nowTime && nowTime <= endTime;
+  }
 
   const getPromoRemainingApplicants = (promo) => {
     if (Number.isFinite(Number(promo?.remainingApplicants))) {
@@ -911,7 +936,7 @@ export default function HomePageClient() {
     : 0;
   const activeServicePromo = selectedServicePromos[normalizedPromoIndex] || null;
   const activeServicePromoRemainingApplicants = getPromoRemainingApplicants(activeServicePromo);
-  const activeServicePromoIsExpired = Boolean(activeServicePromo?.endAt && new Date(activeServicePromo.endAt).getTime() <= promoNow);
+  const activeServicePromoIsExpired = Boolean(activeServicePromo?.endAt && new Date(activeServicePromo.endAt).getTime() < promoNow);
   const activeServicePromoIsClaimed = Boolean(activeServicePromo?.userHasClaimed);
   const activeServicePromoCanCheckout = Boolean(activeServicePromo)
     && !activeServicePromoIsExpired
@@ -1689,7 +1714,7 @@ export default function HomePageClient() {
                             >
                               <div style={{ position: 'relative', height: '190px', background: '#e5e7eb' }}>
                                 <img
-                                  src={activeServicePromo.image || 'https://via.placeholder.com/800x500?text=Promo'}
+                                  src={getImageSrc(activeServicePromo?.image)}
                                   alt={activeServicePromo.title || 'Promo'}
                                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                   onError={(event) => {
