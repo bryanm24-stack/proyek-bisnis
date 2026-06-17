@@ -2,6 +2,18 @@ import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+// Format date untuk MySQL DATETIME(3)
+function formatMySQLDate(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  const ms = String(date.getMilliseconds()).padStart(3, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${ms}`;
+}
+
 // GET - Load existing chat or return null if not found
 export async function GET(request) {
   try {
@@ -103,6 +115,8 @@ export async function POST(request) {
         timestamp: new Date().toISOString()
       }];
 
+      const createdAt = formatMySQLDate();
+
       await query(
         `INSERT INTO chats (id, service_id, service_title, vendor_id, vendor_name, customer_id, customer_name, item_id, item_name, messages, created_at, deal_status)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -117,7 +131,7 @@ export async function POST(request) {
           itemId || null,
           itemName || null,
           JSON.stringify(messages),
-          new Date().toISOString(),
+          createdAt,
           null
         ]
       );
@@ -133,7 +147,7 @@ export async function POST(request) {
         item_id: itemId || null,
         item_name: itemName || null,
         messages,
-        created_at: new Date().toISOString(),
+        created_at: createdAt,
         deal_status: null
       };
     } else {

@@ -4,9 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SharedNavbar from '@/app/components/SharedNavbar';
-
-
-import { readData, writeData } from '@/lib/storage';
 export default function VendorApprovalPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);

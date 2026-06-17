@@ -15,7 +15,7 @@ export async function GET(request) {
         description, detail_description, price, minimum_days, quantity, 
         rental_policy, location, rating, rent_count, images, 
         specifications, specification_options, description_table, checklist,
-        created_at, updated_at
+        created_at
       FROM services
       WHERE 1=1
     `;
@@ -100,14 +100,14 @@ export async function POST(request) {
     const now = new Date().toISOString();
 
     await query(
-      `INSERT INTO services (
+        `INSERT INTO services (
         id, vendor_id, vendor_name, main_category, sub_category, 
         super_sub_category, category, type, title, short_description, 
         description, detail_description, price, minimum_days, quantity, 
         rental_policy, location, rating, rent_count, images, 
         specifications, specification_options, description_table, checklist,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         serviceId,
         vendorId,
@@ -133,7 +133,6 @@ export async function POST(request) {
         JSON.stringify(specificationOptions),
         JSON.stringify(descriptionTable),
         JSON.stringify(checklist),
-        now,
         now
       ]
     );
@@ -163,8 +162,7 @@ export async function POST(request) {
       specificationOptions,
       descriptionTable,
       checklist,
-      createdAt: now,
-      updatedAt: now
+      createdAt: now
     };
 
     return NextResponse.json(newService, { status: 201 });
