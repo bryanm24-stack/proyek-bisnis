@@ -14,7 +14,7 @@ async function readPromos() {
 }
 
 async function writePromos(promos) {
-  await writeData('promo', promos);
+  await writeData('promos', promos);
 }
 
 async function readTransactions() {

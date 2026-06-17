@@ -8,7 +8,17 @@ DROP DATABASE IF EXISTS rent_guard;
 CREATE DATABASE rent_guard;
 USE rent_guard;
 
+-- Role lookup table
+DROP TABLE IF EXISTS roles;
+CREATE TABLE IF NOT EXISTS roles (
+  id INT PRIMARY KEY,
+  role VARCHAR(255) NOT NULL UNIQUE
+);
 
+INSERT IGNORE INTO roles (id, role) VALUES
+  (1, 'customer'),
+  (2, 'vendor'),
+  (3, 'admin');
 
 -- Users
 CREATE TABLE IF NOT EXISTS users (
@@ -16,10 +26,37 @@ CREATE TABLE IF NOT EXISTS users (
   username VARCHAR(255),
   password VARCHAR(255),
   name VARCHAR(255),
+  role_id INT,
   role VARCHAR(255),
   email VARCHAR(255),
   phone VARCHAR(255),
-  created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3)
+  created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+  FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE SET NULL
+);
+
+-- Role ID mapping:
+-- 1 = customer, 2 = vendor, 3 = admin
+
+
+-- Vendor Registrations (for admin approval workflow)
+CREATE TABLE IF NOT EXISTS vendor_registrations (
+  id VARCHAR(255) PRIMARY KEY,
+  user_id VARCHAR(255) NOT NULL,
+  user_name VARCHAR(255),
+  user_email VARCHAR(255),
+  vendor_name VARCHAR(255) NOT NULL,
+  phone_number VARCHAR(255),
+  identity_file LONGTEXT,
+  identity_file_name VARCHAR(255),
+  status VARCHAR(50) DEFAULT 'pending',
+  rejection_reason TEXT,
+  created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+  submitted_at DATETIME(3),
+  approved_at DATETIME(3),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_status (status),
+  INDEX idx_user_id (user_id),
+  INDEX idx_created_at (created_at)
 );
 
 -- Services (store complex nested fields as JSON)
@@ -64,8 +101,11 @@ CREATE TABLE IF NOT EXISTS chats (
   vendor_name VARCHAR(255),
   customer_id VARCHAR(255),
   customer_name VARCHAR(255),
+  item_id VARCHAR(255),
+  item_name VARCHAR(255),
   messages JSON,
   created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3),
   deal_status VARCHAR(255)
 );
 
@@ -102,6 +142,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   invoice_id VARCHAR(255),
   deal_id VARCHAR(255),
   user_id VARCHAR(255),
+  promo_id VARCHAR(255),
   payment_method VARCHAR(255),
   base_price DECIMAL(18,2),
   quantity INTEGER,
@@ -180,6 +221,12 @@ CREATE TABLE IF NOT EXISTS promos (
   promo_price DECIMAL(18,2),
   description TEXT,
   active BOOLEAN,
+  start_at DATETIME(3),
+  end_at DATETIME(3),
+  max_applicants INTEGER,
+  claim_limit_per_user INTEGER,
+  claimed_count INTEGER DEFAULT 0,
+  claimed_user_ids JSON,
   created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3)
 );
@@ -248,12 +295,12 @@ CREATE INDEX idx_services_vendor ON services(vendor_id);
 -- Run this after schema creation in proyek_bisnis_db
 
 -- USERS
-INSERT IGNORE INTO users (id, username, password, name, role, email, phone, created_at) VALUES
-('1','apple','123','Apple Vendor','vendor','apple@rentguard.com','081234567890','2026-04-01 00:00:00'),
-('2','banana','123','Banana Vendor','vendor','banana@rentguard.com','081234567891','2026-04-01 00:00:00'),
-('3','orange','123','Orange Vendor','vendor','orange@rentguard.com','081234567892','2026-04-01 00:00:00'),
-('4','strawberry','123','Strawberry Customer','customer','strawberry@rentguard.com','089876543210','2026-04-02 00:00:00'),
-('5','grape','123','Grape Customer','customer','grape@rentguard.com','089876543211','2026-04-02 00:00:00')
+INSERT IGNORE INTO users (id, username, password, name, role_id, role, email, phone, created_at) VALUES
+('1','apple','123','Apple Vendor',2,'vendor','apple@rentguard.com','081234567890','2026-04-01 00:00:00'),
+('2','banana','123','Banana Vendor',2,'vendor','banana@rentguard.com','081234567891','2026-04-01 00:00:00'),
+('3','orange','123','Orange Vendor',2,'vendor','orange@rentguard.com','081234567892','2026-04-01 00:00:00'),
+('4','strawberry','123','Strawberry Customer',1,'customer','strawberry@rentguard.com','089876543210','2026-04-02 00:00:00'),
+('5','grape','123','Grape Customer',1,'customer','grape@rentguard.com','089876543211','2026-04-02 00:00:00')
 ;
 
 -- TRANSACTIONS

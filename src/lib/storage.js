@@ -1,42 +1,4 @@
-// A simple key/value JSON store table: json_store(key PRIMARY, value LONGTEXT)
-async function ensureTable() {
-  if (!isServer) return;
-  const sql = `CREATE TABLE IF NOT EXISTS json_store (
-    \`key\` VARCHAR(191) PRIMARY KEY,
-    \`value\` LONGTEXT
-  )`;
-  try {
-    const mod = await import('@/lib/db');
-    const db = mod.default || mod;
-    await db.query(sql);
-  } catch (e) {
-    // ignore DB errors here
-  }
-}
-
-
 const isServer = typeof window === 'undefined';
-
-// Avoid importing Node-only modules at top-level so this file can be bundled
-// for browser client components. Use dynamic imports and runtime guards.
-
-// `query` (database) will be dynamically imported when running on server.
-
-const fileMap = {
-  users: 'users.json',
-  chats: 'chats.json',
-  deals: 'deals.json',
-  transactions: 'transactions.json',
-  invoices: 'invoices.json',
-  ratings: 'ratings.json',
-  promos: 'promos.json',
-  favorites: 'favorites.json',
-  notifications: 'notifications.json',
-  vendor_registrations: 'vendor_registrations.json',
-  orders: 'orders.json',
-  returns: 'returns.json',
-  invoice_counter: 'invoice_counter.json'
-};
 
 const datasetMap = {
   user: 'users',
@@ -115,16 +77,6 @@ function normalizeJsonData(raw) {
   }
 }
 
-async function readFromAppData(dataset) {
-  if (!isServer) return [];
-  const { query } = await import('@/lib/db');
-  const res = await query(
-    `SELECT data FROM ${APP_DATA_TABLE} WHERE dataset = ? ORDER BY record_id`,
-    [dataset]
-  );
-  return res.map((row) => row.data || {});
-}
-
 async function writeToAppData(dataset, data) {
   const records = Array.isArray(data) ? data : [data];
   const rows = records.map((item) => {
@@ -166,7 +118,7 @@ async function readFromTable(tableName) {
   if (!isServer) return [];
   const { query } = await import('@/lib/db');
   const res = await query(`SELECT * FROM ${tableName} ORDER BY id`);
-  return res;
+  return res.map((row) => normalizeRecord(row));
 }
 
 async function writeToTable(tableName, data) {
@@ -205,73 +157,43 @@ export async function readData(name) {
 
   try {
     if (isServer) {
-      // Prefer a table named after the dataset (e.g. `services`) if available
       if (await hasTable(dataset)) {
         return await readFromTable(dataset);
       }
 
-      // Fallback to generic `app_data` store
       if (await hasTable(APP_DATA_TABLE)) {
         return await readFromAppData(dataset);
       }
     }
   } catch (error) {
-    // DB fallback to JSON file
+    console.error(`readData SQL error for ${name}:`, error.message);
   }
 
-  try {
-    if (!isServer) return [];
-    const file = fileMap[dataset];
-    if (!file) return [];
-    const pathMod = await import('path');
-    const p = pathMod.join(process.cwd(), file);
-    const { readFile } = await import('fs/promises');
-    const raw = await readFile(p, 'utf-8');
-    return normalizeJsonData(raw);
-  } catch {
-    return [];
-  }
+  return [];
 }
 
 export async function writeData(name, data) {
   const dataset = getDatasetName(name);
 
-  // Prefer writing directly into the dataset table when available
-  try {
-    if (await hasTable(dataset)) {
-      return await writeToTable(dataset, data);
-    }
-  } catch (error) {
-    console.error(`SQL writeData to table failed for ${name}:`, error.message);
-  }
-
-  // Fallback to generic app_data table
-  try {
-    if (await hasTable(APP_DATA_TABLE)) {
-      return await writeToAppData(dataset, data);
-    }
-  } catch (error) {
-    console.error(`SQL writeData failed for ${name}:`, error.message);
-  }
-
-  // Final fallback: write to JSON file
-  try {
-    if (!isServer) {
-      // client can't write files
-      return false;
+  if (isServer) {
+    try {
+      if (await hasTable(dataset)) {
+        return await writeToTable(dataset, data);
+      }
+    } catch (error) {
+      console.error(`SQL writeData to table failed for ${name}:`, error.message);
     }
 
-    const file = fileMap[dataset];
-    if (!file) throw new Error(`No file mapping for ${dataset}`);
-    const pathMod = await import('path');
-    const p = pathMod.join(process.cwd(), file);
-    const { writeFile } = await import('fs/promises');
-    await writeFile(p, JSON.stringify(data, null, 2), 'utf-8');
-    return true;
-  } catch (err) {
-    console.error(`writeData failed for ${name}:`, err.message);
-    throw err;
+    try {
+      if (await hasTable(APP_DATA_TABLE)) {
+        return await writeToAppData(dataset, data);
+      }
+    } catch (error) {
+      console.error(`SQL writeData failed for ${name}:`, error.message);
+    }
   }
+
+  throw new Error(`No storage target found for ${name}`);
 }
 
 export default { readData, writeData };

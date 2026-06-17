@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
+import { query } from '@/lib/db';
 
-
-import { readData, writeData } from '@/lib/storage';
 export async function PUT(request) {
   try {
     const body = await request.json();
@@ -15,19 +14,20 @@ export async function PUT(request) {
       return NextResponse.json({ success: false, message: 'Password baru harus minimal 6 karakter.' }, { status: 400 });
     }
 
-    const users = await readData('users');
+    // Get user from database
+    const users = await query('SELECT id, password FROM users WHERE id = ? LIMIT 1', [id]);
+    const user = users[0];
 
-    const userIndex = users.findIndex((u) => String(u.id) === String(id));
-    if (userIndex === -1) {
+    if (!user) {
       return NextResponse.json({ success: false, message: 'Pengguna tidak ditemukan.' }, { status: 404 });
     }
 
-    if (users[userIndex].password !== currentPassword) {
+    if (user.password !== currentPassword) {
       return NextResponse.json({ success: false, message: 'Password saat ini tidak cocok.' }, { status: 401 });
     }
 
-    users[userIndex].password = newPassword;
-    await writeData('users', users);
+    // Update password in database
+    await query('UPDATE users SET password = ? WHERE id = ?', [newPassword, id]);
 
     return NextResponse.json({ success: true, message: 'Password berhasil diubah.' }, { status: 200 });
   } catch (error) {

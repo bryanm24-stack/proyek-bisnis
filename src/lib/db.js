@@ -17,7 +17,7 @@ if (DATABASE_URL) {
     host: DB_HOST || '127.0.0.1',
     user: DB_USER || 'root',
     password: DB_PASS || '',
-    database: DB_NAME || 'proyek',
+    database: DB_NAME || 'rent_guard',
     port: Number(DB_PORT),
     waitForConnections: true,
     connectionLimit: 10,
