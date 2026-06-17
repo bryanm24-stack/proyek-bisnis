@@ -1,19 +1,35 @@
 import { NextResponse } from 'next/server';
+import { query } from '@/lib/db';
 
+function normalizeRegistration(reg) {
+  if (!reg) return null;
+  return {
+    id: reg.id,
+    userId: reg.user_id,
+    userName: reg.user_name,
+    userEmail: reg.user_email,
+    vendorName: reg.vendor_name,
+    phoneNumber: reg.phone_number,
+    identityFile: reg.identity_file,
+    identityFileName: reg.identity_file_name,
+    status: reg.status,
+    rejectionReason: reg.rejection_reason,
+    createdAt: reg.created_at,
+    submittedAt: reg.submitted_at,
+    approvedAt: reg.approved_at
+  };
+}
 
-import { readData, writeData } from '@/lib/storage';
 // GET - Get all vendor registrations (admin only)
 export async function GET(request) {
   try {
-    const registrationsData = await readData('registrations');
-    const registrations = registrationsData;
-
-    // Sort by createdAt descending
-    registrations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const registrations = await query(
+      'SELECT * FROM vendor_registrations ORDER BY created_at DESC'
+    );
 
     return NextResponse.json({
       success: true,
-      data: registrations
+      data: registrations.map(normalizeRegistration)
     }, { status: 200 });
   } catch (error) {
     console.error('Error di API Admin Vendor Approval GET:', error);
@@ -37,18 +53,20 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
+    // Get registration
+    const registrations = await query(
+      'SELECT * FROM vendor_registrations WHERE id = ?',
+      [registrationId]
+    );
 
-    // Baca registrations
-    const registrationsData = await readData('registrations');
-    const registrations = registrationsData;
-
-    const registration = registrations.find(r => r.id === registrationId);
-    if (!registration) {
+    if (registrations.length === 0) {
       return NextResponse.json({
         success: false,
         message: 'Registrasi tidak ditemukan'
       }, { status: 404 });
     }
+
+    const registration = registrations[0];
 
     if (registration.status !== 'pending') {
       return NextResponse.json({
@@ -58,33 +76,40 @@ export async function POST(request) {
     }
 
     if (action === 'approve') {
-      // Update user role to vendor
-      const usersData = await readData('users');
-      const users = usersData;
+      // Check if user exists
+      const users = await query(
+        'SELECT id FROM users WHERE id = ?',
+        [registration.user_id]
+      );
 
-      const userIndex = users.findIndex(u => u.id === registration.userId);
-      if (userIndex === -1) {
+      if (users.length === 0) {
         return NextResponse.json({
           success: false,
           message: 'User tidak ditemukan'
         }, { status: 404 });
       }
 
-      users[userIndex].role = 'vendor';
-      users[userIndex].name = registration.vendorName;
-      users[userIndex].phone = registration.phoneNumber;
+      // Update user role to vendor
+      await query(
+        `UPDATE users SET role = 'vendor', role_id = 2, name = ?, phone = ?
+         WHERE id = ?`,
+        [registration.vendor_name, registration.phone_number, registration.user_id]
+      );
 
-      // Update registration status
-      registration.status = 'approved';
-      registration.approvedAt = new Date().toISOString();
+      // Update registration status to approved
+      const now = new Date().toISOString();
+      await query(
+        `UPDATE vendor_registrations SET status = 'approved', approved_at = ?
+         WHERE id = ?`,
+        [now, registrationId]
+      );
 
-      await writeData('users', users);
-      await writeData('registrations', registrations);
+      const updated = await query('SELECT * FROM vendor_registrations WHERE id = ?', [registrationId]);
 
       return NextResponse.json({
         success: true,
-        message: `Vendor ${registration.vendorName} berhasil disetujui!`,
-        data: registration
+        message: `Vendor ${registration.vendor_name} berhasil disetujui!`,
+        data: normalizeRegistration(updated[0])
       }, { status: 200 });
     } else {
       // Reject registration
@@ -95,16 +120,21 @@ export async function POST(request) {
         }, { status: 400 });
       }
 
-      registration.status = 'rejected';
-      registration.rejectionReason = rejectionReason;
-      registration.approvedAt = new Date().toISOString();
+      // Update registration status to rejected
+      const now = new Date().toISOString();
+      await query(
+        `UPDATE vendor_registrations 
+         SET status = 'rejected', rejection_reason = ?, approved_at = ?
+         WHERE id = ?`,
+        [rejectionReason, now, registrationId]
+      );
 
-      await writeData('registration', registrations);
+      const updated = await query('SELECT * FROM vendor_registrations WHERE id = ?', [registrationId]);
 
       return NextResponse.json({
         success: true,
-        message: `Registrasi ${registration.vendorName} ditolak.`,
-        data: registration
+        message: `Registrasi ${registration.vendor_name} ditolak.`,
+        data: normalizeRegistration(updated[0])
       }, { status: 200 });
     }
   } catch (error) {

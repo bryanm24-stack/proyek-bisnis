@@ -86,10 +86,10 @@ export async function POST(request) {
     // 2. Extract fields
     const { serviceId, serviceTitle, vendorId, vendorName, customerId, customerName, itemId, itemName, message, senderId, senderName } = body;
 
-    // 3. Validate required fields
-    if (!serviceId || !vendorId || !customerId || !message || !senderId) {
+    // 3. Validate required fields - make vendorName and vendorId optional since they may not always be provided
+    if (!serviceId || !customerId || !message || !senderId) {
       return NextResponse.json(
-        { success: false, message: 'Missing required fields' },
+        { success: false, message: `Missing required fields. Required: serviceId, customerId, message, senderId. Got: {serviceId: ${serviceId}, customerId: ${customerId}, message: ${message}, senderId: ${senderId}}` },
         { status: 400 }
       );
     }
@@ -107,12 +107,13 @@ export async function POST(request) {
         serviceTitle: serviceTitle || 'Unknown',
         itemId: itemId || null,
         itemName: itemName || null,
-        vendorId,
+        vendorId: vendorId || null,
         vendorName: vendorName || 'Unknown',
         customerId,
         customerName: customerName || 'Unknown',
         messages: [],
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         dealStatus: null
       };
       chats.push(chatRoom);
@@ -127,7 +128,10 @@ export async function POST(request) {
       timestamp: new Date().toISOString()
     });
 
-    // 7. Save to file
+    // Update updatedAt timestamp
+    chatRoom.updatedAt = new Date().toISOString();
+
+    // 7. Save to storage (SQL)
     await writeChatsFile(chats);
 
     // 8. Return response

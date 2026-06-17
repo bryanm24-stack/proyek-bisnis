@@ -1,19 +1,63 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+
+function parseJsonSafe(value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value !== 'string') return value;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function snakeToCamel(str) {
+  return str.replace(/_([a-z])/g, (_, char) => char.toUpperCase());
+}
+
 function normalizeServiceCapacity(service) {
   if (!service) return service;
 
-  if (service.type === 'jasa') {
-    const capacity = Number(service.availableQuantity ?? service.availability ?? service.quantity ?? 0);
+  // Convert all keys from snake_case to camelCase
+  const normalized = {};
+  for (const [key, value] of Object.entries(service)) {
+    const camelKey = snakeToCamel(key);
+    normalized[camelKey] = value;
+  }
+
+  const parsedImages = parseJsonSafe(normalized.images, []);
+  const parsedSpecifications = parseJsonSafe(normalized.specifications, {});
+  const parsedDescriptionTable = parseJsonSafe(normalized.descriptionTable, {});
+  const parsedChecklist = parseJsonSafe(normalized.checklist, {});
+  const parsedItems = parseJsonSafe(normalized.items, []);
+  const parsedVariations = parseJsonSafe(normalized.variations, {});
+
+  if (normalized.type === 'jasa') {
+    const capacity = Number(normalized.availableQuantity ?? normalized.availability ?? normalized.quantity ?? 0);
     return {
-      ...service,
+      ...normalized,
       availableQuantity: capacity,
       availability: capacity,
-      quantity: capacity
+      quantity: capacity,
+      images: Array.isArray(parsedImages) ? parsedImages : [],
+      specifications: parsedSpecifications,
+      descriptionTable: parsedDescriptionTable,
+      checklist: parsedChecklist,
+      items: parsedItems,
+      variations: parsedVariations
     };
   }
 
-  return service;
+  return {
+    ...normalized,
+    images: Array.isArray(parsedImages) ? parsedImages : [],
+    specifications: parsedSpecifications,
+    descriptionTable: parsedDescriptionTable,
+    checklist: parsedChecklist,
+    items: parsedItems,
+    variations: parsedVariations
+  };
 }
 
 // GET - Mengambil services dengan filter vendorId

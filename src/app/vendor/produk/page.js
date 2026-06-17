@@ -4,15 +4,12 @@ import React, { useState, useEffect } from 'react';
 import SharedNavbar from '../../components/SharedNavbar';
 import { useRouter } from 'next/navigation';
 
-
-import { readData, writeData } from '@/lib/storage';
 export default function VendorProdukPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [vendorItems, setVendorItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  // ✅ NEW: Track current image index for each item
   const [currentImageIndex, setCurrentImageIndex] = useState({});
   const [promoModalOpen, setPromoModalOpen] = useState(false);
   const [promoSubmitting, setPromoSubmitting] = useState(false);
@@ -29,8 +26,21 @@ export default function VendorProdukPage() {
   });
   const [vendorPromos, setVendorPromos] = useState([]);
   const [promosLoading, setPromosLoading] = useState(false);
-  const [promoNow, setPromoNow] = useState(Date.now());
+  const [promoNow, setPromoNow] = useState(0);
   const [dragOver, setDragOver] = useState(false);
+
+  const getSafeImages = (rawImages) => {
+    if (Array.isArray(rawImages)) return rawImages;
+    if (typeof rawImages === 'string') {
+      try {
+        const parsed = JSON.parse(rawImages);
+        return Array.isArray(parsed) ? parsed : rawImages.trim() ? [rawImages] : [];
+      } catch {
+        return rawImages.trim() ? [rawImages] : [];
+      }
+    }
+    return [];
+  };
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -51,6 +61,7 @@ export default function VendorProdukPage() {
   }, [router]);
 
   useEffect(() => {
+    setPromoNow(Date.now());
     const timer = setInterval(() => setPromoNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -118,6 +129,8 @@ export default function VendorProdukPage() {
 
   const formatPromoCountdown = (endAt) => {
     if (!endAt) return 'Tanpa batas waktu';
+    if (promoNow === 0) return 'Memuat...';
+    
     const diff = new Date(endAt).getTime() - promoNow;
     if (diff <= 0) return 'Berakhir';
 
@@ -154,7 +167,6 @@ export default function VendorProdukPage() {
     }
   };
 
-  // ✅ NEW: Handle image navigation
   const handleNextImage = (e, itemId, totalImages) => {
     e.preventDefault();
     e.stopPropagation();
@@ -229,8 +241,9 @@ export default function VendorProdukPage() {
     event.preventDefault();
     if (!user) return;
 
-    if (!promoForm.title || !promoForm.image || !promoForm.promoPrice) {
-      setPromoMessage('Judul promo, gambar, dan harga promo wajib diisi.');
+    const parsedPrice = Number.parseInt(promoForm.promoPrice, 10);
+    if (!promoForm.title || !promoForm.image || !promoForm.promoPrice || isNaN(parsedPrice)) {
+      setPromoMessage('Judul promo, gambar, dan harga promo wajib diisi dengan format yang benar.');
       return;
     }
 
@@ -246,7 +259,7 @@ export default function VendorProdukPage() {
           vendorName: user.name,
           title: promoForm.title,
           image: promoForm.image,
-          promoPrice: Number.parseInt(promoForm.promoPrice, 10),
+          promoPrice: parsedPrice,
           description: promoForm.description,
           active: promoForm.active,
           startAt: promoForm.startAt || null,
@@ -295,7 +308,6 @@ export default function VendorProdukPage() {
       <SharedNavbar />
 
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 24px' }}>
-        {/* Header */}
         <div style={{ marginBottom: '32px' }}>
           <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>
             📦 Barang/Jasa Saya
@@ -305,7 +317,6 @@ export default function VendorProdukPage() {
           </p>
         </div>
 
-        {/* Search Bar */}
         <div style={{ marginBottom: '32px' }}>
           <div style={{ position: 'relative', maxWidth: '400px' }}>
             <input
@@ -334,7 +345,6 @@ export default function VendorProdukPage() {
           </div>
         </div>
 
-        {/* Promo List */}
         <div style={{ marginBottom: '32px' }}>
           <h2 style={{ margin: '0 0 14px 0', fontSize: '22px' }}>🎁 Promo Vendor</h2>
           {promosLoading ? (
@@ -349,8 +359,8 @@ export default function VendorProdukPage() {
                 const maxApplicants = Number.isFinite(Number(promo.maxApplicants)) ? Number(promo.maxApplicants) : null;
                 const claimedCount = Number(promo.claimedCount || 0);
                 const remaining = maxApplicants === null ? null : Math.max(0, maxApplicants - claimedCount);
-                const isExpired = Boolean(promo.endAt && new Date(promo.endAt).getTime() <= promoNow);
-                const isUpcoming = Boolean(promo.startAt && new Date(promo.startAt).getTime() > promoNow);
+                const isExpired = Boolean(promo.endAt && promoNow > 0 && new Date(promo.endAt).getTime() <= promoNow);
+                const isUpcoming = Boolean(promo.startAt && promoNow > 0 && new Date(promo.startAt).getTime() > promoNow);
 
                 return (
                   <div key={promo.id} style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '12px', background: 'white' }}>
@@ -387,7 +397,6 @@ export default function VendorProdukPage() {
           )}
         </div>
 
-        {/* Items Grid */}
         {filteredItems.length === 0 ? (
           <div style={{
             background: '#f3f4f6',
@@ -421,24 +430,25 @@ export default function VendorProdukPage() {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
-            {filteredItems.map(item => (
-              <div key={item.id} style={{
-                border: '1px solid #e5e7eb',
-                borderRadius: '12px',
-                overflow: 'hidden',
-                background: 'white',
-                transition: 'all 0.3s',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 10px 25px rgba(0,0,0,0.15)';
-                e.currentTarget.style.transform = 'translateY(-4px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}>
-                {/* Image */}
+            {filteredItems.map(item => {
+              const itemImages = getSafeImages(item.images);
+              return (
+                <div key={item.id} style={{
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  background: 'white',
+                  transition: 'all 0.3s',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 10px 25px rgba(0,0,0,0.15)';
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}>
                 <div style={{
                   background: '#f3f4f6',
                   height: '180px',
@@ -450,11 +460,10 @@ export default function VendorProdukPage() {
                   overflow: 'hidden',
                   position: 'relative'
                 }}>
-                  {item.images && item.images.length > 0 ? (
+                  {itemImages.length > 0 ? (
                     <>
-                      {/* Image Display */}
                       <img 
-                        src={item.images[currentImageIndex[item.id] || 0]} 
+                        src={itemImages[currentImageIndex[item.id] || 0]} 
                         alt={item.title} 
                         style={{ 
                           width: '100%', 
@@ -464,12 +473,10 @@ export default function VendorProdukPage() {
                         }} 
                       />
                       
-                      {/* ✅ Carousel Controls (only show if > 1 image) */}
-                      {item.images.length > 1 && (
+                      {itemImages.length > 1 && (
                         <>
-                          {/* Prev Button */}
                           <button
-                            onClick={(e) => handlePrevImage(e, item.id, item.images.length)}
+                            onClick={(e) => handlePrevImage(e, item.id, itemImages.length)}
                             style={{
                               position: 'absolute',
                               left: '8px',
@@ -496,9 +503,8 @@ export default function VendorProdukPage() {
                             ◀
                           </button>
                           
-                          {/* Next Button */}
                           <button
-                            onClick={(e) => handleNextImage(e, item.id, item.images.length)}
+                            onClick={(e) => handleNextImage(e, item.id, itemImages.length)}
                             style={{
                               position: 'absolute',
                               right: '8px',
@@ -525,7 +531,6 @@ export default function VendorProdukPage() {
                             ▶
                           </button>
                           
-                          {/* Image Counter/Dots */}
                           <div
                             style={{
                               position: 'absolute',
@@ -543,7 +548,7 @@ export default function VendorProdukPage() {
                               gap: '4px'
                             }}
                           >
-                            {item.images.map((_, idx) => (
+                            {itemImages.map((_, idx) => (
                               <span
                                 key={idx}
                                 style={{
@@ -568,8 +573,7 @@ export default function VendorProdukPage() {
                         </>
                       )}
                       
-                      {/* Photo count badge */}
-                      {item.images.length > 1 && (
+                      {itemImages.length > 1 && (
                         <div
                           style={{
                             position: 'absolute',
@@ -584,14 +588,13 @@ export default function VendorProdukPage() {
                             zIndex: 9
                           }}
                         >
-                          {(currentImageIndex[item.id] || 0) + 1}/{item.images.length}
+                          {(currentImageIndex[item.id] || 0) + 1}/{itemImages.length}
                         </div>
                       )}
                     </>
                   ) : '📦'}
                 </div>
 
-                {/* Content */}
                 <div style={{ padding: '16px' }}>
                   <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '600' }}>
                     {item.title}
@@ -600,8 +603,7 @@ export default function VendorProdukPage() {
                     {item.shortDescription}
                   </p>
 
-                  {/* Info */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '12px', color: '#666' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '12px', color: '#666' }}>
                     <div>
                       <div style={{ color: '#999', fontSize: '12px' }}>Harga/Hari</div>
                       <div style={{ fontWeight: '600', fontSize: '14px', color: '#1f2937' }}>
@@ -616,7 +618,6 @@ export default function VendorProdukPage() {
                     </div>
                   </div>
 
-                  {/* Buttons */}
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button
                       onClick={() => handleEdit(item.id)}
@@ -684,9 +685,11 @@ export default function VendorProdukPage() {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
+
       </div>
 
       {promoModalOpen && (
@@ -704,7 +707,6 @@ export default function VendorProdukPage() {
             </div>
 
             <form onSubmit={handleCreatePromo} style={{ padding: '28px', display: 'grid', gap: '18px', overflow: 'auto', flex: 1 }}>
-              {/* Preview Promo dengan Harga Besar */}
               {promoForm.image && promoForm.title && (
                 <div style={{ 
                   width: '100%', 
@@ -714,7 +716,6 @@ export default function VendorProdukPage() {
                   boxShadow: '0 12px 32px rgba(0,0,0,0.2)',
                   position: 'relative'
                 }}>
-                  {/* Gambar Background */}
                   <div style={{ position: 'relative', height: '220px', overflow: 'hidden' }}>
                     <img
                       src={promoForm.image}
@@ -730,7 +731,6 @@ export default function VendorProdukPage() {
                       }}
                     />
                     
-                    {/* Overlay dengan Harga */}
                     <div style={{
                       position: 'absolute',
                       inset: 0,
@@ -755,7 +755,6 @@ export default function VendorProdukPage() {
                     </div>
                   </div>
                   
-                  {/* Badge Promo */}
                   <div style={{
                     position: 'absolute',
                     top: '12px',
@@ -773,7 +772,6 @@ export default function VendorProdukPage() {
                 </div>
               )}
 
-              {/* Input Judul Promo */}
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>Judul Promo *</label>
                 <input
@@ -785,7 +783,6 @@ export default function VendorProdukPage() {
                 />
               </div>
 
-              {/* Drag & Drop Area untuk Gambar */}
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>Gambar Promo * (Drag & Drop atau Paste URL)</label>
                 <div
@@ -817,7 +814,6 @@ export default function VendorProdukPage() {
                   </div>
                 </div>
                 
-                {/* Fallback: Input URL Manual */}
                 <div style={{ marginTop: '12px' }}>
                   <input
                     type="text"
@@ -829,7 +825,6 @@ export default function VendorProdukPage() {
                 </div>
               </div>
 
-              {/* Input Harga Promo */}
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>Harga Promo (Rp) *</label>
                 <input
@@ -843,7 +838,6 @@ export default function VendorProdukPage() {
                 <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>Harga final yang akan dibayar customer untuk promo ini</div>
               </div>
 
-              {/* Limit Tanggal Promo */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>Mulai Promo</label>
@@ -865,7 +859,6 @@ export default function VendorProdukPage() {
                 </div>
               </div>
 
-              {/* Limit Applicant */}
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>Limit Applicant</label>
                 <input
@@ -879,7 +872,6 @@ export default function VendorProdukPage() {
                 <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>Kosongkan jika kuota tidak dibatasi. User tetap hanya bisa klaim 1 kali.</div>
               </div>
 
-              {/* Input Deskripsi Promo */}
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px' }}>Deskripsi Promo</label>
                 <textarea
@@ -891,7 +883,6 @@ export default function VendorProdukPage() {
                 />
               </div>
 
-              {/* Checkbox Aktif */}
               <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: '#374151', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
@@ -902,14 +893,12 @@ export default function VendorProdukPage() {
                 <span>Promo aktif dan langsung tampil di home customer</span>
               </label>
 
-              {/* Pesan Error/Success */}
               {promoMessage && (
                 <div style={{ padding: '12px 14px', borderRadius: '10px', background: promoMessage.startsWith('✅') ? '#ecfdf5' : '#fef2f2', color: promoMessage.startsWith('✅') ? '#166534' : '#991b1b', fontSize: '14px', whiteSpace: 'pre-wrap' }}>
                   {promoMessage}
                 </div>
               )}
 
-              {/* Buttons */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '4px' }}>
                 <button type="button" onClick={closePromoModal} style={{ padding: '12px 18px', borderRadius: '10px', border: '1px solid #d1d5db', background: 'white', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s' }}>Batal</button>
                 <button type="submit" disabled={promoSubmitting} style={{ padding: '12px 18px', borderRadius: '10px', border: 'none', background: promoSubmitting ? '#C8A587' : '#B28A67', color: 'white', fontWeight: '800', cursor: promoSubmitting ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}>

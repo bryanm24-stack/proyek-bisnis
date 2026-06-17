@@ -1,4 +1,4 @@
-const mysql = require('mysql2/promise');
+import mysql from 'mysql2/promise';
 
 const {
   DB_HOST = process.env.DB_HOST,
@@ -30,4 +30,5 @@ async function query(sql, params) {
   return rows;
 }
 
-module.exports = { pool, query };
+export { query, pool };
+export default { query, pool };
