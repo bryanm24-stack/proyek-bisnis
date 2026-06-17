@@ -5,6 +5,19 @@ import { query } from '@/lib/db';
 
 function toValidDate(value) {
   if (!value) return null;
+
+  // Support common localized input format like "18 / 06 / 2026 , 10 . 00"
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    const localizedMatch = trimmed.match(/^(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{4})\s*,\s*(\d{1,2})\s*\.\s*(\d{1,2})$/);
+    if (localizedMatch) {
+      const [, d, m, y, hh, mm] = localizedMatch;
+      const converted = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`;
+      const localizedDate = new Date(converted);
+      if (!Number.isNaN(localizedDate.getTime())) return localizedDate;
+    }
+  }
+
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
@@ -77,6 +90,13 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    // Ensure promo image can store base64 payloads from upload input
+    try {
+      await query('ALTER TABLE promos MODIFY COLUMN image LONGTEXT');
+    } catch {
+      // Ignore when already LONGTEXT or no alter permission
+    }
+
     const body = await request.json();
     const {
       vendorId,
@@ -92,7 +112,9 @@ export async function POST(request) {
     } = body;
 
     // Validasi required fields
-    if (!vendorId || !vendorName || !title || !image || promoPrice === undefined) {
+    const normalizedVendorName = String(vendorName || body.vendor || body.name || '').trim();
+
+    if (!vendorId || !normalizedVendorName || !title || !image || promoPrice === undefined) {
       return NextResponse.json({
         success: false,
         message: 'vendorId, vendorName, title, image, dan promoPrice wajib diisi.'
@@ -152,7 +174,7 @@ export async function POST(request) {
       [
         promoId,
         vendorId,
-        vendorName,
+        normalizedVendorName,
         String(title).trim(),
         String(image).trim(),
         parsedPrice,
@@ -170,7 +192,7 @@ export async function POST(request) {
     const newPromo = {
       id: promoId,
       vendorId,
-      vendorName,
+      vendorName: normalizedVendorName,
       title: String(title).trim(),
       image: String(image).trim(),
       promoPrice: parsedPrice,
@@ -187,7 +209,10 @@ export async function POST(request) {
     return NextResponse.json({ success: true, message: 'Promo berhasil dibuat.', data: newPromo }, { status: 201 });
   } catch (error) {
     console.error('Error creating promo:', error);
-    return NextResponse.json({ success: false, message: 'Gagal membuat promo.' }, { status: 500 });
+    return NextResponse.json({
+      success: false,
+      message: error?.message ? `Gagal membuat promo: ${error.message}` : 'Gagal membuat promo.'
+    }, { status: 500 });
   }
 }
 

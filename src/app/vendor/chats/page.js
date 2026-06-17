@@ -5,8 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import SharedNavbar from '../../components/SharedNavbar';
 
-
-import { readData, writeData } from '@/lib/storage';
 export default function VendorChatsPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
