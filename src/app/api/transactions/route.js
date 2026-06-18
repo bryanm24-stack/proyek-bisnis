@@ -98,6 +98,18 @@ const toDateOnly = (value) => {
   return `${y}-${m}-${d}`;
 };
 
+async function hasTransactionsServiceIdColumn() {
+  const rows = await query(
+    `SELECT 1
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'transactions'
+       AND COLUMN_NAME = 'service_id'
+     LIMIT 1`
+  );
+  return rows.length > 0;
+}
+
 export async function GET(request) {
   try {
     const rows = await query('SELECT * FROM transactions ORDER BY COALESCE(created_at, NOW()) DESC');
@@ -117,6 +129,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
+    const hasServiceIdColumn = await hasTransactionsServiceIdColumn();
 
     const txId = body.id || `TRX-${Date.now()}`;
     const createdAt = new Date().toISOString();
@@ -191,11 +204,20 @@ export async function POST(request) {
           const requestedQuantity = Number(body.quantity ?? 1);
 
           // Find overlapping transactions
-          const transactions = await query(
-            `SELECT quantity, start_date, duration_days FROM transactions 
-             WHERE service_id = ? AND status = 'success' ORDER BY start_date ASC`,
-            [serviceId]
-          );
+          const transactions = hasServiceIdColumn
+            ? await query(
+              `SELECT quantity, start_date, duration_days FROM transactions
+               WHERE service_id = ? AND status = 'success' ORDER BY start_date ASC`,
+              [serviceId]
+            )
+            : await query(
+              `SELECT t.quantity, t.start_date, t.duration_days
+               FROM transactions t
+               LEFT JOIN deals d ON d.id = t.deal_id
+               WHERE d.service_id = ? AND t.status = 'success'
+               ORDER BY t.start_date ASC`,
+              [serviceId]
+            );
 
           let bookedQuantity = 0;
           for (const tx of transactions) {
@@ -237,38 +259,69 @@ export async function POST(request) {
       }
     }
 
-    const insertValues = [
-      txId,
-      body.invoiceId || null,
-      body.dealId || null,
-      serviceId || null,
-      body.userId || null,
-      body.promoId || null,
-      body.paymentMethod || null,
-      Number(body.basePrice ?? body.amount ?? 0) || 0,
-      Number(body.quantity ?? 1) || 1,
-      body.quantityType || 'Unit',
-      Number(body.durationDays ?? 0) || null,
-      body.notes || '',
-      toDateOnly(body.startDate),
-      Number(body.amount ?? 0) || 0,
-      Number(body.serviceFee ?? 0) || 0,
-      Number(body.totalAmount ?? body.amount ?? 0) || 0,
-      body.status || 'pending',
-      timestamp,
-      body.cardDetails ? JSON.stringify(body.cardDetails) : null,
-      body.qrCode || null,
-      body.identityVerification ? JSON.stringify(body.identityVerification) : null,
-      createdAt
-    ];
+    const insertValues = hasServiceIdColumn
+      ? [
+        txId,
+        body.invoiceId || null,
+        body.dealId || null,
+        serviceId || null,
+        body.userId || null,
+        body.promoId || null,
+        body.paymentMethod || null,
+        Number(body.basePrice ?? body.amount ?? 0) || 0,
+        Number(body.quantity ?? 1) || 1,
+        body.quantityType || 'Unit',
+        Number(body.durationDays ?? 0) || null,
+        body.notes || '',
+        toDateOnly(body.startDate),
+        Number(body.amount ?? 0) || 0,
+        Number(body.serviceFee ?? 0) || 0,
+        Number(body.totalAmount ?? body.amount ?? 0) || 0,
+        body.status || 'pending',
+        timestamp,
+        body.cardDetails ? JSON.stringify(body.cardDetails) : null,
+        body.qrCode || null,
+        body.identityVerification ? JSON.stringify(body.identityVerification) : null,
+        createdAt
+      ]
+      : [
+        txId,
+        body.invoiceId || null,
+        body.dealId || null,
+        body.userId || null,
+        body.promoId || null,
+        body.paymentMethod || null,
+        Number(body.basePrice ?? body.amount ?? 0) || 0,
+        Number(body.quantity ?? 1) || 1,
+        body.quantityType || 'Unit',
+        Number(body.durationDays ?? 0) || null,
+        body.notes || '',
+        toDateOnly(body.startDate),
+        Number(body.amount ?? 0) || 0,
+        Number(body.serviceFee ?? 0) || 0,
+        Number(body.totalAmount ?? body.amount ?? 0) || 0,
+        body.status || 'pending',
+        timestamp,
+        body.cardDetails ? JSON.stringify(body.cardDetails) : null,
+        body.qrCode || null,
+        body.identityVerification ? JSON.stringify(body.identityVerification) : null,
+        createdAt
+      ];
 
     await query(
-      `INSERT INTO transactions (
-        id, invoice_id, deal_id, service_id, user_id, promo_id, payment_method, base_price,
-        quantity, quantity_type, duration_days, notes, start_date,
-        amount, service_fee, total_amount, status, timestamp,
-        card_details, qr_code, identity_verification, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      hasServiceIdColumn
+        ? `INSERT INTO transactions (
+            id, invoice_id, deal_id, service_id, user_id, promo_id, payment_method, base_price,
+            quantity, quantity_type, duration_days, notes, start_date,
+            amount, service_fee, total_amount, status, timestamp,
+            card_details, qr_code, identity_verification, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        : `INSERT INTO transactions (
+            id, invoice_id, deal_id, user_id, promo_id, payment_method, base_price,
+            quantity, quantity_type, duration_days, notes, start_date,
+            amount, service_fee, total_amount, status, timestamp,
+            card_details, qr_code, identity_verification, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
       insertValues
     );
 

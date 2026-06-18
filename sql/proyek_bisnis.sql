@@ -141,6 +141,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   id VARCHAR(255) PRIMARY KEY,
   invoice_id VARCHAR(255),
   deal_id VARCHAR(255),
+  service_id VARCHAR(255),
   user_id VARCHAR(255),
   promo_id VARCHAR(255),
   payment_method VARCHAR(255),
@@ -256,7 +257,6 @@ ALTER TABLE chats
   ADD CONSTRAINT fk_chats_customer FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE SET NULL;
 
 ALTER TABLE transactions
-  ADD COLUMN IF NOT EXISTS service_id VARCHAR(255) AFTER deal_id,
   ADD CONSTRAINT fk_transactions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
   ADD CONSTRAINT fk_transactions_deal FOREIGN KEY (deal_id) REFERENCES deals(id) ON DELETE SET NULL,
   ADD CONSTRAINT fk_transactions_service FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE SET NULL,

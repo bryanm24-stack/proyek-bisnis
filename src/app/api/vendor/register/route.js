@@ -20,9 +20,34 @@ function normalizeRegistration(reg) {
   };
 }
 
+async function ensureVendorRegistrationsTable() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS vendor_registrations (
+      id VARCHAR(255) PRIMARY KEY,
+      user_id VARCHAR(255) NOT NULL,
+      user_name VARCHAR(255),
+      user_email VARCHAR(255),
+      vendor_name VARCHAR(255) NOT NULL,
+      phone_number VARCHAR(255),
+      identity_file LONGTEXT,
+      identity_file_name VARCHAR(255),
+      status VARCHAR(50) DEFAULT 'pending',
+      rejection_reason TEXT,
+      created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+      submitted_at DATETIME(3),
+      approved_at DATETIME(3),
+      INDEX idx_status (status),
+      INDEX idx_user_id (user_id),
+      INDEX idx_created_at (created_at)
+    )
+  `);
+}
+
 // POST - Submit vendor registration
 export async function POST(request) {
   try {
+    await ensureVendorRegistrationsTable();
+
     const body = await request.json();
     const { userId, vendorName, phoneNumber, identityFile, identityFileName } = body;
 
@@ -43,7 +68,7 @@ export async function POST(request) {
     }
 
     // Check if user exists and is not already vendor
-    const users = await query('SELECT id, name, email, role, role_id FROM users WHERE id = ?', [userId]);
+    const users = await query('SELECT id, name, email, role FROM users WHERE id = ?', [userId]);
     
     if (users.length === 0) {
       return NextResponse.json({
@@ -54,7 +79,7 @@ export async function POST(request) {
 
     const user = users[0];
 
-    if (user.role === 'vendor' || user.role_id === 2) {
+    if (String(user.role || '').toLowerCase() === 'vendor') {
       return NextResponse.json({
         success: false,
         message: 'User sudah terdaftar sebagai vendor'
@@ -129,6 +154,8 @@ export async function POST(request) {
 // GET - Check registration status
 export async function GET(request) {
   try {
+    await ensureVendorRegistrationsTable();
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 

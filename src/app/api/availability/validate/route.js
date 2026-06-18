@@ -21,6 +21,18 @@ const parseJsonSafe = (value, fallback) => {
   }
 };
 
+async function hasTransactionsServiceIdColumn() {
+  const rows = await query(
+    `SELECT 1
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'transactions'
+       AND COLUMN_NAME = 'service_id'
+     LIMIT 1`
+  );
+  return rows.length > 0;
+}
+
 /**
  * Validate availability for a service on a specific date range
  * GET: Check if service is available
@@ -95,13 +107,23 @@ export async function POST(request) {
 
     // Fetch successful transactions that overlap with requested period
     // We're checking for transactions where the rental dates overlap
-    const transactions = await query(
-      `SELECT id, service_id, quantity, start_date, duration_days, status
-       FROM transactions 
-       WHERE service_id = ? AND status = 'success'
-       ORDER BY start_date ASC`,
-      [serviceId]
-    );
+    const hasServiceIdColumn = await hasTransactionsServiceIdColumn();
+    const transactions = hasServiceIdColumn
+      ? await query(
+        `SELECT id, service_id, quantity, start_date, duration_days, status
+         FROM transactions
+         WHERE service_id = ? AND status = 'success'
+         ORDER BY start_date ASC`,
+        [serviceId]
+      )
+      : await query(
+        `SELECT t.id, d.service_id, t.quantity, t.start_date, t.duration_days, t.status
+         FROM transactions t
+         LEFT JOIN deals d ON d.id = t.deal_id
+         WHERE d.service_id = ? AND t.status = 'success'
+         ORDER BY t.start_date ASC`,
+        [serviceId]
+      );
 
     // Calculate booked quantity for overlapping periods
     let bookedQuantity = 0;

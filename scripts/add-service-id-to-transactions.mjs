@@ -7,7 +7,7 @@ async function addServiceIdColumn() {
     // Check if column already exists
     const result = await query(
       `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
-       WHERE TABLE_NAME='transactions' AND COLUMN_NAME='service_id' AND TABLE_SCHEMA='rent_guard'`
+       WHERE TABLE_NAME='transactions' AND COLUMN_NAME='service_id' AND TABLE_SCHEMA = DATABASE()`
     );
 
     if (result.length > 0) {
