@@ -404,8 +404,9 @@ export async function POST(request) {
           [txId, resolvedDealId || null, body.paymentType || 'full', resolvedDealId || null]
       );
 
+      let invoiceId = null;
       if (existingInvoiceRows.length > 0) {
-        const invoiceId = existingInvoiceRows[0].id;
+        invoiceId = existingInvoiceRows[0].id;
         await query(
           `UPDATE invoices
            SET customer_id = ?, vendor_id = ?, service_id = ?, transaction_id = ?,
@@ -429,6 +430,7 @@ export async function POST(request) {
           ]
         );
       } else {
+        invoiceId = `INV-${Date.now()}`;
         await query(
           `INSERT INTO invoices (
             id, deal_id, customer_id, vendor_id, service_id, transaction_id,
@@ -436,7 +438,7 @@ export async function POST(request) {
             status, created_at, paid_at, payment_transaction_id, notes
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            `INV-${Date.now()}`,
+            invoiceId,
             resolvedDealId || null,
             body.userId || currentDeal?.customer_id || null,
             currentDeal?.vendor_id || currentPromo?.vendor_id || body.vendorId || null,
@@ -452,6 +454,15 @@ export async function POST(request) {
             isPayAfter ? null : txId,
             body.notes || ''
           ]
+        );
+      }
+
+      if (invoiceId) {
+        await query(
+          `UPDATE transactions
+           SET invoice_id = ?
+           WHERE id = ?`,
+          [invoiceId, txId]
         );
       }
 
