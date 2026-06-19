@@ -144,6 +144,58 @@ export async function POST(request) {
       }
     }
 
+    const promoRows = body.promoId ? await query('SELECT * FROM promos WHERE id = ? LIMIT 1', [body.promoId]) : [];
+    const currentPromo = promoRows[0] || null;
+
+    let resolvedDealId = body.dealId ? String(body.dealId) : null;
+    if (!resolvedDealId && body.promoId) {
+      const promoDealId = `DEAL-PROMO-${Date.now()}`;
+      const promoBasePrice = Number(body.basePrice ?? body.amount ?? currentPromo?.promo_price ?? 0) || 0;
+      const promoFinalPrice = Number(body.totalAmount ?? body.amount ?? currentPromo?.promo_price ?? promoBasePrice) || promoBasePrice;
+      const promoStatus = (body.status || 'success') === 'success' ? 'active' : 'agreed';
+      const promoInvoiceStatus = (body.status || 'success') === 'success' ? 'paid' : 'pending';
+
+      await query(
+        `INSERT INTO deals (
+          id, chat_id, customer_id, vendor_id, service_id,
+          customer_accepted, vendor_accepted, status,
+          created_at, agreed_at, discount,
+          original_price, final_price, discount_updated_at,
+          invoice_status, payment_confirmed_at, completed_at,
+          actual_return_date, return_status,
+          vendor_confirmed, customer_confirmed,
+          settlement_date, refund_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
+        [
+          promoDealId,
+          null,
+          body.userId ? String(body.userId) : null,
+          currentPromo?.vendor_id ? String(currentPromo.vendor_id) : (body.vendorId ? String(body.vendorId) : null),
+          serviceId || null,
+          1,
+          1,
+          promoStatus,
+          createdAt,
+          timestamp,
+          null,
+          promoBasePrice,
+          promoFinalPrice,
+          timestamp,
+          promoInvoiceStatus,
+          promoInvoiceStatus === 'paid' ? timestamp : null,
+          null,
+          null,
+          null,
+          0,
+          0,
+          null,
+          null
+        ]
+      );
+
+      resolvedDealId = promoDealId;
+    }
+
     if (body.promoId) {
       try {
         const promoRows = await query('SELECT * FROM promos WHERE id = ? LIMIT 1', [body.promoId]);
@@ -263,7 +315,7 @@ export async function POST(request) {
       ? [
         txId,
         body.invoiceId || null,
-        body.dealId || null,
+        resolvedDealId || null,
         serviceId || null,
         body.userId || null,
         body.promoId || null,
@@ -287,7 +339,7 @@ export async function POST(request) {
       : [
         txId,
         body.invoiceId || null,
-        body.dealId || null,
+        resolvedDealId || null,
         body.userId || null,
         body.promoId || null,
         body.paymentMethod || null,
@@ -333,12 +385,10 @@ export async function POST(request) {
       }
     }
 
-    const dealRows = body.dealId ? await query('SELECT * FROM deals WHERE id = ? LIMIT 1', [body.dealId]) : [];
+    const dealRows = resolvedDealId ? await query('SELECT * FROM deals WHERE id = ? LIMIT 1', [resolvedDealId]) : [];
     const currentDeal = dealRows[0] || null;
-    const promoRows = body.promoId ? await query('SELECT * FROM promos WHERE id = ? LIMIT 1', [body.promoId]) : [];
-    const currentPromo = promoRows[0] || null;
 
-    if ((body.dealId || body.promoId) && body.paymentType !== 'invoice_payment') {
+    if ((resolvedDealId || body.promoId) && body.paymentType !== 'invoice_payment') {
       const isPayAfter = body.paymentType === 'pay_after';
       const paymentCompletedAt = timestamp;
       const paymentDeadlineDate = new Date();
@@ -351,7 +401,7 @@ export async function POST(request) {
             OR (deal_id = ? AND payment_type = 'deal_pending' AND status <> 'paid')
          ORDER BY COALESCE(created_at, NOW()) DESC
          LIMIT 1`,
-        [txId, body.dealId || null, body.paymentType || 'full', body.dealId || null]
+          [txId, resolvedDealId || null, body.paymentType || 'full', resolvedDealId || null]
       );
 
       if (existingInvoiceRows.length > 0) {
@@ -387,7 +437,7 @@ export async function POST(request) {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             `INV-${Date.now()}`,
-            body.dealId || null,
+            resolvedDealId || null,
             body.userId || currentDeal?.customer_id || null,
             currentDeal?.vendor_id || currentPromo?.vendor_id || body.vendorId || null,
             currentDeal?.service_id || null,
@@ -405,7 +455,7 @@ export async function POST(request) {
         );
       }
 
-      if (body.dealId) {
+      if (resolvedDealId) {
         await query(
           `UPDATE deals
            SET invoice_status = ?, status = ?, payment_confirmed_at = ?, completed_at = ?
@@ -415,11 +465,11 @@ export async function POST(request) {
             isPayAfter ? 'agreed' : 'active',
             isPayAfter ? null : paymentCompletedAt,
             isPayAfter ? null : paymentCompletedAt,
-            body.dealId
+            resolvedDealId
           ]
         );
 
-        const dealRowsAfter = await query('SELECT chat_id FROM deals WHERE id = ? LIMIT 1', [body.dealId]);
+        const dealRowsAfter = await query('SELECT chat_id FROM deals WHERE id = ? LIMIT 1', [resolvedDealId]);
         if (dealRowsAfter.length > 0 && dealRowsAfter[0].chat_id) {
           await query('UPDATE chats SET deal_status = ? WHERE id = ?', [isPayAfter ? 'agreed' : 'active', dealRowsAfter[0].chat_id]);
         }

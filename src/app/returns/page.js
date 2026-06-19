@@ -306,6 +306,11 @@ export default function ReturnsPage() {
                       return mode === 'end' ? t === 'end_of_use' : (t === 'issue' || t === 'complaint');
                     })
                     .map((d) => (
+                    (() => {
+                      const isVendorOnThisReturn = String(d.vendorId || '') === String(user?.id || '');
+                      const isCustomerOnThisReturn = String(d.customerId || '') === String(user?.id || '');
+
+                      return (
                     <div key={d.id} className={styles.card}>
                       <div className={styles.cardHeader}>
                         <div>
@@ -349,10 +354,10 @@ export default function ReturnsPage() {
                       )}
 
                       <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                        {user.role === 'vendor' && (
+                        {isVendorOnThisReturn && (
                           <button onClick={() => openInspectModal(d)} className={`${styles.btn} ${styles.secondary}`}>{mode === 'complaint' ? 'Tindak Complaint' : 'Inspeksi'}</button>
                         )}
-                        {user.role === 'customer' && (
+                        {isCustomerOnThisReturn && (
                           <div style={{ width: '100%' }}>
                             <div className={`${styles.muted} ${styles.small}`}>Status: {d.returnStatus}</div>
                             <div style={{ marginTop: 6, padding: '10px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#f8fafc' }}>
@@ -377,7 +382,7 @@ export default function ReturnsPage() {
                                   {d.damageInvoiceId && (
                                     <div className={styles.small} style={{ marginTop: 6 }}>
                                       Invoice kerusakan: {d.damageInvoiceId} ({d.damageInvoiceStatus || 'pending'})
-                                      {user.role === 'customer' && d.damageInvoiceStatus === 'pending' && (
+                                      {isCustomerOnThisReturn && d.damageInvoiceStatus === 'pending' && (
                                         <a href="/customer/invoices" style={{ color: '#B28A67', textDecoration: 'underline', marginLeft: 6 }}>Bayar kerusakan</a>
                                       )}
                                     </div>
@@ -394,6 +399,8 @@ export default function ReturnsPage() {
                         )}
                       </div>
                     </div>
+                      );
+                    })()
                   ))}
                 </div>
               )}

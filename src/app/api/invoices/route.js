@@ -43,6 +43,14 @@ function mapInvoiceRow(row) {
     discountedSubtotal,
     serviceFee,
     totalAmount,
+    promo: row.promo_id
+      ? {
+          id: row.promo_id,
+          code: row.promo_title || row.promo_id,
+          title: row.promo_title || row.promo_id,
+          price: row.promo_price !== null && row.promo_price !== undefined ? toNumber(row.promo_price) : null
+        }
+      : null,
     collaborationStatus: row.status === 'paid' ? 'completed' : 'ongoing'
   };
 }
@@ -86,12 +94,16 @@ export async function GET(request) {
          t.quantity,
          t.duration_days,
          t.service_fee,
-         t.total_amount AS tx_total_amount
+         t.total_amount AS tx_total_amount,
+         t.promo_id,
+         p.title AS promo_title,
+         p.promo_price
        FROM invoices i
        LEFT JOIN users c ON c.id = i.customer_id
        LEFT JOIN users v ON v.id = i.vendor_id
        LEFT JOIN services s ON s.id = i.service_id
        LEFT JOIN transactions t ON t.id = COALESCE(i.payment_transaction_id, i.transaction_id)
+       LEFT JOIN promos p ON p.id = t.promo_id
        ${whereClause}
        ORDER BY COALESCE(i.created_at, i.payment_deadline) DESC`,
       params

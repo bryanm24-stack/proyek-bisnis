@@ -22,12 +22,30 @@ function toValidDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function normalizePromo(promo) {
+function normalizePromo(promo, options = {}) {
+  const { userId = null, claimedUsersByPromo = new Map() } = options;
   const startAtDate = toValidDate(promo.start_at || promo.startAt);
   const endAtDate = toValidDate(promo.end_at || promo.endAt);
   const maxApplicants = promo.max_applicants || promo.maxApplicants;
-  const claimedCount = promo.claimed_count || 0;
+  const claimedUsersFromDb = Array.isArray(promo.claimed_user_ids)
+    ? promo.claimed_user_ids.map((id) => String(id))
+    : (() => {
+        try {
+          const parsed = JSON.parse(promo.claimed_user_ids || '[]');
+          return Array.isArray(parsed) ? parsed.map((id) => String(id)) : [];
+        } catch {
+          return [];
+        }
+      })();
+  const claimedUsersFromTx = Array.from(claimedUsersByPromo.get(String(promo.id)) || []);
+  const claimedUsersUnion = Array.from(new Set([...claimedUsersFromDb, ...claimedUsersFromTx]));
+  const claimedCount = claimedUsersUnion.length;
+  const remainingApplicants = Number.isFinite(Number(maxApplicants))
+    ? Math.max(0, Number(maxApplicants) - claimedCount)
+    : null;
   const now = Date.now();
+  const normalizedUserId = userId ? String(userId) : null;
+  const userHasClaimed = Boolean(normalizedUserId && claimedUsersUnion.includes(normalizedUserId));
 
   return {
     id: promo.id,
@@ -42,6 +60,9 @@ function normalizePromo(promo) {
     endAt: endAtDate ? endAtDate.toISOString() : null,
     maxApplicants: maxApplicants ? Number(maxApplicants) : null,
     claimedCount,
+    remainingApplicants,
+    userHasClaimed,
+    claimLimitPerUser: 1,
     createdAt: promo.created_at,
     updatedAt: promo.updated_at,
     isUpcoming: startAtDate && startAtDate.getTime() > now,
@@ -58,6 +79,7 @@ export async function GET(request) {
     const vendorId = searchParams.get('vendorId');
     const active = searchParams.get('active');
     const promoId = searchParams.get('promoId');
+    const userId = searchParams.get('userId');
 
     let sql = 'SELECT * FROM promos WHERE 1=1';
     const params = [];
@@ -75,7 +97,33 @@ export async function GET(request) {
     sql += ' ORDER BY created_at DESC';
 
     const promos = await query(sql, params);
-    let processedPromos = promos.map(normalizePromo);
+
+    const promoIds = promos.map((promo) => String(promo.id));
+    const claimedUsersByPromo = new Map();
+    if (promoIds.length > 0) {
+      try {
+        const placeholders = promoIds.map(() => '?').join(', ');
+        const txRows = await query(
+          `SELECT promo_id, user_id
+           FROM transactions
+           WHERE status = 'success'
+             AND promo_id IN (${placeholders})`,
+          promoIds
+        );
+
+        txRows.forEach((row) => {
+          const key = String(row.promo_id || '');
+          if (!claimedUsersByPromo.has(key)) claimedUsersByPromo.set(key, new Set());
+          if (row.user_id !== null && row.user_id !== undefined) {
+            claimedUsersByPromo.get(key).add(String(row.user_id));
+          }
+        });
+      } catch (transactionReadError) {
+        console.warn('Promo claim aggregation from transactions not available:', transactionReadError?.message || transactionReadError);
+      }
+    }
+
+    let processedPromos = promos.map((promo) => normalizePromo(promo, { userId, claimedUsersByPromo }));
 
     if (active === 'true') {
       processedPromos = processedPromos.filter(p => p.isActiveNow);

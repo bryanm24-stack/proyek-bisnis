@@ -34,7 +34,7 @@ const daysBetweenDates = (dateAString, dateBString) => {
   return Math.max(0, Math.round((a - b) / MS_PER_DAY));
 };
 
-function mapReturnRow(row, role = null) {
+function mapReturnRow(row, role = null, currentUserId = null) {
   const photos = parseJsonArray(row.photos);
   const safePhotos = photos.map((item) => {
     if (typeof item === 'string') {
@@ -49,6 +49,10 @@ function mapReturnRow(row, role = null) {
 
   const serviceImages = parseJsonArray(row.service_images);
   const isComplaint = row.request_type === 'complaint' || row.request_type === 'issue';
+
+  const isVendorPerspective = currentUserId
+    ? String(row.vendor_id || '') === String(currentUserId)
+    : role === 'vendor';
 
   return {
     id: row.deal_id || row.id,
@@ -85,7 +89,8 @@ function mapReturnRow(row, role = null) {
     },
     vendorName: row.vendor_name || '',
     customerName: row.customer_name || '',
-    otherUser: role === 'vendor'
+    perspective: isVendorPerspective ? 'vendor' : 'customer',
+    otherUser: isVendorPerspective
       ? { id: row.customer_id, name: row.customer_name || '' }
       : { id: row.vendor_id, name: row.vendor_name || '' },
     returnSummary: isComplaint
@@ -174,7 +179,13 @@ export async function GET(request) {
     }
 
     if (userId && userRole) {
-      const roleColumn = userRole === 'vendor' ? 'rr.vendor_id' : 'rr.customer_id';
+      const isVendorUser = userRole === 'vendor';
+      const roleCondition = isVendorUser
+        ? '(rr.vendor_id = ? OR rr.customer_id = ?)'
+        : 'rr.customer_id = ?';
+      const roleParams = isVendorUser
+        ? [String(userId), String(userId)]
+        : [String(userId)];
       const rows = await query(
         `SELECT
            rr.*,
@@ -186,12 +197,12 @@ export async function GET(request) {
          LEFT JOIN services s ON s.id = rr.service_id
          LEFT JOIN users c ON c.id = rr.customer_id
          LEFT JOIN users v ON v.id = rr.vendor_id
-         WHERE ${roleColumn} = ?
+         WHERE ${roleCondition}
          ORDER BY COALESCE(rr.updated_at, rr.created_at) DESC`,
-        [String(userId)]
+        roleParams
       );
 
-      const data = rows.map((row) => mapReturnRow(row, userRole));
+      const data = rows.map((row) => mapReturnRow(row, userRole, String(userId)));
       return NextResponse.json({
         success: true,
         data,

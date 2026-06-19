@@ -452,6 +452,11 @@ export async function GET(request) {
       return NextResponse.json({ success: true, data: null }, { status: 200 });
     }
 
+    // If chat cycle has been reset, hide previous completed/cancelled/active deal from UI.
+    if (!chat?.dealStatus && ['active', 'completed', 'cancelled'].includes(String(dealRow.status || '').toLowerCase())) {
+      return NextResponse.json({ success: true, data: null }, { status: 200 });
+    }
+
     let originalPrice = Number(dealRow.original_price ?? 0) || 0;
     if (originalPrice <= 0 && chat) {
       originalPrice = await resolveDealPrice(chat.serviceId, chat.itemId);
