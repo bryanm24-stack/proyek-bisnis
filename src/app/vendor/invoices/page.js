@@ -40,7 +40,7 @@ export default function VendorInvoicesPage() {
     try {
       setIsLoading(true);
       const query = status === 'all' ? '' : `&status=${status}`;
-      const response = await fetch(`/api/invoices?customerId=${vendorId}${query}`);
+      const response = await fetch(`/api/invoices?vendorId=${vendorId}${query}`);
       const data = await response.json();
 
       const ownInvoices = Array.isArray(data)

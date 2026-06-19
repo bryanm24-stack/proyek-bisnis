@@ -161,7 +161,7 @@ export default function ReturnsPage() {
       const r = await fetch('/api/returns', { method: 'POST', body: form });
       const j = await r.json();
       if (!r.ok || j.success === false) throw new Error(j.message || 'Gagal mengajukan return');
-      alert('complaint diajukan');
+      alert(mode === 'complaint' ? 'complaint diajukan' : 'return diajukan');
       setDealId('');
       setDamageDescription('');
       setPhotos([]);

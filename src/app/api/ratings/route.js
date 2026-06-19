@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { query } from '@/lib/db';
 
 import { readData, writeData } from '@/lib/storage';
 // POST - Submit rating and increment rentCount
@@ -22,31 +23,43 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
+    // SQL-first: resolve service id from payload or deal
+    let resolvedServiceId = serviceId ? String(serviceId) : null;
+    if (!resolvedServiceId && dealId) {
+      const dealRows = await query('SELECT service_id FROM deals WHERE id = ? LIMIT 1', [String(dealId)]);
+      resolvedServiceId = dealRows[0]?.service_id ? String(dealRows[0].service_id) : null;
+    }
 
-    const ratings = await readData('ratings');
-    const services = await readData('services');
-
-    // Cari service
-    const service = services.find(s => s.id === serviceId);
-    if (!service) {
+    if (!resolvedServiceId) {
       return NextResponse.json({
         success: false,
         message: 'Layanan tidak ditemukan'
       }, { status: 404 });
     }
 
-    const serviceType = String(service.type || 'barang').toLowerCase();
+    const serviceRows = await query('SELECT id, rating, rent_count FROM services WHERE id = ? LIMIT 1', [resolvedServiceId]);
+    if (serviceRows.length === 0) {
+      return NextResponse.json({
+        success: false,
+        message: 'Layanan tidak ditemukan'
+      }, { status: 404 });
+    }
 
-    // Check duplikasi rating per siklus deal; fallback ke service untuk data lama tanpa dealId.
-    const existingRating = dealId
-      ? ratings.find(
-          (r) => String(r.customerId) === String(customerId) && String(r.dealId || '') === String(dealId)
-        )
-      : ratings.find(
-          (r) => String(r.serviceId) === String(serviceId) && String(r.customerId) === String(customerId) && !r.dealId
-        );
+    // Cek duplikasi rating berdasarkan deal (prioritas) atau service legacy
+    let duplicateRows = [];
+    if (dealId) {
+      duplicateRows = await query(
+        'SELECT id FROM ratings WHERE customer_id = ? AND deal_id = ? LIMIT 1',
+        [String(customerId), String(dealId)]
+      );
+    } else {
+      duplicateRows = await query(
+        'SELECT id FROM ratings WHERE customer_id = ? AND service_id = ? AND (deal_id IS NULL OR deal_id = "") LIMIT 1',
+        [String(customerId), resolvedServiceId]
+      );
+    }
 
-    if (existingRating) {
+    if (duplicateRows.length > 0) {
       return NextResponse.json({
         success: false,
         message: dealId
@@ -55,10 +68,9 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    // Buat rating baru
     const newRating = {
       id: Date.now().toString(),
-      serviceId,
+      serviceId: resolvedServiceId,
       customerId,
       vendorId,
       dealId: dealId || null,
@@ -67,75 +79,37 @@ export async function POST(request) {
       createdAt: new Date().toISOString()
     };
 
-    ratings.push(newRating);
+    await query(
+      `INSERT INTO ratings (id, service_id, customer_id, vendor_id, rating, review, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)` ,
+      [
+        newRating.id,
+        resolvedServiceId,
+        String(customerId),
+        String(vendorId),
+        Number(newRating.rating),
+        newRating.review,
+        newRating.createdAt
+      ]
+    );
 
-    // Update rentCount dan rating di service
-    const currentRating = parseFloat(service.rating) || 5.0;
-    const currentRentCount = parseInt(service.rentCount) || 0;
-    const totalRatings = ratings.filter(r => r.serviceId === serviceId).length;
-    
-    // Hitung rata-rata rating baru
-    const allRatingsForService = ratings.filter(r => r.serviceId === serviceId);
-    const totalRatingScore = allRatingsForService.reduce((sum, r) => sum + r.rating, 0);
-    const newAverageRating = (totalRatingScore / allRatingsForService.length).toFixed(1);
+    const aggregate = await query(
+      'SELECT COUNT(*) AS total, AVG(rating) AS avg_rating FROM ratings WHERE service_id = ?',
+      [resolvedServiceId]
+    );
+    const total = Number(aggregate[0]?.total || 0);
+    const avgRating = Number(aggregate[0]?.avg_rating || 0);
 
-    service.rentCount = (currentRentCount + 1).toString();
-    service.rating = parseFloat(newAverageRating);
-
-    // Update deal ratingCompleted if dealId provided
-    let updatedDeal = null;
-    let updatedChat = null;
-    let chatResetAfterRating = false;
-    if (dealId) {
-      try {
-        const deals = await readData('deals');
-        const deal = deals.find(d => d.id === dealId);
-        if (deal) {
-          deal.ratingCompleted = true;
-          updatedDeal = deal;
-
-          const shouldResetForNewCycle = serviceType === 'barang';
-
-          // Barang: setelah rating, buka kembali deal/chat agar siap siklus beli berikutnya.
-          const users = await readData('users');
-          const customerUser = users.find((u) => String(u.id) === String(deal.customerId));
-          const vendorUser = users.find((u) => String(u.id) === String(deal.vendorId));
-          const isVendorToVendor = customerUser?.role === 'vendor' && vendorUser?.role === 'vendor';
-
-          if ((shouldResetForNewCycle || isVendorToVendor) && deal.chatId) {
-            const chats = await readData('chats');
-            const chat = chats.find((c) => String(c.id) === String(deal.chatId));
-
-            if (chat) {
-              chat.dealStatus = 'pending';
-              chat.closedAt = null;
-              chat.closedReason = null;
-              await writeData('chat', chats);
-              updatedChat = chat;
-              chatResetAfterRating = true;
-            }
-          }
-
-          await writeData('deal', deals);
-        }
-      } catch (e) {
-        console.warn('Could not update deal ratingCompleted:', e);
-      }
-    }
-
-    // Simpan perubahan
-    await writeData('rating', ratings);
-    await writeData('service', services);
+    await query(
+      'UPDATE services SET rent_count = ?, rating = ? WHERE id = ?',
+      [total, Number(avgRating.toFixed(1)), resolvedServiceId]
+    );
 
     return NextResponse.json({
       success: true,
       message: 'Rating berhasil disimpan',
       data: {
-        rating: newRating,
-        updatedService: service,
-        updatedDeal,
-        updatedChat,
-        chatResetAfterRating
+        rating: newRating
       }
     }, { status: 201 });
   } catch (error) {
