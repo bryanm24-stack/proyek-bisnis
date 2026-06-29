@@ -17,6 +17,7 @@ export default function FavoritesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [detailTab, setDetailTab] = useState('packages');
   const [selectedItemDetail, setSelectedItemDetail] = useState(null);
+  const [selectedChatItem, setSelectedChatItem] = useState(null);
   const [serviceReviews, setServiceReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewFilter, setReviewFilter] = useState('all');
@@ -30,6 +31,7 @@ export default function FavoritesPage() {
   const [ratingValue, setRatingValue] = useState(5);
   const [ratingReview, setRatingReview] = useState('');
   const [currentImageIndex, setCurrentImageIndex] = useState({});
+  const activeChatItem = selectedChatItem || selectedItemDetail;
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -216,15 +218,16 @@ export default function FavoritesPage() {
     setDetailTab('packages');
     setReviewFilter('all');
     setReviewPage(1);
-  };
+  };  
 
-  const openChatModal = async (service) => {
+  const openChatModal = async (service, itemDetail = null) => {
     if (!user) {
       alert('Silakan login terlebih dahulu');
       return;
     }
 
     setSelectedService(service);
+    setSelectedChatItem(itemDetail);
     setMessages([]);
     setNewMessage('');
     setChatModalOpen(true);
@@ -232,7 +235,16 @@ export default function FavoritesPage() {
 
     try {
       // Load existing chat if any
-      const response = await fetch(`/api/chat?serviceId=${service.id}&customerId=${user.id}`);
+      const chatQuery = new URLSearchParams({
+        serviceId: service.id,
+        customerId: user.id
+      });
+
+      if (itemDetail?.id) {
+        chatQuery.set('itemId', itemDetail.id);
+      }
+
+      const response = await fetch(`/api/chat?${chatQuery.toString()}`);
       const data = await response.json();
 
       if (data.success && data.data) {
@@ -266,6 +278,7 @@ export default function FavoritesPage() {
   const closeChatModal = () => {
     setChatModalOpen(false);
     setSelectedService(null);
+    setSelectedChatItem(null);
     setMessages([]);
     setNewMessage('');
     setChatData(null);
@@ -295,6 +308,8 @@ export default function FavoritesPage() {
           vendorName: selectedService.vendorName,
           customerId: user.id,
           customerName: user.name,
+          itemId: activeChatItem?.id || null,
+          itemName: activeChatItem?.namaBarang || activeChatItem?.namaJasa || activeChatItem?.title || null,
           message: newMessage,
           senderId: user.id,
           senderName: user.name
@@ -903,7 +918,7 @@ export default function FavoritesPage() {
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
                   <span style={{ fontSize: '14px', color: '#666' }}>Rp</span>
                   <span style={{ fontSize: '28px', fontWeight: '700', color: '#B28A67' }}>
-                    {(selectedService.price || 0).toLocaleString('id-ID')}
+                    {getServiceDisplayPrice(selectedService)}
                   </span>
                   <span style={{ fontSize: '14px', color: '#666' }}>/ hari</span>
                 </div>
@@ -999,7 +1014,7 @@ export default function FavoritesPage() {
                             <div>
                               <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Harga</p>
                               <p style={{ margin: '0', fontSize: '16px', fontWeight: 'bold', color: '#B28A67' }}>
-                                Rp {(selectedItemDetail.hargaPcs || selectedItemDetail.price || 0).toLocaleString('id-ID')}
+                                Rp {formatPrice(getItemPriceNumber(selectedItemDetail))}
                               </p>
                             </div>
                             {selectedItemDetail.stok && (
@@ -1021,6 +1036,8 @@ export default function FavoritesPage() {
                               fontWeight: '600',
                               fontSize: '14px'
                             }}
+                            onClick={() => openChatModal(selectedService, selectedItemDetail)}
+                            disabled={user && user.id === selectedService.vendorId}
                             onMouseEnter={(e) => e.target.style.backgroundColor = '#8F6B4A'}
                             onMouseLeave={(e) => e.target.style.backgroundColor = '#B28A67'}
                           >
