@@ -372,7 +372,9 @@ INSERT IGNORE INTO users (id, username, password, name, role_id, role, email, ph
 ('2','banana','123','Banana Vendor',2,'vendor','banana@rentguard.com','081234567891','2026-04-01 00:00:00'),
 ('3','orange','123','Orange Vendor',2,'vendor','orange@rentguard.com','081234567892','2026-04-01 00:00:00'),
 ('4','strawberry','123','Strawberry Customer',1,'customer','strawberry@rentguard.com','089876543210','2026-04-02 00:00:00'),
-('5','grape','123','Grape Customer',1,'customer','grape@rentguard.com','089876543211','2026-04-02 00:00:00')
+('5','grape','123','Grape Customer',1,'customer','grape@rentguard.com','089876543211','2026-04-02 00:00:00'),
+('6','admin','123','Admin Rentguard',1,'admin','admin@rentguard.com','089872391012','2026-04-03 00:00:00')
+
 ;
 
 -- TRANSACTIONS
