@@ -141,6 +141,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   id VARCHAR(255) PRIMARY KEY,
   invoice_id VARCHAR(255),
   deal_id VARCHAR(255),
+  service_id VARCHAR(255),
   user_id VARCHAR(255),
   promo_id VARCHAR(255),
   payment_method VARCHAR(255),
@@ -178,6 +179,58 @@ CREATE TABLE IF NOT EXISTS invoices (
   paid_at DATETIME(3),
   payment_transaction_id VARCHAR(255),
   notes TEXT
+);
+
+-- Return requests / complaints linked to invoices
+CREATE TABLE IF NOT EXISTS return_requests (
+  id VARCHAR(255) PRIMARY KEY,
+  invoice_id VARCHAR(255) NOT NULL,
+  deal_id VARCHAR(255),
+  customer_id VARCHAR(255),
+  vendor_id VARCHAR(255),
+  service_id VARCHAR(255),
+  request_type VARCHAR(50),
+  item_condition VARCHAR(255),
+  complaint_category VARCHAR(255),
+  description TEXT,
+  photos JSON,
+  status VARCHAR(255),
+  damage_status VARCHAR(50),
+  damage_charge DECIMAL(18,2) DEFAULT 0,
+  damage_invoice_id VARCHAR(255),
+  late_charge DECIMAL(18,2) DEFAULT 0,
+  total_refund DECIMAL(18,2) DEFAULT 0,
+  complaint_resolution VARCHAR(100),
+  complaint_penalty DECIMAL(18,2) DEFAULT 0,
+  vendor_notes TEXT,
+  customer_confirmed BOOLEAN DEFAULT false,
+  vendor_confirmed BOOLEAN DEFAULT false,
+  created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3),
+  resolved_at DATETIME(3)
+);
+
+-- Vendor-custom category hierarchy (parent > sub > super-sub)
+CREATE TABLE IF NOT EXISTS category_parents (
+  id VARCHAR(255) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL UNIQUE,
+  created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3)
+);
+
+CREATE TABLE IF NOT EXISTS category_sub_categories (
+  id VARCHAR(255) PRIMARY KEY,
+  parent_id VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY uq_sub_per_parent (parent_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS category_super_sub_categories (
+  id VARCHAR(255) PRIMARY KEY,
+  sub_category_id VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY uq_super_sub_per_sub (sub_category_id, name)
 );
 
 -- Favorites
@@ -258,6 +311,7 @@ ALTER TABLE chats
 ALTER TABLE transactions
   ADD CONSTRAINT fk_transactions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
   ADD CONSTRAINT fk_transactions_deal FOREIGN KEY (deal_id) REFERENCES deals(id) ON DELETE SET NULL,
+  ADD CONSTRAINT fk_transactions_service FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE SET NULL,
   ADD CONSTRAINT fk_transactions_invoice FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE SET NULL;
 
 ALTER TABLE invoices
@@ -265,6 +319,20 @@ ALTER TABLE invoices
   ADD CONSTRAINT fk_invoices_customer FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE SET NULL,
   ADD CONSTRAINT fk_invoices_vendor FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE SET NULL,
   ADD CONSTRAINT fk_invoices_transaction FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL;
+
+ALTER TABLE return_requests
+  ADD CONSTRAINT fk_return_requests_invoice FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
+  ADD CONSTRAINT fk_return_requests_deal FOREIGN KEY (deal_id) REFERENCES deals(id) ON DELETE SET NULL,
+  ADD CONSTRAINT fk_return_requests_customer FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE SET NULL,
+  ADD CONSTRAINT fk_return_requests_vendor FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE SET NULL,
+  ADD CONSTRAINT fk_return_requests_service FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE SET NULL,
+  ADD CONSTRAINT fk_return_requests_damage_invoice FOREIGN KEY (damage_invoice_id) REFERENCES invoices(id) ON DELETE SET NULL;
+
+ALTER TABLE category_sub_categories
+  ADD CONSTRAINT fk_category_sub_parent FOREIGN KEY (parent_id) REFERENCES category_parents(id) ON DELETE CASCADE;
+
+ALTER TABLE category_super_sub_categories
+  ADD CONSTRAINT fk_category_super_sub_sub FOREIGN KEY (sub_category_id) REFERENCES category_sub_categories(id) ON DELETE CASCADE;
 
 ALTER TABLE favorites
   ADD CONSTRAINT fk_favorites_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -290,6 +358,10 @@ CREATE INDEX idx_chats_service ON chats(service_id);
 CREATE INDEX idx_transactions_user ON transactions(user_id);
 CREATE INDEX idx_invoices_deal ON invoices(deal_id);
 CREATE INDEX idx_services_vendor ON services(vendor_id);
+CREATE INDEX idx_return_requests_invoice ON return_requests(invoice_id);
+CREATE INDEX idx_return_requests_customer ON return_requests(customer_id);
+CREATE INDEX idx_return_requests_vendor ON return_requests(vendor_id);
+CREATE INDEX idx_return_requests_deal ON return_requests(deal_id);
 
 -- Combined INSERTs for JSON-derived data
 -- Run this after schema creation in proyek_bisnis_db

@@ -473,7 +473,6 @@ function PaymentContent() {
     }
   };
 
-  const serviceFee = 25000;
   // ✅ FIXED: Prefer the currently selected item price over an older stored deal price
   const selectedItemPrice = Number(selectedItem?.price || 0);
   const dealOriginalPrice = Number(deal?.originalPrice ?? selectedItemPrice) || 0;
@@ -488,10 +487,11 @@ function PaymentContent() {
     ? Math.max((dealFinalPrice ?? 0) * quantity * durationDays, 0)
     : (basePrice * quantity * durationDays);
   const totalPrice = selectedPromo ? selectedPromo.price : dealSubtotal;
+  const serviceFee = selectedPromo ? 0 : Math.max(0, Math.round((Number(totalPrice || 0)) * 0.05));
   const discountedSubtotal = totalPrice;
   const discountAmount = selectedPromo ? 0 : (deal?.discountGiven ? (dealDiscountAmount * quantity * durationDays) : 0);
   const appliedPromo = null; // ✅ NEW: No promo code in new system
-  const totalAmount = discountedSubtotal + (selectedPromo ? 0 : serviceFee); // ✅ NEW: No service fee for promo
+  const totalAmount = discountedSubtotal + serviceFee; // ✅ NEW: No service fee for promo
   const downPayment = Math.round(totalAmount * 0.2); // 20% down payment
   const remainingPayment = totalAmount - downPayment; // 80% remaining
   const isService = service?.type === 'jasa' || deal?.serviceType === 'jasa' || deal?.type === 'jasa';

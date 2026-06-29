@@ -1,28 +1,14 @@
-import { readData, writeData } from '@/lib/storage';
+import { NextResponse } from 'next/server';
+import { query } from '@/lib/db';
 
-const buildRentalTimeline = (startDate, durationDays) => {
-  const parsedStartDate = startDate ? new Date(`${startDate}T00:00:00.000Z`) : null;
-  const parsedDurationDays = Number(durationDays || 0);
-
-  if (!parsedStartDate || Number.isNaN(parsedStartDate.getTime()) || parsedDurationDays <= 0) {
-    return {
-      borrowDate: startDate || null,
-      expectedReturnDate: null,
-      returnDeadline: null
-    };
+const parseJsonSafe = (value, fallback) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
   }
-
-  const expectedReturnDate = new Date(parsedStartDate);
-  expectedReturnDate.setUTCDate(expectedReturnDate.getUTCDate() + parsedDurationDays);
-
-  const returnDeadline = new Date(expectedReturnDate);
-  returnDeadline.setUTCDate(returnDeadline.getUTCDate() - 1);
-
-  return {
-    borrowDate: parsedStartDate.toISOString(),
-    expectedReturnDate: expectedReturnDate.toISOString(),
-    returnDeadline: returnDeadline.toISOString()
-  };
 };
 
 const parseDateOrNull = (value) => {
@@ -31,32 +17,29 @@ const parseDateOrNull = (value) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-const normalizePromo = (promo) => {
-  const startAt = parseDateOrNull(promo.startAt);
-  const endAt = parseDateOrNull(promo.endAt);
-  const claimedUserIds = Array.isArray(promo.claimedUserIds)
-    ? promo.claimedUserIds.map((userId) => String(userId))
-    : [];
-  const maxApplicants = promo.maxApplicants === undefined || promo.maxApplicants === null || promo.maxApplicants === ''
+const normalizePromoRow = (promo) => {
+  const startAt = parseDateOrNull(promo.start_at);
+  const endAt = parseDateOrNull(promo.end_at);
+  const claimedUserIds = parseJsonSafe(promo.claimed_user_ids, []).map((id) => String(id));
+  const maxApplicants = promo.max_applicants === undefined || promo.max_applicants === null || promo.max_applicants === ''
     ? null
-    : Number(promo.maxApplicants);
-  const claimedCount = Number.isFinite(Number(promo.claimedCount))
-    ? Number(promo.claimedCount)
-    : claimedUserIds.length;
+    : Number(promo.max_applicants);
+  const claimedCount = Number.isFinite(Number(promo.claimed_count)) ? Number(promo.claimed_count) : claimedUserIds.length;
 
   return {
     ...promo,
-    startAt: startAt ? startAt.toISOString() : (promo.startAt || null),
-    endAt: endAt ? endAt.toISOString() : (promo.endAt || null),
+    startAt: startAt ? startAt.toISOString() : null,
+    endAt: endAt ? endAt.toISOString() : null,
     maxApplicants: Number.isFinite(maxApplicants) ? maxApplicants : null,
     claimedCount,
-    claimedUserIds
+    claimedUserIds,
+    active: Boolean(promo.active)
   };
 };
 
-const validatePromoAvailability = (promo, userId, transactions) => {
+const validatePromoAvailability = (promo, userId, successfulTransactionsForPromo) => {
   const now = Date.now();
-  const normalizedPromo = normalizePromo(promo);
+  const normalizedPromo = normalizePromoRow(promo);
 
   if (normalizedPromo.active === false) {
     return 'Promo sedang tidak aktif.';
@@ -76,9 +59,8 @@ const validatePromoAvailability = (promo, userId, transactions) => {
 
   if (userId) {
     const userKey = String(userId);
-    const hasClaimedBefore = normalizedPromo.claimedUserIds.includes(userKey) || transactions.some((transaction) =>
-      String(transaction.promoId) === String(normalizedPromo.id) &&
-      String(transaction.userId) === userKey &&
+    const hasClaimedBefore = normalizedPromo.claimedUserIds.includes(userKey) || successfulTransactionsForPromo.some((transaction) =>
+      String(transaction.user_id) === userKey &&
       transaction.status === 'success'
     );
 
@@ -93,73 +75,148 @@ const validatePromoAvailability = (promo, userId, transactions) => {
 async function markPromoClaimed(promoId, userId) {
   if (!promoId || !userId) return;
 
-  const promos = await readData('promos');
-  const promoIndex = promos.findIndex((item) => String(item.id) === String(promoId));
+  const rows = await query('SELECT claimed_user_ids FROM promos WHERE id = ? LIMIT 1', [promoId]);
+  if (rows.length === 0) return;
 
-  if (promoIndex === -1) return;
-
-  const promo = normalizePromo(promos[promoIndex]);
+  const claimedUserIds = parseJsonSafe(rows[0].claimed_user_ids, []).map((id) => String(id));
   const userKey = String(userId);
-  const claimedUserIds = Array.from(new Set([...(promo.claimedUserIds || []), userKey]));
+  if (!claimedUserIds.includes(userKey)) claimedUserIds.push(userKey);
 
-  promos[promoIndex] = {
-    ...promos[promoIndex],
-    claimedUserIds,
-    claimedCount: claimedUserIds.length,
-    updatedAt: new Date().toISOString()
-  };
-
-  await writeData('promos', promos);
+  await query(
+    'UPDATE promos SET claimed_user_ids = ?, claimed_count = ?, updated_at = ? WHERE id = ?',
+    [JSON.stringify(claimedUserIds), claimedUserIds.length, new Date().toISOString(), promoId]
+  );
 }
 
-// Storage setup helpers are no-ops when using database or storage abstraction.
-const ensureTransactionsFile = async () => {};
-const ensureInvoicesFile = async () => {};
-const ensureDealsFile = async () => {};
-const ensurePromosFile = async () => {};
+const toDateOnly = (value) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, '0');
+  const d = String(parsed.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+async function hasTransactionsServiceIdColumn() {
+  const rows = await query(
+    `SELECT 1
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'transactions'
+       AND COLUMN_NAME = 'service_id'
+     LIMIT 1`
+  );
+  return rows.length > 0;
+}
 
 export async function GET(request) {
   try {
-    ensureTransactionsFile();
-    const data = await readData('transactions');
-    const transactions = data;
-    
-    return Response.json(transactions);
+    const rows = await query('SELECT * FROM transactions ORDER BY COALESCE(created_at, NOW()) DESC');
+    const transactions = rows.map((row) => ({
+      ...row,
+      card_details: parseJsonSafe(row.card_details, null),
+      identity_verification: parseJsonSafe(row.identity_verification, null)
+    }));
+
+    return NextResponse.json(transactions, { status: 200 });
   } catch (error) {
     console.error('Error reading transactions:', error);
-    return Response.json([], { status: 200 });
+    return NextResponse.json([], { status: 200 });
   }
 }
 
 export async function POST(request) {
   try {
     const body = await request.json();
-    
-    ensureTransactionsFile();
-    ensureInvoicesFile();
-    ensureDealsFile();
-    ensurePromosFile();
-    
-    let transactions = await readData('transactions');
+    const hasServiceIdColumn = await hasTransactionsServiceIdColumn();
 
-    // PROMO CHECK - Validate promo rules before writing the transaction
+    const txId = body.id || `TRX-${Date.now()}`;
+    const createdAt = new Date().toISOString();
+    const timestamp = body.timestamp || createdAt;
+
+    // Determine service ID early from deal or direct parameter
+    let serviceId = body.serviceId;
+    if (!serviceId && body.dealId) {
+      const dealRows = await query('SELECT service_id FROM deals WHERE id = ? LIMIT 1', [body.dealId]);
+      if (dealRows.length > 0) {
+        serviceId = dealRows[0].service_id;
+      }
+    }
+
+    const promoRows = body.promoId ? await query('SELECT * FROM promos WHERE id = ? LIMIT 1', [body.promoId]) : [];
+    const currentPromo = promoRows[0] || null;
+
+    let resolvedDealId = body.dealId ? String(body.dealId) : null;
+    if (!resolvedDealId && body.promoId) {
+      const promoDealId = `DEAL-PROMO-${Date.now()}`;
+      const promoBasePrice = Number(body.basePrice ?? body.amount ?? currentPromo?.promo_price ?? 0) || 0;
+      const promoFinalPrice = Number(body.totalAmount ?? body.amount ?? currentPromo?.promo_price ?? promoBasePrice) || promoBasePrice;
+      const promoStatus = (body.status || 'success') === 'success' ? 'active' : 'agreed';
+      const promoInvoiceStatus = (body.status || 'success') === 'success' ? 'paid' : 'pending';
+
+      await query(
+        `INSERT INTO deals (
+          id, chat_id, customer_id, vendor_id, service_id,
+          customer_accepted, vendor_accepted, status,
+          created_at, agreed_at, discount,
+          original_price, final_price, discount_updated_at,
+          invoice_status, payment_confirmed_at, completed_at,
+          actual_return_date, return_status,
+          vendor_confirmed, customer_confirmed,
+          settlement_date, refund_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
+        [
+          promoDealId,
+          null,
+          body.userId ? String(body.userId) : null,
+          currentPromo?.vendor_id ? String(currentPromo.vendor_id) : (body.vendorId ? String(body.vendorId) : null),
+          serviceId || null,
+          1,
+          1,
+          promoStatus,
+          createdAt,
+          timestamp,
+          null,
+          promoBasePrice,
+          promoFinalPrice,
+          timestamp,
+          promoInvoiceStatus,
+          promoInvoiceStatus === 'paid' ? timestamp : null,
+          null,
+          null,
+          null,
+          0,
+          0,
+          null,
+          null
+        ]
+      );
+
+      resolvedDealId = promoDealId;
+    }
+
     if (body.promoId) {
       try {
-        const promosData = await readData('promos');
-        const promos = promosData;
-        const promo = promos.find((item) => String(item.id) === String(body.promoId));
+        const promoRows = await query('SELECT * FROM promos WHERE id = ? LIMIT 1', [body.promoId]);
+        const promo = promoRows[0] || null;
+
+        const promoTransactions = await query(
+          'SELECT promo_id, user_id, status FROM transactions WHERE promo_id = ? AND status = ?',
+          [body.promoId, 'success']
+        );
 
         if (!promo) {
-          return Response.json({
+          return NextResponse.json({
             success: false,
             error: 'Promo tidak ditemukan',
             message: 'Promo tidak ditemukan atau sudah dihapus.'
           }, { status: 404 });
         }
 
-        const promoError = validatePromoAvailability(promo, body.userId, transactions);
+        const promoError = validatePromoAvailability(promo, body.userId, promoTransactions);
         if (promoError) {
-          return Response.json({
+          return NextResponse.json({
             success: false,
             error: 'Promo tidak tersedia',
             message: promoError,
@@ -168,7 +225,7 @@ export async function POST(request) {
         }
       } catch (promoError) {
         console.warn('Promo check warning:', promoError.message);
-        return Response.json({
+        return NextResponse.json({
           success: false,
           error: 'Promo tidak tersedia',
           message: 'Gagal memvalidasi promo.',
@@ -176,427 +233,272 @@ export async function POST(request) {
         }, { status: 400 });
       }
     }
-    
-    // AVAILABILITY CHECK - Validasi stok sebelum payment diproses
-    if (body.serviceId && body.quantity && body.startDate) {
+
+    // Validate stock availability before processing payment
+    if ((body.status === 'success' || !body.status) && body.startDate && body.durationDays && serviceId) {
       try {
-        const services = await readData('services');
+        // Calculate end date based on start date and duration
+        const startDate = new Date(body.startDate);
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + Number(body.durationDays || 0));
 
-        const service = services.find(s => String(s.id) === String(body.serviceId));
-        if (service) {
-          // Determine total quantity based on service type
-          let totalQuantity = 0;
-          const serviceType = service.type || 'barang'; // default to barang
-          
-          if (serviceType === 'jasa') {
-            // JASA: prefer availability, fallback to quantity for backward compatibility
-            totalQuantity = Number(service.availability ?? service.quantity) || 0;
-          } else {
-            // BARANG: Sum of all items stok (total inventory)
-            totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
-          }
-          
-          // Calculate end date if not provided
-          let endDate = body.endDate;
-          if (!endDate && body.startDate && body.durationDays) {
-            const start = new Date(body.startDate);
-            const end = new Date(start);
-            end.setDate(end.getDate() + (Number(body.durationDays) || 1));
-            endDate = end.toISOString().split('T')[0];
-          }
+        // Check availability
+        const services = await query(
+          'SELECT id, quantity FROM services WHERE id = ? LIMIT 1',
+          [serviceId]
+        );
 
-          // Check for overlapping bookings
-          const startDateTime = new Date(body.startDate);
-          const endDateTime = new Date(endDate || body.startDate);
-          
+        if (services.length === 0) {
+          console.warn(`Service ${serviceId} not found for availability check`);
+        } else {
+          const service = services[0];
+          const totalQuantity = Number(service.quantity ?? 0);
+          const requestedQuantity = Number(body.quantity ?? 1);
+
+          // Find overlapping transactions
+          const transactions = hasServiceIdColumn
+            ? await query(
+              `SELECT quantity, start_date, duration_days FROM transactions
+               WHERE service_id = ? AND status = 'success' ORDER BY start_date ASC`,
+              [serviceId]
+            )
+            : await query(
+              `SELECT t.quantity, t.start_date, t.duration_days
+               FROM transactions t
+               LEFT JOIN deals d ON d.id = t.deal_id
+               WHERE d.service_id = ? AND t.status = 'success'
+               ORDER BY t.start_date ASC`,
+              [serviceId]
+            );
+
           let bookedQuantity = 0;
-          const bookings = service.bookings || [];
-          
-          for (const booking of bookings) {
-            if (booking.status === 'cancelled') continue;
-            
-            const bookingStart = new Date(booking.startDate);
-            const bookingEnd = new Date(booking.endDate);
-            
-            // Check for overlap
-            if (bookingStart < endDateTime && bookingEnd > startDateTime) {
-              bookedQuantity += booking.quantity || 0;
+          for (const tx of transactions) {
+            if (!tx.start_date || !tx.duration_days) continue;
+            const txStart = new Date(tx.start_date);
+            const txEnd = new Date(txStart);
+            txEnd.setDate(txEnd.getDate() + Number(tx.duration_days));
+
+            // Check for date range overlap
+            if (txStart < endDate && txEnd > startDate) {
+              bookedQuantity += Number(tx.quantity || 0);
             }
           }
 
           const availableQuantity = totalQuantity - bookedQuantity;
-          
-          if (availableQuantity < body.quantity) {
-            console.warn(`AVAILABILITY CHECK FAILED: Service ${body.serviceId} - Available: ${availableQuantity}, Requested: ${body.quantity}`);
-            return Response.json({
+
+          if (availableQuantity < requestedQuantity) {
+            return NextResponse.json({
               success: false,
-              error: serviceType === 'jasa' ? 'Availability tidak mencukupi' : 'Stok tidak mencukupi',
-              message: `${serviceType === 'jasa' ? 'Availability provider/tim' : 'Stok barang'} tidak cukup untuk periode ini. Tersedia: ${availableQuantity} dari ${body.quantity} yang diminta`,
+              error: 'Stok tidak tersedia',
+              message: `❌ Stok tidak mencukupi untuk tanggal tersebut. Tersedia: ${availableQuantity} unit, diminta: ${requestedQuantity} unit`,
+              available: false,
               availableQuantity,
-              requestedQuantity: body.quantity,
-              status: 'availability_check_failed'
+              requestedQuantity,
+              totalQuantity,
+              bookedQuantity,
+              status: 'stock_unavailable'
             }, { status: 400 });
           }
-        }
-      } catch (availabilityError) {
-        console.warn('Availability check warning:', availabilityError.message);
-        // Don't fail on availability check errors, continue with transaction
-      }
-    }
 
-    // ✅ NEW: ITEM PRICE VERIFICATION - Validate item price matches service data
-    let verifiedItemPrice = body.basePrice || 0;
-    let verifiedItemId = body.itemId || null;
-    
-    if (body.serviceId && body.itemId) {
-      try {
-        const services = await readData('services');
-        
-        const service = services.find(s => String(s.id) === String(body.serviceId));
-        if (service && service.items && Array.isArray(service.items)) {
-          const item = service.items.find(i => String(i.id) === String(body.itemId));
-          
-          if (item) {
-            // Get price based on service type
-            const priceField = service.type === 'barang' ? 'hargaPcs' : 'hargaSesi';
-            const itemPrice = item[priceField] || item.price || body.basePrice;
-            
-            verifiedItemPrice = itemPrice;
-            verifiedItemId = item.id;
-            
-            // Log price mismatch if significant difference (> 1000)
-            if (Math.abs(body.basePrice - itemPrice) > 1000) {
-              console.warn(`Price mismatch for item ${body.itemId}: payment sent ${body.basePrice}, but actual is ${itemPrice}`);
-              // Don't fail, just log - customer might have applied discount
-            }
-          } else {
-            console.warn(`Item ${body.itemId} not found in service ${body.serviceId}`);
+          // Log availability check passed
+          if (availableQuantity === requestedQuantity) {
+            console.log(`[STOCK] Last unit(s) booked for service ${serviceId}: ${availableQuantity - requestedQuantity} remaining`);
           }
         }
-      } catch (priceVerifyError) {
-        console.warn('Item price verification warning:', priceVerifyError.message);
-        // Continue with transaction using provided price
-      }
-    }
-    
-    // Add new transaction
-    // ✅ NEW: If transaction is tied to a deal, verify the deal exists and is in correct state
-    if (body.dealId) {
-      try {
-        const deals = await readData('deals');
-        const deal = deals.find(d => String(d.id) === String(body.dealId));
-        if (!deal) {
-          return Response.json({ success: false, error: 'Deal tidak ditemukan', message: 'Deal tidak ditemukan untuk pembayaran ini' }, { status: 404 });
-        }
-
-        // Only allow payment when deal is in 'agreed' state (both sides accepted) or explicit vendor payment flow
-        if (!['agreed', 'active', 'pending'].includes(deal.status)) {
-          return Response.json({ success: false, error: 'Deal tidak siap untuk pembayaran', message: `Deal status '${deal.status}' tidak memperbolehkan pembayaran` }, { status: 400 });
-        }
-
-        // If UI removed pay_after option, enforce full payment server-side when configured
-        if (body.paymentType === 'pay_after') {
-          // reject pay_after by default to avoid unexpected credit flows
-          return Response.json({ success: false, error: 'Pay after tidak diizinkan', message: 'Metode pembayaran "pay_after" tidak diizinkan. Gunakan pembayaran penuh.' }, { status: 400 });
-        }
-      } catch (dealVerifyError) {
-        console.warn('Deal verification warning:', dealVerifyError.message);
-        return Response.json({ success: false, error: 'Gagal memverifikasi deal', message: 'Gagal memverifikasi deal sebelum pembayaran' }, { status: 500 });
+      } catch (stockError) {
+        console.warn('Stock availability check warning:', stockError.message);
+        // Don't fail the transaction if stock check fails, just log it
       }
     }
 
-    const identityVerification = body.identityVerification
-      ? {
-          ...body.identityVerification,
-          status: body.identityVerification.status || 'pending',
-          reviewedAt: body.identityVerification.reviewedAt || null,
-          reviewedBy: body.identityVerification.reviewedBy || null,
-          adminNotes: body.identityVerification.adminNotes || ''
-        }
-      : null;
+    const insertValues = hasServiceIdColumn
+      ? [
+        txId,
+        body.invoiceId || null,
+        resolvedDealId || null,
+        serviceId || null,
+        body.userId || null,
+        body.promoId || null,
+        body.paymentMethod || null,
+        Number(body.basePrice ?? body.amount ?? 0) || 0,
+        Number(body.quantity ?? 1) || 1,
+        body.quantityType || 'Unit',
+        Number(body.durationDays ?? 0) || null,
+        body.notes || '',
+        toDateOnly(body.startDate),
+        Number(body.amount ?? 0) || 0,
+        Number(body.serviceFee ?? 0) || 0,
+        Number(body.totalAmount ?? body.amount ?? 0) || 0,
+        body.status || 'pending',
+        timestamp,
+        body.cardDetails ? JSON.stringify(body.cardDetails) : null,
+        body.qrCode || null,
+        body.identityVerification ? JSON.stringify(body.identityVerification) : null,
+        createdAt
+      ]
+      : [
+        txId,
+        body.invoiceId || null,
+        resolvedDealId || null,
+        body.userId || null,
+        body.promoId || null,
+        body.paymentMethod || null,
+        Number(body.basePrice ?? body.amount ?? 0) || 0,
+        Number(body.quantity ?? 1) || 1,
+        body.quantityType || 'Unit',
+        Number(body.durationDays ?? 0) || null,
+        body.notes || '',
+        toDateOnly(body.startDate),
+        Number(body.amount ?? 0) || 0,
+        Number(body.serviceFee ?? 0) || 0,
+        Number(body.totalAmount ?? body.amount ?? 0) || 0,
+        body.status || 'pending',
+        timestamp,
+        body.cardDetails ? JSON.stringify(body.cardDetails) : null,
+        body.qrCode || null,
+        body.identityVerification ? JSON.stringify(body.identityVerification) : null,
+        createdAt
+      ];
 
-    const newTransaction = {
-      ...body,
-      identityVerification,
-      createdAt: new Date().toISOString(),
-      // ✅ ADD: Verified item price for audit trail
-      verifiedItemPrice: verifiedItemPrice,
-      verifiedItemId: verifiedItemId
-    };
+    await query(
+      hasServiceIdColumn
+        ? `INSERT INTO transactions (
+            id, invoice_id, deal_id, service_id, user_id, promo_id, payment_method, base_price,
+            quantity, quantity_type, duration_days, notes, start_date,
+            amount, service_fee, total_amount, status, timestamp,
+            card_details, qr_code, identity_verification, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        : `INSERT INTO transactions (
+            id, invoice_id, deal_id, user_id, promo_id, payment_method, base_price,
+            quantity, quantity_type, duration_days, notes, start_date,
+            amount, service_fee, total_amount, status, timestamp,
+            card_details, qr_code, identity_verification, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
+      insertValues
+    );
 
-    const rentalTimeline = buildRentalTimeline(body.startDate, body.durationDays);
-    newTransaction.borrowDate = rentalTimeline.borrowDate;
-    newTransaction.expectedReturnDate = rentalTimeline.expectedReturnDate;
-    newTransaction.returnDeadline = rentalTimeline.returnDeadline;
-    newTransaction.returnStatus = 'pending';
-    newTransaction.actualReturnDate = null;
-    newTransaction.daysLate = 0;
-    newTransaction.lateCharge = 0;
-    newTransaction.returnCondition = null;
-    newTransaction.returnNotes = '';
-    newTransaction.lastReminderSent = null;
-    
-    transactions.push(newTransaction);
-    
-    // Write transaction
-    await writeData('transactions', transactions);
-
-    if (body.promoId && body.status === 'success') {
+    if (body.promoId && (body.status || 'pending') === 'success') {
       try {
-        markPromoClaimed(body.promoId, body.userId);
+        await markPromoClaimed(body.promoId, body.userId);
       } catch (promoWriteError) {
         console.warn('Could not update promo claim state:', promoWriteError);
       }
     }
 
-    let currentDeal = null;
-    try {
-      const dealsData = await readData('deals');
-      const deals = dealsData;
-      currentDeal = deals.find((item) => item.id === body.dealId) || null;
-    } catch (dealReadError) {
-      console.warn('Could not read deal for invoice metadata:', dealReadError);
-    }
+    const dealRows = resolvedDealId ? await query('SELECT * FROM deals WHERE id = ? LIMIT 1', [resolvedDealId]) : [];
+    const currentDeal = dealRows[0] || null;
 
-    let currentPromo = null;
-    if (body.promoId) {
-      try {
-        const promosData = await readData('promos');
-        const promos = promosData;
-        currentPromo = promos.find((item) => String(item.id) === String(body.promoId)) || null;
-      } catch (promoReadError) {
-        console.warn('Could not read promo for invoice metadata:', promoReadError);
-      }
-    }
-
-    // Create invoice for deal/promo payments (exclude invoice settlement transactions)
-    if ((body.dealId || body.promoId) && body.paymentType !== 'invoice_payment') {
-      let invoices = await readData('invoices');
-
+    if ((resolvedDealId || body.promoId) && body.paymentType !== 'invoice_payment') {
       const isPayAfter = body.paymentType === 'pay_after';
-      const createdAt = new Date().toISOString();
-      const paymentCompletedAt = body.timestamp || createdAt;
+      const paymentCompletedAt = timestamp;
       const paymentDeadlineDate = new Date();
       paymentDeadlineDate.setDate(paymentDeadlineDate.getDate() + 2);
-      let upsertedInvoiceId = null;
 
-      const existingInvoice = invoices.find(
-        (item) =>
-          item.transactionId === body.id ||
-          (body.dealId && item.dealId === body.dealId && item.paymentType === body.paymentType) ||
-          (body.promoId && String(item.promoId) === String(body.promoId) && String(item.customerId) === String(body.userId) && item.status !== 'paid') ||
-          (item.dealId === body.dealId && item.paymentType === 'deal_pending' && item.status !== 'paid')
+      const existingInvoiceRows = await query(
+        `SELECT * FROM invoices
+         WHERE transaction_id = ?
+            OR (deal_id = ? AND payment_type = ?)
+            OR (deal_id = ? AND payment_type = 'deal_pending' AND status <> 'paid')
+         ORDER BY COALESCE(created_at, NOW()) DESC
+         LIMIT 1`,
+          [txId, resolvedDealId || null, body.paymentType || 'full', resolvedDealId || null]
       );
-      if (existingInvoice) {
-        existingInvoice.customerId = existingInvoice.customerId || body.userId || currentDeal?.customerId || null;
-        existingInvoice.vendorId = existingInvoice.vendorId || currentDeal?.vendorId || currentPromo?.vendorId || body.vendorId || null;
-        existingInvoice.serviceId = existingInvoice.serviceId || currentDeal?.serviceId || null;
-        existingInvoice.promoId = existingInvoice.promoId || body.promoId || null;
-        existingInvoice.transactionId = body.id;
-        existingInvoice.remainingPayment = isPayAfter
-          ? Number(body.remainingPayment ?? 0)
-          : Number(body.totalAmount ?? body.amount ?? 0);
-        existingInvoice.paymentDeadline = isPayAfter ? paymentDeadlineDate.toISOString() : body.timestamp || createdAt;
-        existingInvoice.paymentMethod = body.paymentMethod || existingInvoice.paymentMethod || null;
-        existingInvoice.paymentType = body.paymentType || existingInvoice.paymentType || 'full';
-        existingInvoice.status = isPayAfter ? 'pending' : 'paid';
-        existingInvoice.createdAt = existingInvoice.createdAt || createdAt;
-        existingInvoice.paidAt = isPayAfter ? null : paymentCompletedAt;
-        existingInvoice.paymentTransactionId = isPayAfter ? null : body.id;
-        existingInvoice.notes = body.notes || existingInvoice.notes || '';
-        existingInvoice.serviceTitle = existingInvoice.serviceTitle || currentPromo?.title || body.promo?.title || null;
-        existingInvoice.promo = existingInvoice.promo || body.promo || (currentPromo ? {
-          id: currentPromo.id,
-          title: currentPromo.title,
-          promoPrice: currentPromo.promoPrice,
-          image: currentPromo.image,
-          description: currentPromo.description
-        } : null);
-        upsertedInvoiceId = existingInvoice.id;
-        await writeData('invoices', invoices);
+
+      let invoiceId = null;
+      if (existingInvoiceRows.length > 0) {
+        invoiceId = existingInvoiceRows[0].id;
+        await query(
+          `UPDATE invoices
+           SET customer_id = ?, vendor_id = ?, service_id = ?, transaction_id = ?,
+               remaining_payment = ?, payment_deadline = ?, payment_method = ?, payment_type = ?,
+               status = ?, paid_at = ?, payment_transaction_id = ?, notes = ?
+           WHERE id = ?`,
+          [
+            body.userId || currentDeal?.customer_id || null,
+            currentDeal?.vendor_id || currentPromo?.vendor_id || body.vendorId || null,
+            currentDeal?.service_id || null,
+            txId,
+            isPayAfter ? Number(body.remainingPayment ?? 0) : Number(body.totalAmount ?? body.amount ?? 0),
+            isPayAfter ? paymentDeadlineDate.toISOString() : timestamp,
+            body.paymentMethod || null,
+            body.paymentType || 'full',
+            isPayAfter ? 'pending' : 'paid',
+            isPayAfter ? null : paymentCompletedAt,
+            isPayAfter ? null : txId,
+            body.notes || '',
+            invoiceId
+          ]
+        );
       } else {
-
-      const newInvoice = {
-        id: `INV-${Date.now()}`,
-        dealId: body.dealId || null,
-        customerId: body.userId || currentDeal?.customerId || null,
-        vendorId: currentDeal?.vendorId || currentPromo?.vendorId || body.vendorId || null,
-        serviceId: currentDeal?.serviceId || null,
-        promoId: body.promoId || null,
-        transactionId: body.id,
-        remainingPayment: isPayAfter
-          ? Number(body.remainingPayment ?? 0)
-          : Number(body.totalAmount ?? body.amount ?? 0),
-        paymentDeadline: isPayAfter ? paymentDeadlineDate.toISOString() : body.timestamp || createdAt,
-        paymentMethod: body.paymentMethod || null,
-        paymentType: body.paymentType || 'full',
-        status: isPayAfter ? 'pending' : 'paid',
-        createdAt,
-        paidAt: isPayAfter ? null : paymentCompletedAt,
-        paymentTransactionId: isPayAfter ? null : body.id,
-        notes: body.notes || '',
-        serviceTitle: currentPromo?.title || body.promo?.title || null,
-        promo: body.promo || (currentPromo ? {
-          id: currentPromo.id,
-          title: currentPromo.title,
-          promoPrice: currentPromo.promoPrice,
-          image: currentPromo.image,
-          description: currentPromo.description
-        } : null)
-      };
-
-      invoices.push(newInvoice);
-      upsertedInvoiceId = newInvoice.id;
-      await writeData('invoices', invoices);
+        invoiceId = `INV-${Date.now()}`;
+        await query(
+          `INSERT INTO invoices (
+            id, deal_id, customer_id, vendor_id, service_id, transaction_id,
+            remaining_payment, payment_deadline, payment_method, payment_type,
+            status, created_at, paid_at, payment_transaction_id, notes
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            invoiceId,
+            resolvedDealId || null,
+            body.userId || currentDeal?.customer_id || null,
+            currentDeal?.vendor_id || currentPromo?.vendor_id || body.vendorId || null,
+            currentDeal?.service_id || null,
+            txId,
+            isPayAfter ? Number(body.remainingPayment ?? 0) : Number(body.totalAmount ?? body.amount ?? 0),
+            isPayAfter ? paymentDeadlineDate.toISOString() : timestamp,
+            body.paymentMethod || null,
+            body.paymentType || 'full',
+            isPayAfter ? 'pending' : 'paid',
+            createdAt,
+            isPayAfter ? null : paymentCompletedAt,
+            isPayAfter ? null : txId,
+            body.notes || ''
+          ]
+        );
       }
 
-      // Update deal with payment info
-      try {
-        const deals = await readData('deals');
-
-        const dealIndex = deals.findIndex(d => d.id === body.dealId);
-        if (dealIndex !== -1) {
-          deals[dealIndex] = {
-            ...deals[dealIndex],
-            paymentType: body.paymentType,
-            downPayment: isPayAfter ? body.downPayment : null,
-            remainingPayment: isPayAfter ? body.remainingPayment : 0,
-            invoiceStatus: isPayAfter ? 'pending' : 'paid',
-            status: isPayAfter ? (deals[dealIndex].status || 'agreed') : 'active',
-            completedAt: isPayAfter ? (deals[dealIndex].completedAt || null) : paymentCompletedAt,
-            paymentDeadline: isPayAfter ? paymentDeadlineDate.toISOString() : null,
-            invoiceId: upsertedInvoiceId || deals[dealIndex].invoiceId || null,
-            borrowDate: rentalTimeline.borrowDate || deals[dealIndex].borrowDate || null,
-            expectedReturnDate: rentalTimeline.expectedReturnDate || deals[dealIndex].expectedReturnDate || null,
-            returnDeadline: rentalTimeline.returnDeadline || deals[dealIndex].returnDeadline || null,
-            returnStatus: deals[dealIndex].returnStatus || 'pending',
-            actualReturnDate: deals[dealIndex].actualReturnDate || null,
-            daysLate: deals[dealIndex].daysLate || 0,
-            lateCharge: deals[dealIndex].lateCharge || 0,
-            returnCondition: deals[dealIndex].returnCondition || null,
-            returnNotes: deals[dealIndex].returnNotes || '',
-            lastReminderSent: deals[dealIndex].lastReminderSent || null,
-            durationDays: body.durationDays,
-            startDate: body.startDate
-          };
-          await writeData('deals', deals);
-        }
-      } catch (dealError) {
-        console.warn('Could not update deal:', dealError);
+      if (invoiceId) {
+        await query(
+          `UPDATE transactions
+           SET invoice_id = ?
+           WHERE id = ?`,
+          [invoiceId, txId]
+        );
       }
 
-        // Keep chat open after payment; only progress status so the flow can continue to rating/new cycle.
-        try {
-          if (body.dealId) {
-            const chats = await readData('chats');
-            const deals = await readData('deals');
-            const relatedDeal = deals.find((item) => item.id === body.dealId);
-            const chatIndex = chats.findIndex((item) => item.id === relatedDeal?.chatId);
+      if (resolvedDealId) {
+        await query(
+          `UPDATE deals
+           SET invoice_status = ?, status = ?, payment_confirmed_at = ?, completed_at = ?
+           WHERE id = ?`,
+          [
+            isPayAfter ? 'pending' : 'paid',
+            isPayAfter ? 'agreed' : 'active',
+            isPayAfter ? null : paymentCompletedAt,
+            isPayAfter ? null : paymentCompletedAt,
+            resolvedDealId
+          ]
+        );
 
-            if (chatIndex !== -1) {
-              chats[chatIndex] = {
-                ...chats[chatIndex],
-                dealStatus: isPayAfter ? 'agreed' : 'active',
-                closedAt: null,
-                closedReason: null
-              };
-              await writeData('chats', chats);
-            }
-          }
-        } catch (chatError) {
-          console.warn('Could not update chat status after payment:', chatError);
+        const dealRowsAfter = await query('SELECT chat_id FROM deals WHERE id = ? LIMIT 1', [resolvedDealId]);
+        if (dealRowsAfter.length > 0 && dealRowsAfter[0].chat_id) {
+          await query('UPDATE chats SET deal_status = ? WHERE id = ?', [isPayAfter ? 'agreed' : 'active', dealRowsAfter[0].chat_id]);
         }
-    }
-
-    // RESERVE BOOKING - Buat booking record saat payment sukses (full payment atau down payment)
-    if (body.status === 'success' && body.serviceId && body.quantity && body.startDate) {
-      try {
-        const services = await readData('services');
-
-        const serviceIndex = services.findIndex(s => String(s.id) === String(body.serviceId));
-        if (serviceIndex !== -1) {
-          const service = services[serviceIndex];
-
-          // Initialize bookings array if not exists
-          if (!service.bookings) {
-            service.bookings = [];
-          }
-
-          // Calculate end date
-          let endDate = body.endDate;
-          if (!endDate && body.durationDays) {
-            const start = new Date(body.startDate);
-            const end = new Date(start);
-            end.setDate(end.getDate() + Number(body.durationDays));
-            endDate = end.toISOString().split('T')[0];
-          }
-
-          // Create booking record
-          const newBooking = {
-            id: `BOOKING-${Date.now()}`,
-            transactionId: body.id,
-            dealId: body.dealId,
-            quantity: Number(body.quantity),
-            startDate: body.startDate,
-            endDate: endDate || body.startDate,
-            status: 'confirmed',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-
-          // Reserve/decrement actual stock immediately on successful payment
-          // and mark booking.stockReserved to avoid double-decrement at pickup.
-          // For goods (barang), decrement item.stok greedily by quantity.
-          if (service.type !== 'jasa') {
-            let remaining = Number(body.quantity);
-            for (const item of service.items || []) {
-              if (remaining <= 0) break;
-              const dec = Math.min(Number(item.stok) || 0, remaining);
-              item.stok = (Number(item.stok) || 0) - dec;
-              remaining -= dec;
-            }
-          } else {
-            // For jasa, decrement service.quantity
-            service.quantity = Math.max(0, (service.quantity || 0) - Number(body.quantity));
-          }
-
-          // mark booking as having reserved stock
-          newBooking.stockReserved = true;
-
-          service.bookings.push(newBooking);
-
-          // Recalculate availableQuantity based on service type
-          let totalQuantity = 0;
-          const serviceType = service.type || 'barang';
-          
-          if (serviceType === 'jasa') {
-            // JASA: prefer availability, fallback to quantity for backward compatibility
-            totalQuantity = Number(service.availability ?? service.quantity) || 0;
-          } else {
-            // BARANG: Sum of all items stok
-            totalQuantity = (service.items || []).reduce((sum, item) => sum + (Number(item.stok) || 0), 0);
-          }
-          
-          let bookedQuantity = 0;
-          for (const booking of service.bookings) {
-            if (booking.status !== 'cancelled' && booking.status !== 'completed') {
-              bookedQuantity += booking.quantity || 0;
-            }
-          }
-          service.availableQuantity = Math.max(0, totalQuantity - bookedQuantity);
-
-          await writeData('services', services);
-          console.log(`Booking reserved: Transaction ${body.id}, Service ${body.serviceId}, Qty: ${body.quantity}`);
-        }
-      } catch (reservationError) {
-        console.warn('Reservation creation warning:', reservationError.message);
-        // Don't fail transaction if reservation fails
       }
     }
-    
-    return Response.json({ success: true, transaction: newTransaction }, { status: 201 });
+
+    const inserted = await query('SELECT * FROM transactions WHERE id = ? LIMIT 1', [txId]);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Transaksi berhasil diproses ke SQL',
+      data: inserted[0] || { id: txId }
+    }, { status: 201 });
   } catch (error) {
     console.error('Error creating transaction:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({
+      success: false,
+      message: error.message || 'Terjadi kesalahan saat memproses transaksi'
+    }, { status: 500 });
   }
 }

@@ -5,8 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import SharedNavbar from '../../components/SharedNavbar';
 
-
-import { readData, writeData } from '@/lib/storage';
 export default function VendorChatsPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -1017,7 +1015,7 @@ export default function VendorChatsPage() {
             {/* Customer action - lanjut pembayaran hanya setelah vendor accept */}
             {String(user?.id) === String(selectedChat.customerId) && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-                {dealData?.status === 'agreed' && dealData?.vendorAccepted && !selectedChat?.closedAt && selectedChat?.dealStatus !== 'closed' && (
+                {dealData?.status === 'agreed' && !selectedChat?.closedAt && selectedChat?.dealStatus !== 'closed' && (
                   <button
                     onClick={() => {
                       if (selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt || dealData?.status === 'completed') {

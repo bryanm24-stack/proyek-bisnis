@@ -36,11 +36,11 @@ export default function VendorInvoicesPage() {
     fetchVendorInvoices(parsedUser.id, 'pending');
   }, [router]);
 
-  const fetchVendorInvoices = async (vendorId, status = 'all') => {
+  const fetchVendorInvoices = async (userId, status = 'all') => {
     try {
       setIsLoading(true);
       const query = status === 'all' ? '' : `&status=${status}`;
-      const response = await fetch(`/api/invoices?customerId=${vendorId}${query}`);
+      const response = await fetch(`/api/invoices?customerId=${userId}${query}`);
       const data = await response.json();
 
       const ownInvoices = Array.isArray(data)
