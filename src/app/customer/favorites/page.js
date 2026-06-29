@@ -19,6 +19,8 @@ export default function FavoritesPage() {
   const [selectedItemDetail, setSelectedItemDetail] = useState(null);
   const [serviceReviews, setServiceReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState('all');
+  const [reviewPage, setReviewPage] = useState(1);
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
@@ -27,6 +29,7 @@ export default function FavoritesPage() {
   const [showRatingForm, setShowRatingForm] = useState(false);
   const [ratingValue, setRatingValue] = useState(5);
   const [ratingReview, setRatingReview] = useState('');
+  const [currentImageIndex, setCurrentImageIndex] = useState({});
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -97,15 +100,19 @@ export default function FavoritesPage() {
     return '0';
   };
 
+  const getItemPriceNumber = (item) => {
+    if (!item) return 0;
+    return Number(item.hargaPcs || item.hargaSesi || item.harga || item.price || 0);
+  };
+
   // Helper function to get display price from items
   const getItemsPrice = (service) => {
     if (!service.items || service.items.length === 0) {
       return null;
     }
 
-    // Get prices from items based on type
     const prices = service.items
-      .map(item => item.hargaSesi || item.hargaPcs || 0)
+      .map(item => getItemPriceNumber(item))
       .filter(price => price > 0)
       .sort((a, b) => a - b);
 
@@ -135,12 +142,42 @@ export default function FavoritesPage() {
     };
   };
 
+  const getServiceDisplayPrice = (service) => {
+    const itemPrice = getItemsPrice(service);
+    if (itemPrice?.display) {
+      return itemPrice.display;
+    }
+
+    const basePrice = Number(service?.price || service?.tarif || service?.harga || 0);
+    return formatPrice(basePrice);
+  };
+
+  const handleNextImage = (e, serviceId, totalImages) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentImageIndex(prev => ({
+      ...prev,
+      [serviceId]: ((prev[serviceId] || 0) + 1) % totalImages
+    }));
+  };
+
+  const handlePrevImage = (e, serviceId, totalImages) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentImageIndex(prev => ({
+      ...prev,
+      [serviceId]: ((prev[serviceId] || 0) - 1 + totalImages) % totalImages
+    }));
+  };
+
   const openModal = (service) => {
     setSelectedService(service);
     setDetailTab('packages');
     setSelectedItemDetail(null);
     setServiceReviews([]);
     setReviewsLoading(true);
+    setReviewFilter('all');
+    setReviewPage(1);
     setModalOpen(true);
 
     // Fetch reviews for this service
@@ -177,6 +214,8 @@ export default function FavoritesPage() {
     setServiceReviews([]);
     setReviewsLoading(false);
     setDetailTab('packages');
+    setReviewFilter('all');
+    setReviewPage(1);
   };
 
   const openChatModal = async (service) => {
@@ -435,6 +474,35 @@ export default function FavoritesPage() {
         return true;
       });
 
+  const REVIEWS_PER_PAGE = 5;
+  const itemScopedReviews = selectedItemDetail?.id
+    ? serviceReviews.filter((review) => String(review.itemId || '') === String(selectedItemDetail.id))
+    : serviceReviews;
+  const reviewAverage = itemScopedReviews.length
+    ? (
+        itemScopedReviews.reduce((sum, item) => sum + Number(item.rating || 0), 0) /
+        itemScopedReviews.length
+      ).toFixed(1)
+    : '0.0';
+  const filteredReviews = itemScopedReviews.filter((review) =>
+    reviewFilter === 'all' ? true : Number(review.rating) === Number(reviewFilter)
+  );
+  const totalReviewPages = Math.max(1, Math.ceil(filteredReviews.length / REVIEWS_PER_PAGE));
+  const currentReviewPage = Math.min(reviewPage, totalReviewPages);
+  const paginatedReviews = filteredReviews.slice(
+    (currentReviewPage - 1) * REVIEWS_PER_PAGE,
+    currentReviewPage * REVIEWS_PER_PAGE
+  );
+
+  const locationLabel = selectedService?.location || selectedService?.lokasi || '-';
+  const categoryPath = [
+    selectedService?.mainCategory,
+    selectedService?.subCategory,
+    selectedService?.category
+  ]
+    .filter(Boolean)
+    .join(' > ');
+
   if (!user) {
     return <div>Loading...</div>;
   }
@@ -442,7 +510,7 @@ export default function FavoritesPage() {
   return (
     <>
       <SharedNavbar />
-      <div style={{ minHeight: 'calc(100vh - 300px)', padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
+      <div style={{ minHeight: 'calc(100vh - 300px)', padding: '20px', width: '100%', maxWidth: '1400px', margin: 0 }}>
         <div style={{ marginBottom: '30px' }}>
           <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '10px' }}>
             ❤️ Favorit Saya
@@ -563,13 +631,128 @@ export default function FavoritesPage() {
                   </button>
                   
                   {/* Cover Image */}
-                  <div className="vendor-cover">
+                  <div className="vendor-cover" style={{ position: 'relative', overflow: 'hidden' }}>
                     <img 
                       src={service.images && service.images.length > 0 
-                        ? service.images[0]
+                        ? service.images[currentImageIndex[service.id] || 0]
                         : imageUrl} 
                       alt={service.title}
+                      style={{ transition: 'opacity 0.3s ease' }}
                     />
+
+                    {service.images && service.images.length > 1 && (
+                      <>
+                        <button
+                          onClick={(e) => handlePrevImage(e, service.id, service.images.length)}
+                          style={{
+                            position: 'absolute',
+                            left: '8px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'rgba(0,0,0,0.5)',
+                            color: 'white',
+                            border: 'none',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '14px',
+                            zIndex: 5,
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.target.style.background = 'rgba(0,0,0,0.8)'}
+                          onMouseLeave={(e) => e.target.style.background = 'rgba(0,0,0,0.5)'}
+                          title="Foto sebelumnya"
+                        >
+                          ◀
+                        </button>
+
+                        <button
+                          onClick={(e) => handleNextImage(e, service.id, service.images.length)}
+                          style={{
+                            position: 'absolute',
+                            right: '8px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'rgba(0,0,0,0.5)',
+                            color: 'white',
+                            border: 'none',
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '14px',
+                            zIndex: 5,
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.target.style.background = 'rgba(0,0,0,0.8)'}
+                          onMouseLeave={(e) => e.target.style.background = 'rgba(0,0,0,0.5)'}
+                          title="Foto berikutnya"
+                        >
+                          ▶
+                        </button>
+
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            background: 'rgba(0,0,0,0.7)',
+                            color: 'white',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            zIndex: 4
+                          }}
+                        >
+                          {(currentImageIndex[service.id] || 0) + 1}/{service.images.length}
+                        </div>
+
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: '8px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            background: 'rgba(0,0,0,0.6)',
+                            padding: '4px 8px',
+                            borderRadius: '12px',
+                            display: 'flex',
+                            gap: '4px',
+                            zIndex: 4
+                          }}
+                        >
+                          {service.images.map((_, idx) => (
+                            <span
+                              key={idx}
+                              style={{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                background: idx === (currentImageIndex[service.id] || 0) ? 'white' : 'rgba(255,255,255,0.5)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCurrentImageIndex(prev => ({
+                                  ...prev,
+                                  [service.id]: idx
+                                }));
+                              }}
+                              title={`Foto ${idx + 1}`}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                   
                   <div className="vendor-content">
@@ -592,7 +775,7 @@ export default function FavoritesPage() {
                       <div className="vendor-price">
                         <span className="price-label">Rp</span>
                         <span className="price-amount">
-                          {getItemsPrice(service)?.display || formatPrice(service.price)}
+                          {getServiceDisplayPrice(service)}
                         </span>
                       </div>
 
@@ -868,94 +1051,137 @@ export default function FavoritesPage() {
               )}
 
               {detailTab === 'information' && (
-                <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                    <div>
-                      <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: '600', color: '#999' }}>
-                        Nama Vendor
-                      </h4>
-                      <p style={{ margin: 0, fontSize: '14px', fontWeight: '600' }}>
-                        {selectedService.vendorName}
-                      </p>
-                    </div>
-                    <div>
-                      <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: '600', color: '#999' }}>
-                        Rating
-                      </h4>
-                      <p style={{ margin: 0, fontSize: '14px', fontWeight: '600' }}>
-                        ⭐ {(selectedService.rating || 0).toFixed(1)}
-                      </p>
-                    </div>
-                    <div>
-                      <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: '600', color: '#999' }}>
-                        Total Penyewaan
-                      </h4>
-                      <p style={{ margin: 0, fontSize: '14px', fontWeight: '600' }}>
-                        {selectedService.rentCount || 0}
-                      </p>
-                    </div>
-                    <div>
-                      <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: '600', color: '#999' }}>
-                        Kategori
-                      </h4>
-                      <p style={{ margin: 0, fontSize: '14px', fontWeight: '600' }}>
-                        {selectedService.category || 'N/A'}
-                      </p>
-                    </div>
+                <>
+                  <div className="info-section">
+                    <h4>📍 Vendor</h4>
+                    <p>{selectedService.vendorName}</p>
                   </div>
-                </div>
+
+                  <div className="info-section">
+                    <h4>🏷️ Kategori</h4>
+                    <p>{categoryPath || selectedService.category || '-'}</p>
+                  </div>
+
+                  <div className="info-section">
+                    <h4>📈 Terjual</h4>
+                    <p>{selectedService.rentCount ?? '0'}</p>
+                  </div>
+
+                  {(selectedService.location || selectedService.lokasi) && (
+                    <div className="info-section">
+                      <h4>📍 Lokasi Penjemputan</h4>
+                      <p>{locationLabel}</p>
+                    </div>
+                  )}
+
+                  {selectedService.minimumDays && (
+                    <div className="info-section">
+                      <h4>📅 Minimum Sewa</h4>
+                      <p>{selectedService.minimumDays} hari</p>
+                    </div>
+                  )}
+
+                  {selectedService.rentalPolicy && (
+                    <div className="info-section">
+                      <h4>📜 Kebijakan Sewa</h4>
+                      <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.rentalPolicy}</p>
+                    </div>
+                  )}
+
+                  <div className="info-section">
+                    <h4>🕒 Status</h4>
+                    <p>Terakhir online baru-baru ini</p>
+                  </div>
+                </>
               )}
 
               {detailTab === 'reviews' && (
-                <div>
-                  <div style={{ marginBottom: '20px' }}>
-                    <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: '700' }}>
-                      Rating & Review
-                    </h4>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                      <span style={{ fontSize: '28px', fontWeight: 'bold', color: '#B28A67' }}>
-                        {(selectedService.rating || 0).toFixed(1)}
+                <>
+                  <div className="info-section">
+                    <h4>⭐ Rating & Review</h4>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#B28A67' }}>
+                        {selectedService.rating?.toFixed?.(1) ?? selectedService.rating}
                       </span>
-                      <span style={{ color: '#666' }}>
-                        {selectedService.rentCount || 0} orang telah menyewa
-                      </span>
+                      <span style={{ color: '#666' }}>{selectedService.rentCount} orang telah menyewa</span>
                     </div>
-                  </div>
-
-                  {reviewsLoading ? (
-                    <p style={{ color: '#999' }}>Memuat review...</p>
-                  ) : serviceReviews.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
-                      {serviceReviews.slice(0, 5).map(review => (
-                        <div
-                          key={review.id}
-                          style={{
-                            padding: '14px',
-                            backgroundColor: '#f8f9fa',
-                            borderRadius: '8px',
-                            borderLeft: '4px solid #FFD700'
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: '600' }}>
-                              ⭐ {review.rating}/5
-                            </span>
-                            <span style={{ fontSize: '12px', color: '#999' }}>
-                              {new Date(review.createdAt).toLocaleDateString('id-ID')}
-                            </span>
+                    {!reviewsLoading && serviceReviews.length > 0 && (
+                      <div className="review-summary-row">
+                        <span className="review-summary-chip">Rata-rata ulasan: ⭐ {reviewAverage}</span>
+                        <span className="review-summary-chip">Total review: {itemScopedReviews.length}</span>
+                      </div>
+                    )}
+                    {selectedItemDetail?.id && (
+                      <div className="review-summary-row" style={{ marginTop: '8px' }}>
+                        <span className="review-summary-chip">Filter item aktif: {selectedItemDetail.namaBarang || selectedItemDetail.namaJasa || selectedItemDetail.title}</span>
+                      </div>
+                    )}
+                    <div className="review-filter-row">
+                      <label htmlFor="review-filter" className="review-filter-label">Filter bintang</label>
+                      <select
+                        id="review-filter"
+                        className="review-filter-select"
+                        value={reviewFilter}
+                        onChange={(e) => {
+                          setReviewFilter(e.target.value);
+                          setReviewPage(1);
+                        }}
+                      >
+                        <option value="all">Semua</option>
+                        <option value="5">5 bintang</option>
+                        <option value="4">4 bintang</option>
+                        <option value="3">3 bintang</option>
+                        <option value="2">2 bintang</option>
+                        <option value="1">1 bintang</option>
+                      </select>
+                    </div>
+                    <div className="reviews-list">
+                      {reviewsLoading ? (
+                        <p className="review-empty">Memuat review...</p>
+                      ) : filteredReviews.length === 0 ? (
+                        <p className="review-empty">Belum ada review customer.</p>
+                      ) : (
+                        paginatedReviews.map((review) => (
+                          <div key={review.id} className="review-item">
+                            <div className="review-header">
+                              <span className="review-rating">⭐ {review.rating}/5</span>
+                              <span className="review-date">{new Date(review.createdAt).toLocaleDateString('id-ID')}</span>
+                            </div>
+                            <p className="review-author">{review.customerName || 'Customer'}</p>
+                            <p className="review-text">{review.review?.trim() || 'Customer tidak menulis komentar.'}</p>
+                            {review.vendorReply && (
+                              <div className="vendor-reply-box">
+                                <div className="vendor-reply-label">Balasan vendor</div>
+                                <p className="vendor-reply-text">{review.vendorReply}</p>
+                              </div>
+                            )}
                           </div>
-                          <p style={{ margin: '0', fontSize: '13px', color: '#333', lineHeight: '1.5' }}>
-                            {review.review || 'Customer tidak menulis komentar.'}
-                          </p>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
-                  ) : (
-                    <p style={{ color: '#999', textAlign: 'center', padding: '20px' }}>
-                      Belum ada ulasan customer.
-                    </p>
-                  )}
-                </div>
+                    {!reviewsLoading && filteredReviews.length > REVIEWS_PER_PAGE && (
+                      <div className="review-pagination">
+                        <button
+                          type="button"
+                          className="review-page-btn"
+                          disabled={currentReviewPage <= 1}
+                          onClick={() => setReviewPage((prev) => Math.max(1, prev - 1))}
+                        >
+                          Sebelumnya
+                        </button>
+                        <span className="review-page-info">Halaman {currentReviewPage} / {totalReviewPages}</span>
+                        <button
+                          type="button"
+                          className="review-page-btn"
+                          disabled={currentReviewPage >= totalReviewPages}
+                          onClick={() => setReviewPage((prev) => Math.min(totalReviewPages, prev + 1))}
+                        >
+                          Berikutnya
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
 
               {/* Promo Section */}
@@ -1228,8 +1454,8 @@ export default function FavoritesPage() {
       <style jsx>{`
         .vendor-grid {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 20px;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 24px;
         }
 
         .vendor-card {
@@ -1285,34 +1511,32 @@ export default function FavoritesPage() {
 
         .vendor-content {
           padding: 16px;
+          flex: 1;
           display: flex;
           flex-direction: column;
-          flex: 1;
         }
 
         .vendor-title {
-          margin: 0 0 8px 0;
-          font-size: 16px;
-          font-weight: 600;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          font-size: 18px;
+          font-weight: 700;
+          color: #1a1a1a;
+          margin: 0 0 6px 0;
+          line-height: 1.35;
         }
 
         .vendor-vendor-name {
-          margin: 0 0 8px 0;
-          font-size: 13px;
-          color: #666;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          font-size: 14px;
+          color: #B28A67;
+          margin: 0 0 12px 0;
+          font-weight: 600;
         }
 
         .vendor-short-desc {
-          margin: 0 0 12px 0;
-          font-size: 13px;
-          color: #999;
-          line-height: 1.4;
+          font-size: 14px;
+          color: #525252;
+          margin: 0 0 14px 0;
+          line-height: 1.7;
+          flex-grow: 1;
           display: -webkit-box;
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
@@ -1321,23 +1545,27 @@ export default function FavoritesPage() {
 
         .vendor-stats {
           display: flex;
-          justify-content: space-between;
-          margin: 12px 0;
-          font-size: 12px;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 12px;
+          padding-bottom: 12px;
+          border-bottom: 1px solid #f0f0f0;
         }
 
         .stat-rating {
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 4px;
         }
 
         .rating-stars {
-          color: #fbbf24;
+          font-size: 14px;
           font-weight: 600;
+          color: #1a1a1a;
         }
 
         .rating-count {
+          font-size: 13px;
           color: #999;
         }
 
@@ -1352,6 +1580,10 @@ export default function FavoritesPage() {
         }
 
         .vendor-price {
+          font-size: 16px;
+          font-weight: 700;
+          color: #B28A67;
+          margin-bottom: 12px;
           display: flex;
           align-items: baseline;
           gap: 2px;
@@ -1359,11 +1591,12 @@ export default function FavoritesPage() {
 
         .price-label {
           font-size: 12px;
-          color: #666;
+          color: #B28A67;
+          font-weight: 600;
         }
 
         .price-amount {
-          font-size: 16px;
+          font-size: 18px;
           font-weight: 700;
           color: #B28A67;
         }
@@ -1374,31 +1607,39 @@ export default function FavoritesPage() {
         }
 
         .btn-detail {
-          flex: 1;
-          padding: 10px 16px;
-          background: #B28A67;
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
           color: white;
           border: none;
+          padding: 10px 16px;
           border-radius: 8px;
           cursor: pointer;
           font-weight: 600;
           font-size: 13px;
-          transition: background 0.3s;
+          transition: all 0.3s;
+          white-space: nowrap;
+          flex-shrink: 0;
         }
 
         .btn-detail:hover {
-          background: #4a3bb8;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(178, 138, 103, 0.3);
+        }
+
+        .btn-detail:active {
+          transform: translateY(0);
         }
 
         @media (max-width: 1200px) {
           .vendor-grid {
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
           }
         }
 
         @media (max-width: 768px) {
           .vendor-grid {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
           }
         }
 
@@ -1406,6 +1647,172 @@ export default function FavoritesPage() {
           .vendor-grid {
             grid-template-columns: 1fr;
           }
+        }
+
+        .info-section {
+          padding-bottom: 16px;
+          border-bottom: 1px solid #eee;
+        }
+
+        .info-section:last-of-type {
+          border-bottom: none;
+        }
+
+        .info-section h4 {
+          margin: 0 0 12px 0;
+          font-size: 16px;
+          font-weight: 700;
+          color: #1a1a1a;
+        }
+
+        .info-section p {
+          margin: 0;
+          color: #555;
+          line-height: 1.6;
+          font-size: 16px;
+        }
+
+        .reviews-list {
+          margin-top: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .review-summary-row {
+          margin-top: 10px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .review-summary-chip {
+          font-size: 12px;
+          color: #334155;
+          background: #e2e8f0;
+          border-radius: 999px;
+          padding: 4px 10px;
+          font-weight: 600;
+        }
+
+        .review-filter-row {
+          margin-top: 10px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .review-filter-label {
+          font-size: 12px;
+          color: #475569;
+          font-weight: 600;
+        }
+
+        .review-filter-select {
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+          padding: 6px 8px;
+          font-size: 12px;
+          color: #1f2937;
+          background: #fff;
+        }
+
+        .review-item {
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 10px 12px;
+          background: #fafafa;
+        }
+
+        .review-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-bottom: 6px;
+        }
+
+        .review-rating {
+          font-size: 13px;
+          font-weight: 700;
+          color: #111827;
+        }
+
+        .review-date {
+          font-size: 12px;
+          color: #6b7280;
+        }
+
+        .review-author {
+          font-size: 12px;
+          color: #4b5563;
+          margin: 0 0 4px 0;
+          font-weight: 600;
+        }
+
+        .review-text {
+          margin: 0;
+          font-size: 13px;
+          color: #374151;
+          line-height: 1.5;
+        }
+
+        .vendor-reply-box {
+          margin-top: 10px;
+          padding: 10px 12px;
+          border-radius: 8px;
+          background: rgba(178, 138, 103, 0.06);
+          border: 1px solid #bfdbfe;
+        }
+
+        .vendor-reply-label {
+          font-size: 12px;
+          font-weight: 700;
+          color: #B28A67;
+          margin-bottom: 4px;
+        }
+
+        .vendor-reply-text {
+          margin: 0;
+          font-size: 13px;
+          color: #1e3a8a;
+          line-height: 1.5;
+        }
+
+        .review-empty {
+          margin: 8px 0 0;
+          font-size: 13px;
+          color: #6b7280;
+        }
+
+        .review-pagination {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-top: 10px;
+        }
+
+        .review-page-btn {
+          border: none;
+          background: #B28A67;
+          color: #fff;
+          border-radius: 6px;
+          padding: 6px 10px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .review-page-btn:disabled {
+          background: #cbd5e1;
+          cursor: not-allowed;
+        }
+
+        .review-page-info {
+          font-size: 12px;
+          color: #475569;
+          font-weight: 600;
         }
 
         /* Modal Actions */
