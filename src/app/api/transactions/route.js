@@ -98,6 +98,11 @@ const toDateOnly = (value) => {
   return `${y}-${m}-${d}`;
 };
 
+const toFiniteNumber = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 async function hasTransactionsServiceIdColumn() {
   const rows = await query(
     `SELECT 1
@@ -134,6 +139,7 @@ export async function POST(request) {
     const txId = body.id || `TRX-${Date.now()}`;
     const createdAt = new Date().toISOString();
     const timestamp = body.timestamp || createdAt;
+    const paymentIsPayAfter = body.paymentType === 'pay_after';
 
     // Determine service ID early from deal or direct parameter
     let serviceId = body.serviceId;
@@ -311,6 +317,42 @@ export async function POST(request) {
       }
     }
 
+    const currentDealRowsForPricing = resolvedDealId
+      ? await query('SELECT id, customer_id, vendor_id, service_id, original_price, final_price FROM deals WHERE id = ? LIMIT 1', [resolvedDealId])
+      : [];
+    const currentDealForPricing = currentDealRowsForPricing[0] || null;
+
+    const isPromoFlow = Boolean(body.promoId);
+    const requestedQuantity = Math.max(1, toFiniteNumber(body.quantity, 1));
+    const requestedDurationDays = isPromoFlow ? 1 : Math.max(1, toFiniteNumber(body.durationDays, 1));
+
+    const dealUnitFinalPrice = toFiniteNumber(currentDealForPricing?.final_price, 0);
+    const dealUnitOriginalPrice = toFiniteNumber(currentDealForPricing?.original_price, 0);
+    const payloadBasePrice = toFiniteNumber(body.basePrice ?? body.amount, 0);
+
+    const effectiveUnitPrice = isPromoFlow
+      ? toFiniteNumber(body.totalAmount ?? body.amount, payloadBasePrice)
+      : (dealUnitFinalPrice > 0 ? dealUnitFinalPrice : (dealUnitOriginalPrice > 0 ? dealUnitOriginalPrice : payloadBasePrice));
+
+    const computedSubtotal = isPromoFlow
+      ? Math.max(toFiniteNumber(body.totalAmount ?? body.amount, effectiveUnitPrice), 0)
+      : Math.max(effectiveUnitPrice * requestedQuantity * requestedDurationDays, 0);
+
+    const computedServiceFee = isPromoFlow ? 0 : Math.max(0, Math.round(computedSubtotal * 0.05));
+    const computedTotalAmount = isPromoFlow ? computedSubtotal : (computedSubtotal + computedServiceFee);
+    const computedDownPayment = isPromoFlow ? null : Math.round(computedTotalAmount * 0.2);
+    const computedRemainingPayment = isPromoFlow ? null : Math.max(computedTotalAmount - computedDownPayment, 0);
+    const computedAmount = isPromoFlow
+      ? computedTotalAmount
+      : (paymentIsPayAfter ? Number(computedDownPayment || 0) : computedTotalAmount);
+
+    const payloadTotalAmount = toFiniteNumber(body.totalAmount, computedTotalAmount);
+    if (!isPromoFlow && Math.abs(payloadTotalAmount - computedTotalAmount) > 1) {
+      console.warn(
+        `[transactions] Total mismatch detected for deal ${resolvedDealId || '-'}: payload=${payloadTotalAmount}, computed=${computedTotalAmount}. Using computed total.`
+      );
+    }
+
     const insertValues = hasServiceIdColumn
       ? [
         txId,
@@ -320,15 +362,15 @@ export async function POST(request) {
         body.userId || null,
         body.promoId || null,
         body.paymentMethod || null,
-        Number(body.basePrice ?? body.amount ?? 0) || 0,
-        Number(body.quantity ?? 1) || 1,
+        effectiveUnitPrice,
+        Number(requestedQuantity) || 1,
         body.quantityType || 'Unit',
         Number(body.durationDays ?? 0) || null,
         body.notes || '',
         toDateOnly(body.startDate),
-        Number(body.amount ?? 0) || 0,
-        Number(body.serviceFee ?? 0) || 0,
-        Number(body.totalAmount ?? body.amount ?? 0) || 0,
+        computedAmount,
+        computedServiceFee,
+        computedTotalAmount,
         body.status || 'pending',
         timestamp,
         body.cardDetails ? JSON.stringify(body.cardDetails) : null,
@@ -343,15 +385,15 @@ export async function POST(request) {
         body.userId || null,
         body.promoId || null,
         body.paymentMethod || null,
-        Number(body.basePrice ?? body.amount ?? 0) || 0,
-        Number(body.quantity ?? 1) || 1,
+        effectiveUnitPrice,
+        Number(requestedQuantity) || 1,
         body.quantityType || 'Unit',
         Number(body.durationDays ?? 0) || null,
         body.notes || '',
         toDateOnly(body.startDate),
-        Number(body.amount ?? 0) || 0,
-        Number(body.serviceFee ?? 0) || 0,
-        Number(body.totalAmount ?? body.amount ?? 0) || 0,
+        computedAmount,
+        computedServiceFee,
+        computedTotalAmount,
         body.status || 'pending',
         timestamp,
         body.cardDetails ? JSON.stringify(body.cardDetails) : null,
@@ -389,7 +431,6 @@ export async function POST(request) {
     const currentDeal = dealRows[0] || null;
 
     if ((resolvedDealId || body.promoId) && body.paymentType !== 'invoice_payment') {
-      const isPayAfter = body.paymentType === 'pay_after';
       const paymentCompletedAt = timestamp;
       const paymentDeadlineDate = new Date();
       paymentDeadlineDate.setDate(paymentDeadlineDate.getDate() + 2);
@@ -418,13 +459,13 @@ export async function POST(request) {
             currentDeal?.vendor_id || currentPromo?.vendor_id || body.vendorId || null,
             currentDeal?.service_id || null,
             txId,
-            isPayAfter ? Number(body.remainingPayment ?? 0) : Number(body.totalAmount ?? body.amount ?? 0),
-            isPayAfter ? paymentDeadlineDate.toISOString() : timestamp,
+                paymentIsPayAfter ? Number(computedRemainingPayment ?? 0) : computedTotalAmount,
+                paymentIsPayAfter ? paymentDeadlineDate.toISOString() : timestamp,
             body.paymentMethod || null,
             body.paymentType || 'full',
-            isPayAfter ? 'pending' : 'paid',
-            isPayAfter ? null : paymentCompletedAt,
-            isPayAfter ? null : txId,
+                paymentIsPayAfter ? 'pending' : 'paid',
+                paymentIsPayAfter ? null : paymentCompletedAt,
+                paymentIsPayAfter ? null : txId,
             body.notes || '',
             invoiceId
           ]
@@ -444,14 +485,14 @@ export async function POST(request) {
             currentDeal?.vendor_id || currentPromo?.vendor_id || body.vendorId || null,
             currentDeal?.service_id || null,
             txId,
-            isPayAfter ? Number(body.remainingPayment ?? 0) : Number(body.totalAmount ?? body.amount ?? 0),
-            isPayAfter ? paymentDeadlineDate.toISOString() : timestamp,
+            paymentIsPayAfter ? Number(computedRemainingPayment ?? 0) : computedTotalAmount,
+            paymentIsPayAfter ? paymentDeadlineDate.toISOString() : timestamp,
             body.paymentMethod || null,
             body.paymentType || 'full',
-            isPayAfter ? 'pending' : 'paid',
+            paymentIsPayAfter ? 'pending' : 'paid',
             createdAt,
-            isPayAfter ? null : paymentCompletedAt,
-            isPayAfter ? null : txId,
+            paymentIsPayAfter ? null : paymentCompletedAt,
+            paymentIsPayAfter ? null : txId,
             body.notes || ''
           ]
         );
@@ -469,20 +510,21 @@ export async function POST(request) {
       if (resolvedDealId) {
         await query(
           `UPDATE deals
-           SET invoice_status = ?, status = ?, payment_confirmed_at = ?, completed_at = ?
+           SET invoice_status = ?, status = ?, payment_confirmed_at = ?, completed_at = ?, final_price = ?
            WHERE id = ?`,
           [
-            isPayAfter ? 'pending' : 'paid',
-            isPayAfter ? 'agreed' : 'active',
-            isPayAfter ? null : paymentCompletedAt,
-            isPayAfter ? null : paymentCompletedAt,
+            paymentIsPayAfter ? 'pending' : 'paid',
+            paymentIsPayAfter ? 'agreed' : 'active',
+            paymentIsPayAfter ? null : paymentCompletedAt,
+            paymentIsPayAfter ? null : paymentCompletedAt,
+            computedTotalAmount,
             resolvedDealId
           ]
         );
 
         const dealRowsAfter = await query('SELECT chat_id FROM deals WHERE id = ? LIMIT 1', [resolvedDealId]);
         if (dealRowsAfter.length > 0 && dealRowsAfter[0].chat_id) {
-          await query('UPDATE chats SET deal_status = ? WHERE id = ?', [isPayAfter ? 'agreed' : 'active', dealRowsAfter[0].chat_id]);
+          await query('UPDATE chats SET deal_status = ? WHERE id = ?', [paymentIsPayAfter ? 'agreed' : 'active', dealRowsAfter[0].chat_id]);
         }
       }
     }
