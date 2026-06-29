@@ -127,13 +127,7 @@ CREATE TABLE IF NOT EXISTS deals (
   discount_updated_at DATETIME(3),
   invoice_status VARCHAR(255),
   payment_confirmed_at DATETIME(3),
-  completed_at DATETIME(3),
-  actual_return_date DATE,
-  return_status VARCHAR(255),
-  vendor_confirmed BOOLEAN,
-  customer_confirmed BOOLEAN,
-  settlement_date DATE,
-  refund_status VARCHAR(255)
+  completed_at DATETIME(3)
 );
 
 -- Transactions

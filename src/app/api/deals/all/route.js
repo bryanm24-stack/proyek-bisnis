@@ -31,13 +31,7 @@ function mapDeal(row) {
     discountUpdatedAt: row.discount_updated_at,
     invoiceStatus: row.invoice_status,
     paymentConfirmedAt: row.payment_confirmed_at,
-    completedAt: row.completed_at,
-    actualReturnDate: row.actual_return_date,
-    returnStatus: row.return_status,
-    vendorConfirmed: row.vendor_confirmed,
-    customerConfirmed: row.customer_confirmed,
-    settlementDate: row.settlement_date,
-    refundStatus: row.refund_status
+    completedAt: row.completed_at
   };
 }
 

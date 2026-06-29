@@ -167,11 +167,8 @@ export async function POST(request) {
           customer_accepted, vendor_accepted, status,
           created_at, agreed_at, discount,
           original_price, final_price, discount_updated_at,
-          invoice_status, payment_confirmed_at, completed_at,
-          actual_return_date, return_status,
-          vendor_confirmed, customer_confirmed,
-          settlement_date, refund_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
+          invoice_status, payment_confirmed_at, completed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
         [
           promoDealId,
           null,
@@ -189,12 +186,6 @@ export async function POST(request) {
           timestamp,
           promoInvoiceStatus,
           promoInvoiceStatus === 'paid' ? timestamp : null,
-          null,
-          null,
-          null,
-          0,
-          0,
-          null,
           null
         ]
       );

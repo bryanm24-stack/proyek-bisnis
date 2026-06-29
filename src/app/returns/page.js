@@ -207,6 +207,32 @@ export default function ReturnsPage() {
     }
   }
 
+  async function confirmReturnByCustomer(deal) {
+    if (!deal || !user) return;
+    const confirmed = window.confirm('Konfirmasi denda dan selesaikan return ini?');
+    if (!confirmed) return;
+
+    try {
+      const r = await fetch('/api/returns', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          returnId: deal.returnId || deal.id,
+          dealId: deal.dealId || deal.id,
+          customerId: user.id
+        })
+      });
+      const j = await r.json();
+      if (!r.ok || j.success === false) {
+        throw new Error(j.message || 'Gagal konfirmasi return');
+      }
+      alert('Return selesai dikonfirmasi');
+      loadReturns();
+    } catch (err) {
+      alert(err.message || 'Gagal konfirmasi return');
+    }
+  }
+
   return (
     <div>
       <SharedNavbar />
@@ -309,6 +335,12 @@ export default function ReturnsPage() {
                     (() => {
                       const isVendorOnThisReturn = String(d.vendorId || '') === String(user?.id || '');
                       const isCustomerOnThisReturn = String(d.customerId || '') === String(user?.id || '');
+                      const vendorConfirmed = Boolean(
+                        d.vendorConfirmed ?? d.isVendorConfirmed ?? d.is_vendor_confirmed
+                      );
+                      const customerConfirmed = Boolean(
+                        d.customerConfirmed ?? d.isCustomerConfirmed ?? d.is_customer_confirmed
+                      );
 
                       return (
                     <div key={d.id} className={styles.card}>
@@ -393,6 +425,27 @@ export default function ReturnsPage() {
                                     </div>
                                   )}
                                 </>
+                              )}
+                            </div>
+                            <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                              {!vendorConfirmed && (
+                                <button type="button" className={`${styles.btn} ${styles.secondary}`} disabled>
+                                  Menunggu inspeksi vendor
+                                </button>
+                              )}
+                              {vendorConfirmed && !customerConfirmed && (
+                                <button
+                                  type="button"
+                                  className={`${styles.btn} ${styles.danger}`}
+                                  onClick={() => confirmReturnByCustomer(d)}
+                                >
+                                  Konfirmasi Denda & Selesaikan Return
+                                </button>
+                              )}
+                              {customerConfirmed && (
+                                <button type="button" className={`${styles.btn} ${styles.success}`} disabled>
+                                  Return Selesai
+                                </button>
                               )}
                             </div>
                           </div>

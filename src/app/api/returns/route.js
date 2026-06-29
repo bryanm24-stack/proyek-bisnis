@@ -6,6 +6,31 @@ import { query } from '@/lib/db';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+const normalizeItemCondition = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return null;
+
+  if (['good', 'baik'].includes(raw)) {
+    return { code: 'good', label: 'Baik', damageStatus: 'none' };
+  }
+  if (['minor_damage', 'minor', 'rusak ringan', 'rusak_ringan'].includes(raw)) {
+    return { code: 'minor_damage', label: 'Rusak ringan', damageStatus: 'minor' };
+  }
+  if (['major_damage', 'major', 'rusak berat', 'rusak_berat'].includes(raw)) {
+    return { code: 'major_damage', label: 'Rusak berat', damageStatus: 'major' };
+  }
+  if (['lost', 'hilang'].includes(raw)) {
+    return { code: 'lost', label: 'Hilang', damageStatus: 'lost' };
+  }
+
+  return null;
+};
+
+const toItemConditionLabel = (value) => {
+  const normalized = normalizeItemCondition(value);
+  return normalized?.label || String(value || '').trim();
+};
+
 const parseJsonArray = (value) => {
   if (!value) return [];
   if (Array.isArray(value)) return value;
@@ -49,6 +74,7 @@ function mapReturnRow(row, role = null, currentUserId = null) {
 
   const serviceImages = parseJsonArray(row.service_images);
   const isComplaint = row.request_type === 'complaint' || row.request_type === 'issue';
+  const itemConditionLabel = toItemConditionLabel(row.item_condition);
 
   const isVendorPerspective = currentUserId
     ? String(row.vendor_id || '') === String(currentUserId)
@@ -64,8 +90,8 @@ function mapReturnRow(row, role = null, currentUserId = null) {
     serviceId: row.service_id,
     returnType: row.request_type || 'end_of_use',
     returnStatus: row.status || 'pending_inspection',
-    complaintCategory: row.complaint_category || row.item_condition || '',
-    itemCondition: row.item_condition || '',
+    complaintCategory: row.complaint_category || itemConditionLabel || '',
+    itemCondition: itemConditionLabel || '',
     complaintDescription: row.description || '',
     damageDescription: row.description || '',
     returnPhotos: safePhotos,
@@ -79,6 +105,8 @@ function mapReturnRow(row, role = null, currentUserId = null) {
     complaintResolutionNotes: row.vendor_notes || '',
     customerConfirmed: Boolean(row.customer_confirmed),
     vendorConfirmed: Boolean(row.vendor_confirmed),
+    is_customer_confirmed: Boolean(row.customer_confirmed),
+    is_vendor_confirmed: Boolean(row.vendor_confirmed),
     reportedAt: row.created_at,
     actualReturnDate: row.resolved_at || null,
     settlementDate: row.resolved_at || null,
@@ -167,6 +195,28 @@ async function createOrUpdateDamageInvoice(returnRequest, amount) {
   return newInvoiceId;
 }
 
+async function createNotification(userId, type, message, relatedId, relatedData = {}) {
+  if (!userId) return;
+  try {
+    await query(
+      `INSERT INTO notifications (id, user_id, type, message, related_id, related_data, is_read, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        `notif_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        String(userId),
+        String(type || 'return_update'),
+        String(message || ''),
+        String(relatedId || ''),
+        JSON.stringify(relatedData || {}),
+        0,
+        new Date().toISOString()
+      ]
+    );
+  } catch (error) {
+    console.warn('Failed to create notification:', error?.message || error);
+  }
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -231,7 +281,7 @@ export async function GET(request) {
         invoiceId: row.invoice_id,
         returnType: row.request_type,
         returnStatus: row.status,
-        itemCondition: row.item_condition || null,
+        itemCondition: toItemConditionLabel(row.item_condition) || null,
         damageDescription: row.description || '',
         damageStatus: row.damage_status || 'none',
         damageCharge: Number(row.damage_charge || 0),
@@ -242,6 +292,8 @@ export async function GET(request) {
         returnPhotos: parseJsonArray(row.photos),
         customerConfirmed: Boolean(row.customer_confirmed),
         vendorConfirmed: Boolean(row.vendor_confirmed),
+        is_customer_confirmed: Boolean(row.customer_confirmed),
+        is_vendor_confirmed: Boolean(row.vendor_confirmed),
         settlementDate: row.resolved_at || null,
         complains: []
       }
@@ -322,13 +374,26 @@ export async function POST(request) {
     const requestType = normalizedType === 'complaint'
       ? 'complaint'
       : (normalizedType === 'issue' ? 'issue' : 'end_of_use');
+    const normalizedItemCondition = normalizeItemCondition(itemCondition);
+
+    if (requestType === 'end_of_use' && !normalizedItemCondition) {
+      return NextResponse.json({
+        success: false,
+        message: 'itemCondition harus: Baik, Rusak ringan, Rusak berat, atau Hilang'
+      }, { status: 400 });
+    }
+
+    const itemConditionCode = normalizedItemCondition?.code || String(itemCondition || '').trim().toLowerCase();
+    const itemConditionLabel = requestType === 'end_of_use'
+      ? (normalizedItemCondition?.label || String(itemCondition || '').trim())
+      : null;
 
     const expectedReturnDate = deal?.expected_return_date || null;
     const daysLate = requestType === 'end_of_use' ? daysBetweenDates(new Date().toISOString(), expectedReturnDate) : 0;
 
     const baseAmount = Number(invoice.remaining_payment || 0);
     const lateCharge = daysLate > 0 ? Math.round((baseAmount / Math.max(Number(deal?.duration_days || 1), 1)) * daysLate) : 0;
-    const damageCharge = (requestType === 'end_of_use' && itemCondition === 'lost') ? baseAmount : 0;
+    const damageCharge = (requestType === 'end_of_use' && itemConditionCode === 'lost') ? baseAmount : 0;
 
     const initialStatus = requestType === 'end_of_use' ? 'pending_inspection' : 'reported';
     const id = `RET-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -350,12 +415,12 @@ export async function POST(request) {
         invoice.vendor_id || null,
         invoice.service_id || null,
         requestType,
-        requestType === 'end_of_use' ? itemCondition : null,
+        requestType === 'end_of_use' ? itemConditionLabel : null,
         requestType === 'end_of_use' ? null : itemCondition,
         damageDescription || '',
         JSON.stringify(returnPhotos || []),
         initialStatus,
-        requestType === 'end_of_use' ? (itemCondition === 'good' ? 'none' : (itemCondition === 'minor_damage' ? 'minor' : (itemCondition === 'major_damage' ? 'major' : 'lost'))) : 'none',
+        requestType === 'end_of_use' ? (normalizedItemCondition?.damageStatus || 'none') : 'none',
         damageCharge,
         lateCharge,
         Math.max(0, baseAmount - damageCharge - lateCharge),
@@ -388,7 +453,17 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const body = await request.json();
-    const { dealId, returnId, vendorId, damageStatus, damageCharge, notes, complaintResolution, complaintPenalty } = body;
+    const {
+      dealId,
+      returnId,
+      vendorId,
+      damageStatus,
+      damageCharge,
+      lateCharge,
+      notes,
+      complaintResolution,
+      complaintPenalty
+    } = body;
 
     if ((!dealId && !returnId) || !vendorId) {
       return NextResponse.json({ success: false, message: 'dealId/returnId dan vendorId wajib diisi' }, { status: 400 });
@@ -416,11 +491,11 @@ export async function PUT(request) {
 
     const isComplaint = requestRow.request_type === 'complaint' || requestRow.request_type === 'issue';
 
-    let nextStatus = requestRow.status || 'pending_inspection';
     let nextComplaintResolution = requestRow.complaint_resolution;
     let nextComplaintPenalty = Number(requestRow.complaint_penalty || 0);
     let nextDamageStatus = requestRow.damage_status || 'none';
     let nextDamageCharge = Number(requestRow.damage_charge || 0);
+    let nextLateCharge = Number(requestRow.late_charge || 0);
     let nextTotalRefund = Number(requestRow.total_refund || 0);
     let nextDamageInvoiceId = requestRow.damage_invoice_id || null;
 
@@ -434,7 +509,6 @@ export async function PUT(request) {
       const penalty = Number(complaintPenalty || 0) || 0;
       nextComplaintResolution = normalizedResolution;
       nextComplaintPenalty = penalty;
-      nextStatus = normalizedResolution === 'reject' ? 'complaint_rejected' : 'complaint_confirmed';
       const invoiceAmount = Number(requestRow.total_refund || 0);
       nextTotalRefund = Math.max(0, invoiceAmount - penalty);
     } else {
@@ -444,45 +518,57 @@ export async function PUT(request) {
 
       nextDamageStatus = String(damageStatus || 'none');
       nextDamageCharge = Number(damageCharge || 0) || 0;
-      nextStatus = 'inspected';
-      nextTotalRefund = Math.max(0, Number(requestRow.total_refund || 0) - nextDamageCharge);
+      nextLateCharge = Number(lateCharge || 0) || 0;
+      nextTotalRefund = Math.max(0, Number(requestRow.total_refund || 0) - nextDamageCharge - nextLateCharge);
 
       if (nextDamageCharge > 0) {
         nextDamageInvoiceId = await createOrUpdateDamageInvoice(requestRow, nextDamageCharge);
       }
     }
 
-    const customerAlreadyConfirmed = Boolean(requestRow.customer_confirmed);
-    const completed = customerAlreadyConfirmed;
+    const nextStatus = 'inspected';
+    const nowIso = new Date().toISOString();
 
     await query(
       `UPDATE return_requests
        SET status = ?,
            damage_status = ?,
            damage_charge = ?,
+           late_charge = ?,
            damage_invoice_id = ?,
            total_refund = ?,
            complaint_resolution = ?,
            complaint_penalty = ?,
            vendor_notes = ?,
            vendor_confirmed = true,
-           updated_at = ?,
-           resolved_at = CASE WHEN ? THEN ? ELSE resolved_at END
+           updated_at = ?
        WHERE id = ?`,
       [
-        completed ? 'completed' : nextStatus,
+        nextStatus,
         nextDamageStatus,
         nextDamageCharge,
+        nextLateCharge,
         nextDamageInvoiceId,
         nextTotalRefund,
         nextComplaintResolution,
         nextComplaintPenalty,
         notes || '',
-        new Date().toISOString(),
-        completed,
-        new Date().toISOString(),
+        nowIso,
         requestRow.id
       ]
+    );
+
+    await createNotification(
+      requestRow.customer_id,
+      'return_inspection_done',
+      'Inspeksi telah selesai, silakan periksa rincian denda dan lakukan konfirmasi akhir',
+      requestRow.id,
+      {
+        returnId: requestRow.id,
+        dealId: requestRow.deal_id,
+        invoiceId: requestRow.invoice_id,
+        status: nextStatus
+      }
     );
 
     return NextResponse.json({
@@ -491,9 +577,11 @@ export async function PUT(request) {
       data: {
         returnId: requestRow.id,
         dealId: requestRow.deal_id,
-        returnStatus: completed ? 'completed' : nextStatus,
+        returnStatus: nextStatus,
         damageInvoiceId: nextDamageInvoiceId,
-        totalRefund: nextTotalRefund
+        totalRefund: nextTotalRefund,
+        is_vendor_confirmed: true,
+        is_customer_confirmed: Boolean(requestRow.customer_confirmed)
       }
     }, { status: 200 });
   } catch (error) {
@@ -531,16 +619,29 @@ export async function DELETE(request) {
       return NextResponse.json({ success: false, message: 'Anda tidak memiliki akses untuk return ini' }, { status: 403 });
     }
 
-    const completed = Boolean(requestRow.vendor_confirmed);
+    if (!Boolean(requestRow.vendor_confirmed)) {
+      return NextResponse.json({
+        success: false,
+        message: 'Menunggu inspeksi dari vendor',
+        data: {
+          returnId: requestRow.id,
+          dealId: requestRow.deal_id,
+          is_vendor_confirmed: false,
+          is_customer_confirmed: Boolean(requestRow.customer_confirmed)
+        }
+      }, { status: 400 });
+    }
+
+    const nowIso = new Date().toISOString();
 
     await query(
       `UPDATE return_requests
        SET customer_confirmed = true,
-           status = CASE WHEN ? THEN 'completed' ELSE status END,
+           status = 'completed',
            updated_at = ?,
-           resolved_at = CASE WHEN ? THEN ? ELSE resolved_at END
+           resolved_at = ?
        WHERE id = ?`,
-      [completed, new Date().toISOString(), completed, new Date().toISOString(), requestRow.id]
+      [nowIso, nowIso, requestRow.id]
     );
 
     return NextResponse.json({
@@ -549,9 +650,11 @@ export async function DELETE(request) {
       data: {
         returnId: requestRow.id,
         dealId: requestRow.deal_id,
-        status: completed ? 'completed' : requestRow.status,
+        status: 'completed',
         totalRefund: Number(requestRow.total_refund || 0),
-        settlementDate: completed ? new Date().toISOString() : null
+        settlementDate: nowIso,
+        is_vendor_confirmed: true,
+        is_customer_confirmed: true
       }
     }, { status: 200 });
   } catch (error) {

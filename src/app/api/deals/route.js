@@ -62,12 +62,6 @@ function mapDealRow(row, chat = null, originalPriceOverride = null) {
     invoiceStatus: row.invoice_status,
     paymentConfirmedAt: row.payment_confirmed_at,
     completedAt: row.completed_at,
-    actualReturnDate: row.actual_return_date,
-    returnStatus: row.return_status,
-    vendorConfirmed: toBool(row.vendor_confirmed),
-    customerConfirmed: toBool(row.customer_confirmed),
-    settlementDate: row.settlement_date,
-    refundStatus: row.refund_status,
     itemId: chat?.itemId ?? null,
     itemName: chat?.itemName ?? null,
     itemPrice: originalPrice
@@ -271,8 +265,8 @@ export async function POST(request) {
           `INSERT INTO deals (
             id, chat_id, customer_id, vendor_id, service_id,
             customer_accepted, vendor_accepted, status, created_at,
-            agreed_at, discount, original_price, final_price, return_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            agreed_at, discount, original_price, final_price
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             dealId,
             chatId,
@@ -286,8 +280,7 @@ export async function POST(request) {
             agreedAt,
             JSON.stringify({ type: null, value: 0, amount: 0 }),
             resolvedPrice,
-            resolvedPrice,
-            'pending'
+            resolvedPrice
           ]
         );
 
