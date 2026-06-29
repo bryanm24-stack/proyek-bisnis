@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+const normalizeOptionalString = (value) => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+};
+
 function normalizeRegistration(reg) {
   if (!reg) return null;
   return {
@@ -49,10 +55,21 @@ export async function POST(request) {
     await ensureVendorRegistrationsTable();
 
     const body = await request.json();
-    const { userId, vendorName, phoneNumber, identityFile, identityFileName } = body;
+    const {
+      userId,
+      vendorName,
+      phoneNumber,
+      identityFile,
+      identityFileName
+    } = body;
+
+    const normalizedVendorName = normalizeOptionalString(vendorName);
+    const normalizedPhoneNumber = normalizeOptionalString(phoneNumber);
+    const normalizedIdentityFile = normalizeOptionalString(identityFile);
+    const normalizedIdentityFileName = normalizeOptionalString(identityFileName);
 
     // Validasi input
-    if (!userId || !vendorName || !phoneNumber || !identityFile) {
+    if (!userId || !normalizedVendorName || !normalizedPhoneNumber || !normalizedIdentityFile) {
       return NextResponse.json({
         success: false,
         message: 'Semua field wajib diisi!'
@@ -60,7 +77,7 @@ export async function POST(request) {
     }
 
     // Validasi format nomor telepon (minimal 10 digit)
-    if (!/^\d{10,}$/.test(phoneNumber.replace(/\D/g, ''))) {
+    if (!/^\d{10,}$/.test(normalizedPhoneNumber.replace(/\D/g, ''))) {
       return NextResponse.json({
         success: false,
         message: 'Nomor telepon tidak valid (minimal 10 digit)'
@@ -110,7 +127,14 @@ export async function POST(request) {
            SET vendor_name = ?, phone_number = ?, identity_file = ?, 
                identity_file_name = ?, status = 'pending', submitted_at = ?, rejection_reason = NULL
            WHERE id = ?`,
-          [vendorName, phoneNumber, identityFile, identityFileName, new Date().toISOString(), existingReg.id]
+          [
+            normalizedVendorName,
+            normalizedPhoneNumber,
+            normalizedIdentityFile,
+            normalizedIdentityFileName,
+            new Date().toISOString(),
+            existingReg.id
+          ]
         );
 
         const updated = await query('SELECT * FROM vendor_registrations WHERE id = ?', [existingReg.id]);
@@ -131,8 +155,18 @@ export async function POST(request) {
        (id, user_id, user_name, user_email, vendor_name, phone_number, identity_file, 
         identity_file_name, status, created_at, submitted_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
-      [registrationId, userId, user.name, user.email, vendorName, phoneNumber, 
-       identityFile, identityFileName, now, now]
+      [
+        registrationId,
+        userId,
+        user.name,
+        user.email,
+        normalizedVendorName,
+        normalizedPhoneNumber,
+        normalizedIdentityFile,
+        normalizedIdentityFileName,
+        now,
+        now
+      ]
     );
 
     const newReg = await query('SELECT * FROM vendor_registrations WHERE id = ?', [registrationId]);

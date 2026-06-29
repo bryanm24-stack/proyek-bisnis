@@ -458,4 +458,3 @@ VALUES
   {"id":"item-foto-pre-wed","namaJasa":"Paket Pre-Wedding (2 lokasi, 8 jam)","hargaSesi":1500000,"images":["https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=300&q=80"],"variationValues":{},"specOptionValues":{}}
  ]', '{}', '{}', '{}', '{}', '[]', '{}', 3, 3)
 ;
-

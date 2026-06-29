@@ -40,7 +40,7 @@ async function query(sql, params) {
   };
 
   const convertedParams = (params || []).map(p => {
-    if (!p && p !== 0) return p; // keep null/undefined as-is
+    if (p === undefined || p === null) return null;
     if (p instanceof Date) return normalizeDate(p);
     if (typeof p === 'string') {
       // match ISO-like string e.g. 2026-06-17T16:41:43.378Z
