@@ -259,8 +259,14 @@ CREATE TABLE IF NOT EXISTS ratings (
   service_id VARCHAR(255),
   customer_id VARCHAR(255),
   vendor_id VARCHAR(255),
+  deal_id VARCHAR(255),
   rating INTEGER,
   review TEXT,
+  vendor_reply TEXT,
+  vendor_reply_at DATETIME(3),
+  vendor_reply_by VARCHAR(255),
+  weight_multiplier DECIMAL(5,2) DEFAULT 1.00,
+  weighted_score DECIMAL(5,2) DEFAULT 0.00,
   created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3)
 );
 
@@ -345,6 +351,49 @@ ALTER TABLE ratings
   ADD CONSTRAINT fk_ratings_service FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE SET NULL,
   ADD CONSTRAINT fk_ratings_customer FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE SET NULL,
   ADD CONSTRAINT fk_ratings_vendor FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE SET NULL;
+
+DROP PROCEDURE IF EXISTS recalculate_ratings;
+CREATE PROCEDURE recalculate_ratings()
+UPDATE ratings r
+LEFT JOIN deals d ON d.id = r.deal_id
+SET
+  r.weight_multiplier = ROUND(
+    (
+      1.0
+      - LEAST(
+          0.5,
+          GREATEST(
+            0,
+            TIMESTAMPDIFF(DAY, COALESCE(d.created_at, r.created_at), NOW())
+          ) * 0.01
+        )
+      + CASE
+          WHEN COALESCE(d.final_price, 0) > 500000 THEN 0.5
+          WHEN COALESCE(d.final_price, 0) > 100000 THEN 0.25
+          ELSE 0
+        END
+    ),
+    2
+  ),
+  r.weighted_score = ROUND(
+    COALESCE(r.rating, 0) *
+    (
+      1.0
+      - LEAST(
+          0.5,
+          GREATEST(
+            0,
+            TIMESTAMPDIFF(DAY, COALESCE(d.created_at, r.created_at), NOW())
+          ) * 0.01
+        )
+      + CASE
+          WHEN COALESCE(d.final_price, 0) > 500000 THEN 0.5
+          WHEN COALESCE(d.final_price, 0) > 100000 THEN 0.25
+          ELSE 0
+        END
+    ),
+    2
+  );
 
 ALTER TABLE promos
   ADD CONSTRAINT fk_promos_vendor FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE SET NULL;
@@ -458,3 +507,5 @@ VALUES
   {"id":"item-foto-pre-wed","namaJasa":"Paket Pre-Wedding (2 lokasi, 8 jam)","hargaSesi":1500000,"images":["https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=300&q=80"],"variationValues":{},"specOptionValues":{}}
  ]', '{}', '{}', '{}', '{}', '[]', '{}', 3, 3)
 ;
+
+  CALL recalculate_ratings();
