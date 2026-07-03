@@ -7,7 +7,7 @@ export default function SearchBar({ services, onSearch, onCategoryChange, catego
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [locationTerm, setLocationTerm] = useState('');
   const [minRating, setMinRating] = useState('all');
-  const [priceRange, setPriceRange] = useState('all');
+  const [budget, setBudget] = useState('');
   const [sortBy, setSortBy] = useState('recommended');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const categorySource = categoriesSource || services;
@@ -146,7 +146,7 @@ export default function SearchBar({ services, onSearch, onCategoryChange, catego
               syncFilters({
                 locationTerm: nextValue,
                 minRating,
-                priceRange,
+                budget,
                 sortBy
               });
             }}
@@ -162,7 +162,7 @@ export default function SearchBar({ services, onSearch, onCategoryChange, catego
               syncFilters({
                 locationTerm,
                 minRating: nextValue,
-                priceRange,
+                budget,
                 sortBy
               });
             }}
@@ -174,26 +174,23 @@ export default function SearchBar({ services, onSearch, onCategoryChange, catego
           </select>
         </div>
         <div className="filter-field">
-          <label>Rentang harga</label>
-          <select
-            value={priceRange}
+          <label>Budget minimum</label>
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="Min harga, contoh 20.000"
+            value={budget}
             onChange={(e) => {
               const nextValue = e.target.value;
-              setPriceRange(nextValue);
+              setBudget(nextValue);
               syncFilters({
                 locationTerm,
                 minRating,
-                priceRange: nextValue,
+                budget: nextValue,
                 sortBy
               });
             }}
-          >
-            <option value="all">Semua</option>
-            <option value="under_100k">Di bawah Rp100 ribu</option>
-            <option value="100k_250k">Rp100 ribu - Rp250 ribu</option>
-            <option value="250k_500k">Rp250 ribu - Rp500 ribu</option>
-            <option value="above_500k">Di atas Rp500 ribu</option>
-          </select>
+          />
         </div>
         <div className="filter-field">
           <label>Urutkan</label>

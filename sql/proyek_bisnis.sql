@@ -59,6 +59,21 @@ CREATE TABLE IF NOT EXISTS vendor_registrations (
   INDEX idx_created_at (created_at)
 );
 
+-- Vendor Profiles (store vendor storefront data and metadata)
+CREATE TABLE IF NOT EXISTS vendor_profiles (
+  vendor_id VARCHAR(255) PRIMARY KEY,
+  vendor_name VARCHAR(255),
+  vendor_logo TEXT,
+  vendor_address TEXT,
+  vendor_bio TEXT,
+  is_online BOOLEAN DEFAULT false,
+  last_active_at DATETIME(3),
+  joined_at DATETIME(3),
+  created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Services (store complex nested fields as JSON)
 CREATE TABLE IF NOT EXISTS services (
   id VARCHAR(255) PRIMARY KEY,
@@ -89,6 +104,7 @@ CREATE TABLE IF NOT EXISTS services (
   variations JSON,
   available_quantity INTEGER,
   availability INTEGER,
+  pengiriman_rentguard BOOLEAN DEFAULT false,
   created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3)
 );
 
@@ -159,6 +175,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   card_details JSON,
   qr_code VARCHAR(255),
   identity_verification JSON,
+  shipping_address TEXT,
   created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3)
 );
 

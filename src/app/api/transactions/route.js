@@ -115,6 +115,18 @@ async function hasTransactionsServiceIdColumn() {
   return rows.length > 0;
 }
 
+async function hasTransactionsShippingAddressColumn() {
+  const rows = await query(
+    `SELECT 1
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'transactions'
+       AND COLUMN_NAME = 'shipping_address'
+     LIMIT 1`
+  );
+  return rows.length > 0;
+}
+
 export async function GET(request) {
   try {
     const rows = await query('SELECT * FROM transactions ORDER BY COALESCE(created_at, NOW()) DESC');
@@ -135,6 +147,7 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const hasServiceIdColumn = await hasTransactionsServiceIdColumn();
+    const hasShippingAddressColumn = await hasTransactionsShippingAddressColumn();
 
     const txId = body.id || `TRX-${Date.now()}`;
     const createdAt = new Date().toISOString();
@@ -344,7 +357,8 @@ export async function POST(request) {
       );
     }
 
-    const insertValues = hasServiceIdColumn
+    const shippingAddressValue = body.shippingAddress || null;
+    const baseInsertValues = hasServiceIdColumn
       ? [
         txId,
         body.invoiceId || null,
@@ -366,8 +380,7 @@ export async function POST(request) {
         timestamp,
         body.cardDetails ? JSON.stringify(body.cardDetails) : null,
         body.qrCode || null,
-        body.identityVerification ? JSON.stringify(body.identityVerification) : null,
-        createdAt
+        body.identityVerification ? JSON.stringify(body.identityVerification) : null
       ]
       : [
         txId,
@@ -389,26 +402,45 @@ export async function POST(request) {
         timestamp,
         body.cardDetails ? JSON.stringify(body.cardDetails) : null,
         body.qrCode || null,
-        body.identityVerification ? JSON.stringify(body.identityVerification) : null,
-        createdAt
+        body.identityVerification ? JSON.stringify(body.identityVerification) : null
       ];
 
-    await query(
-      hasServiceIdColumn
+    if (hasShippingAddressColumn) {
+      baseInsertValues.push(shippingAddressValue);
+    }
+
+    baseInsertValues.push(createdAt);
+    const insertValues = baseInsertValues;
+
+    const insertSql = hasServiceIdColumn
+      ? hasShippingAddressColumn
         ? `INSERT INTO transactions (
             id, invoice_id, deal_id, service_id, user_id, promo_id, payment_method, base_price,
             quantity, quantity_type, duration_days, notes, start_date,
             amount, service_fee, total_amount, status, timestamp,
+            card_details, qr_code, identity_verification, shipping_address, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        : `INSERT INTO transactions (
+            id, invoice_id, deal_id, service_id, user_id, promo_id, payment_method, base_price,
+            quantity, quantity_type, duration_days, notes, start_date,
+            amount, service_fee, total_amount, status, timestamp,
             card_details, qr_code, identity_verification, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      : hasShippingAddressColumn
+        ? `INSERT INTO transactions (
+            id, invoice_id, deal_id, user_id, promo_id, payment_method, base_price,
+            quantity, quantity_type, duration_days, notes, start_date,
+            amount, service_fee, total_amount, status, timestamp,
+            card_details, qr_code, identity_verification, shipping_address, created_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         : `INSERT INTO transactions (
             id, invoice_id, deal_id, user_id, promo_id, payment_method, base_price,
             quantity, quantity_type, duration_days, notes, start_date,
             amount, service_fee, total_amount, status, timestamp,
             card_details, qr_code, identity_verification, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
-      insertValues
-    );
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+    await query(insertSql, insertValues);
 
     if (body.promoId && (body.status || 'pending') === 'success') {
       try {

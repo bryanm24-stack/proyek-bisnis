@@ -90,6 +90,7 @@ export async function POST(request) {
         username: newUser[0].username,
         name: newUser[0].name,
         email: newUser[0].email,
+        phone: newUser[0].phone || '',
         role: newUser[0].role
       }
     }, { status: 201 });

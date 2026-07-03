@@ -19,6 +19,7 @@ function InspectionContent() {
   const [complaintCategory, setComplaintCategory] = useState('damage');
   const [complaintSeverity, setComplaintSeverity] = useState('major');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittingRefund, setSubmittingRefund] = useState(false);
   const [timeLeft, setTimeLeft] = useState(null);
 
   useEffect(() => {
@@ -191,6 +192,42 @@ function InspectionContent() {
     }
   };
 
+  const handleRequestRefund = async () => {
+    if (!order) return;
+
+    if (!window.confirm('Anda yakin ingin meminta refund? Pastikan barang belum dikirim dan pembayaran telah selesai.')) {
+      return;
+    }
+
+    setSubmittingRefund(true);
+    try {
+      const response = await fetch('/api/orders/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: order.id,
+          action: 'request-refund'
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        alert('Permintaan refund terkirim. Menunggu persetujuan vendor.');
+        const dealsResponse = await fetch('/api/deals/all');
+        const deals = await dealsResponse.json();
+        const updatedOrder = deals.find(d => d.id === orderId);
+        setOrder(updatedOrder);
+      } else {
+        alert('Gagal mengajukan refund: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Terjadi kesalahan saat mengajukan refund');
+    } finally {
+      setSubmittingRefund(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
@@ -211,6 +248,8 @@ function InspectionContent() {
     checking: '⏳ Menunggu Pengecekan',
     approved: '✅ Disetujui',
     complaint: '⚠️ Ada Komplain',
+    refund_requested: '⏳ Permintaan Refund Diajukan',
+    refund_rejected: '❌ Permintaan Refund Ditolak',
     refunded: '💰 Refund Selesai',
     partially_refunded: '💸 Partial Refund Selesai',
     penalty_applied: '⚠️ Denda Diterapkan',
@@ -304,6 +343,32 @@ function InspectionContent() {
             </div>
           )}
 
+          {order.inspectionStatus === 'refund_requested' && (
+            <div style={{ background: '#f0f9ff', border: '1px solid #93c5fd', borderRadius: '8px', padding: '15px', marginBottom: '20px' }}>
+              <h4 style={{ margin: '0 0 10px 0', color: '#2563eb' }}>⏳ Permintaan Refund Diajukan</h4>
+              <p style={{ margin: '8px 0', color: '#1d4ed8', fontSize: '14px' }}>
+                Permintaan refund Anda telah terkirim ke vendor. Silakan tunggu keputusan vendor.
+              </p>
+              {order.refundRequestedAt && (
+                <div style={{ marginTop: '10px', fontSize: '12px', color: '#2563eb' }}>
+                  Waktu permintaan: {new Date(order.refundRequestedAt).toLocaleDateString('id-ID')} {new Date(order.refundRequestedAt).toLocaleTimeString('id-ID')}
+                </div>
+              )}
+            </div>
+          )}
+
+          {order.inspectionStatus === 'refund_rejected' && (
+            <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '15px', marginBottom: '20px' }}>
+              <h4 style={{ margin: '0 0 10px 0', color: '#b91c1c' }}>❌ Permintaan Refund Ditolak</h4>
+              <p style={{ margin: '8px 0', color: '#7f1d1d', fontSize: '14px' }}>
+                Vendor menolak permintaan refund Anda.
+              </p>
+              {order.complaintResolutionNotes && (
+                <p style={{ margin: '6px 0 0', color: '#7f1d1d', fontSize: '13px' }}>{order.complaintResolutionNotes}</p>
+              )}
+            </div>
+          )}
+
           {order.inspectionStatus === 'refunded' && (
             <div style={{ background: '#dcfce7', border: '1px solid #86efac', borderRadius: '8px', padding: '15px', marginBottom: '20px' }}>
               <h4 style={{ margin: '0 0 10px 0', color: '#15803d' }}>💰 Refund Selesai</h4>
@@ -354,7 +419,7 @@ function InspectionContent() {
 
           {/* Actions */}
           {order.inspectionStatus === 'checking' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
               <button
                 onClick={handleApprove}
                 disabled={isSubmitting}
@@ -388,6 +453,23 @@ function InspectionContent() {
                 }}
               >
                 ❌ Komplain
+              </button>
+              <button
+                onClick={handleRequestRefund}
+                disabled={submittingRefund}
+                style={{
+                  padding: '12px',
+                  background: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  opacity: submittingRefund ? 0.6 : 1
+                }}
+              >
+                💸 Minta Refund
               </button>
             </div>
           )}

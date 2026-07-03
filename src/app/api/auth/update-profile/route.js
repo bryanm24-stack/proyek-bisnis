@@ -4,14 +4,14 @@ import { query } from '@/lib/db';
 export async function PUT(request) {
   try {
     const body = await request.json();
-    const { id, name, email } = body;
+    const { id, name, email, phone } = body;
 
     if (!id || !name || !email) {
       return NextResponse.json({ success: false, message: 'ID, nama, dan email harus diisi.' }, { status: 400 });
     }
 
     // Check if user exists
-    const users = await query('SELECT id, name, email, role FROM users WHERE id = ? LIMIT 1', [id]);
+    const users = await query('SELECT id, name, email, role, phone FROM users WHERE id = ? LIMIT 1', [id]);
     if (users.length === 0) {
       return NextResponse.json({ success: false, message: 'Pengguna tidak ditemukan.' }, { status: 404 });
     }
@@ -25,7 +25,7 @@ export async function PUT(request) {
     }
 
     // Update user profile in database
-    await query('UPDATE users SET name = ?, email = ? WHERE id = ?', [name, email, id]);
+    await query('UPDATE users SET name = ?, email = ?, phone = ? WHERE id = ?', [name, email, phone || null, id]);
 
     return NextResponse.json(
       {
@@ -35,6 +35,7 @@ export async function PUT(request) {
           id: user.id,
           name,
           email,
+          phone: phone || user.phone,
           role: user.role
         }
       },

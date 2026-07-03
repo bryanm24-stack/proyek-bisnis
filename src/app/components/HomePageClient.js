@@ -32,6 +32,7 @@ export default function HomePageClient() {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [serviceReviews, setServiceReviews] = useState([]);
+  const [selectedVendorProfile, setSelectedVendorProfile] = useState(null);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewFilter, setReviewFilter] = useState('all');
   const [reviewPage, setReviewPage] = useState(1);
@@ -40,7 +41,7 @@ export default function HomePageClient() {
   const [searchFilters, setSearchFilters] = useState({
     locationTerm: '',
     minRating: 'all',
-    priceRange: 'all',
+    budget: '',
     sortBy: 'recommended'
   });
   const [activePromoIndex, setActivePromoIndex] = useState(0);
@@ -336,6 +337,7 @@ export default function HomePageClient() {
 
   const openModal = (service) => {
     setSelectedService(service);
+    setSelectedVendorProfile(null);
     setDetailTab('packages');
     setSelectedItemDetail(null);
     setModalImageIndex(0);
@@ -345,6 +347,23 @@ export default function HomePageClient() {
     setReviewFilter('all');
     setReviewPage(1);
     setModalOpen(true);
+
+    const fetchVendorProfile = async () => {
+      try {
+        const response = await fetch(`/api/vendor/profile?vendorId=${encodeURIComponent(service.vendorId)}`);
+        const data = await response.json();
+        if (data.success && data.data) {
+          setSelectedVendorProfile(data.data);
+        } else {
+          setSelectedVendorProfile(null);
+        }
+      } catch (error) {
+        console.error('Error fetching vendor profile:', error);
+        setSelectedVendorProfile(null);
+      }
+    };
+
+    fetchVendorProfile();
 
     // Fetch reviews for this service
     console.log('Fetching reviews for serviceId:', service.id);
@@ -376,6 +395,7 @@ export default function HomePageClient() {
   const closeModal = () => {
     setModalOpen(false);
     setSelectedService(null);
+    setSelectedVendorProfile(null);
     setSelectedItemDetail(null);
     setModalImageIndex(0);
     setActivePromoIndex(0);
@@ -776,14 +796,12 @@ export default function HomePageClient() {
       filtered = filtered.filter(service => Number(service.rating || 0) >= minimumRating);
     }
 
-    if (searchFilters.priceRange !== 'all') {
+    const budgetRaw = String(searchFilters.budget || '').replace(/[^\d]/g, '');
+    const budgetValue = Number(budgetRaw);
+    if (Number.isFinite(budgetValue) && budgetValue > 0) {
       filtered = filtered.filter((service) => {
         const price = getServicePriceNumber(service);
-        if (searchFilters.priceRange === 'under_100k') return price > 0 && price < 100000;
-        if (searchFilters.priceRange === '100k_250k') return price >= 100000 && price < 250000;
-        if (searchFilters.priceRange === '250k_500k') return price >= 250000 && price < 500000;
-        if (searchFilters.priceRange === 'above_500k') return price >= 500000;
-        return true;
+        return price > 0 && price >= budgetValue;
       });
     }
 
@@ -1847,10 +1865,42 @@ export default function HomePageClient() {
 
                   {detailTab === 'information' && (
                     <>
-                      <div className="info-section">
-                        <h4>📍 Vendor</h4>
-                        <p>{selectedService.vendorName}</p>
+                      <div className="info-section" style={{ paddingBottom: '16px', borderBottom: '1px solid #e5e7eb', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                          {selectedVendorProfile?.vendorLogo ? (
+                            <img
+                              src={selectedVendorProfile.vendorLogo}
+                              alt={selectedVendorProfile.vendorName || selectedService.vendorName}
+                              style={{ width: '72px', height: '72px', borderRadius: '18px', objectFit: 'cover', border: '1px solid #e2e8f0' }}
+                            />
+                          ) : (
+                            <div style={{ width: '72px', height: '72px', borderRadius: '18px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '14px', border: '1px solid #e2e8f0' }}>
+                              Logo
+                            </div>
+                          )}
+
+                          <div style={{ minWidth: 0 }}>
+                            <p style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#111' }}>
+                              {selectedVendorProfile?.vendorName || selectedService.vendorName || 'Vendor'}
+                            </p>
+                            <p style={{ margin: '8px 0 0 0', color: '#475569', fontSize: '14px', lineHeight: '1.6' }}>
+                              {selectedVendorProfile?.vendorBio || selectedService.shortDescription || 'Belum ada informasi toko tersedia.'}
+                            </p>
+                          </div>
+                        </div>
                       </div>
+
+                      {selectedVendorProfile?.vendorAddress ? (
+                        <div className="info-section">
+                          <h4>📍 Alamat Toko</h4>
+                          <p>{selectedVendorProfile.vendorAddress}</p>
+                        </div>
+                      ) : (selectedService.location || selectedService.lokasi) && (
+                        <div className="info-section">
+                          <h4>📍 Lokasi Penjemputan</h4>
+                          <p>{locationLabel}</p>
+                        </div>
+                      )}
 
                       <div className="info-section">
                         <h4>🏷️ Kategori</h4>
@@ -1858,34 +1908,32 @@ export default function HomePageClient() {
                       </div>
 
                       <div className="info-section">
+                        <h4>⭐ Rating Vendor</h4>
+                        <p>{selectedVendorProfile ? `${selectedVendorProfile.averageRating?.toFixed?.(1) ?? '0.0'} • ${selectedVendorProfile.totalReviews} review` : (selectedService.rating?.toFixed?.(1) ?? selectedService.rating)}</p>
+                      </div>
+
+                      <div className="info-section">
                         <h4>📈 Terjual</h4>
                         <p>{selectedService.rentCount ?? '0'}</p>
                       </div>
 
-                      {(selectedService.location || selectedService.lokasi) && (
+                      {(selectedVendorProfile?.totalServices ?? 0) > 0 && (
                         <div className="info-section">
-                          <h4>📍 Lokasi Penjemputan</h4>
-                          <p>{locationLabel}</p>
+                          <h4>🛒 Jumlah Layanan</h4>
+                          <p>{selectedVendorProfile.totalServices}</p>
                         </div>
                       )}
 
-                      {selectedService.minimumDays && (
+                      {selectedVendorProfile?.memberSince && (
                         <div className="info-section">
-                          <h4>📅 Minimum Sewa</h4>
-                          <p>{selectedService.minimumDays} hari</p>
-                        </div>
-                      )}
-
-                      {selectedService.rentalPolicy && (
-                        <div className="info-section">
-                          <h4>📜 Kebijakan Sewa</h4>
-                          <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.rentalPolicy}</p>
+                          <h4>📅 Bergabung Sejak</h4>
+                          <p>{new Date(selectedVendorProfile.memberSince).toLocaleDateString('id-ID')}</p>
                         </div>
                       )}
 
                       <div className="info-section">
                         <h4>🕒 Status</h4>
-                        <p>Terakhir online baru-baru ini</p>
+                        <p>{selectedVendorProfile?.isOnline ? 'Sedang online' : 'Terakhir online baru-baru ini'}</p>
                       </div>
                     </>
                   )}
