@@ -16,7 +16,7 @@ export async function POST(request) {
     // Try DB first
     try {
       const res = await query(
-        'SELECT id, name, email, role FROM users WHERE email = ? AND password = ? LIMIT 1',
+        'SELECT id, name, email, role, phone FROM users WHERE email = ? AND password = ? LIMIT 1',
         [email, password]
       );
       const user = Array.isArray(res) ? res[0] : undefined;
@@ -31,6 +31,7 @@ export async function POST(request) {
           id: String(user.id),
           name: user.name,
           email: user.email,
+          phone: user.phone || '',
           role: user.role
         }
       }, { status: 200 });

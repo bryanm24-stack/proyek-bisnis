@@ -1,142 +1,368 @@
 import { NextResponse } from 'next/server';
+import { query } from '@/lib/db';
 
+const normalizeId = (id) => String(id ?? '').trim();
 
-import { readData, writeData } from '@/lib/storage';
-// Helper: Normalize ID for consistent comparison
-const normalizeId = (id) => String(id || '').trim();
-
-const findLatestDealByChatId = (deals, chatId) => {
-  const normalizedChatId = normalizeId(chatId);
-  for (let index = deals.length - 1; index >= 0; index -= 1) {
-    if (normalizeId(deals[index]?.chatId) === normalizedChatId) {
-      return deals[index];
-    }
-  }
-  return null;
-};
-
-const resolveItemPrice = (service, itemId) => {
-  if (!service || !itemId || !Array.isArray(service.items)) return null;
-
-  const item = service.items.find((entry) => normalizeId(entry?.id) === normalizeId(itemId));
-  if (!item) return null;
-
-  const priceField = service.type === 'barang' ? 'hargaPcs' : 'hargaSesi';
-  return Number(item[priceField] ?? item.price ?? null);
-};
-
-const resolveDealPrice = (service, itemId) => {
-  const itemPrice = resolveItemPrice(service, itemId);
-  if (Number.isFinite(itemPrice) && itemPrice > 0) return itemPrice;
-
-  return Number(service?.price ?? service?.harga ?? 0) || 0;
-};
-
-const enrichDealWithItemContext = (deal, chatRoom, service) => {
-  if (!deal) return null;
-
-  const resolvedItemId = deal.itemId || chatRoom?.itemId || null;
-  const resolvedItemName = deal.itemName || chatRoom?.itemName || null;
-  const resolvedOriginalPrice = resolveDealPrice(service, resolvedItemId);
-  const originalPrice = Number.isFinite(resolvedOriginalPrice) && resolvedOriginalPrice > 0
-    ? resolvedOriginalPrice
-    : Number(deal.originalPrice || 0);
-  const finalPrice = deal.discountGiven
-    ? Number(deal.finalPrice ?? Math.max(originalPrice - Number(deal.discount?.amount || 0), 0))
-    : Number(deal.finalPrice ?? originalPrice);
-
-  return {
-    ...deal,
-    itemId: resolvedItemId,
-    itemName: resolvedItemName,
-    itemPrice: originalPrice,
-    originalPrice,
-    finalPrice
-  };
-};
-
-// Helper function to create notification
-async function createNotification(userId, type, message, relatedId, relatedData = {}) {
+function parseJsonSafe(value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'object') return value;
   try {
-    const data = await readData('notifications');
-    const notifications = data;
-
-    const newNotification = {
-      id: `notif_${Date.now()}`,
-      userId,
-      type,
-      message,
-      relatedId,
-      relatedData,
-      read: false,
-      createdAt: new Date().toISOString()
-    };
-
-    notifications.push(newNotification);
-    await writeData('notification', notifications);
-
-    return newNotification;
-  } catch (error) {
-    console.error('Error creating notification:', error);
+    return JSON.parse(value);
+  } catch {
+    return fallback;
   }
 }
 
-// POST - Accept, cancel, or apply-discount for a deal
+function toBool(value) {
+  if (value === null || value === undefined) return null;
+  return Boolean(value);
+}
+
+function mapChatRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    serviceId: row.service_id,
+    serviceTitle: row.service_title,
+    vendorId: row.vendor_id,
+    vendorName: row.vendor_name,
+    customerId: row.customer_id,
+    customerName: row.customer_name,
+    itemId: row.item_id,
+    itemName: row.item_name,
+    messages: parseJsonSafe(row.messages, []),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    dealStatus: row.deal_status
+  };
+}
+
+function mapDealRow(row, chat = null, originalPriceOverride = null) {
+  if (!row) return null;
+  const discount = parseJsonSafe(row.discount, { type: null, value: 0, amount: 0 });
+  const originalPrice = Number(originalPriceOverride ?? row.original_price ?? 0) || 0;
+  const finalPrice = Number(row.final_price ?? Math.max(originalPrice - Number(discount?.amount || 0), 0)) || 0;
+
+  return {
+    id: row.id,
+    chatId: row.chat_id,
+    customerId: row.customer_id,
+    vendorId: row.vendor_id,
+    serviceId: row.service_id,
+    customerAccepted: toBool(row.customer_accepted),
+    vendorAccepted: toBool(row.vendor_accepted),
+    status: row.status,
+    createdAt: row.created_at,
+    agreedAt: row.agreed_at,
+    discount,
+    discountGiven: Number(discount?.amount || 0) > 0,
+    originalPrice,
+    finalPrice,
+    discountUpdatedAt: row.discount_updated_at,
+    invoiceStatus: row.invoice_status,
+    paymentConfirmedAt: row.payment_confirmed_at,
+    completedAt: row.completed_at,
+    itemId: chat?.itemId ?? null,
+    itemName: chat?.itemName ?? null,
+    itemPrice: originalPrice
+  };
+}
+
+async function getChatById(chatId) {
+  const rows = await query('SELECT * FROM chats WHERE id = ? LIMIT 1', [chatId]);
+  return rows[0] || null;
+}
+
+async function getLatestDealByChatId(chatId) {
+  const rows = await query(
+    'SELECT * FROM deals WHERE chat_id = ? ORDER BY COALESCE(created_at, NOW()) DESC, id DESC LIMIT 1',
+    [chatId]
+  );
+  return rows[0] || null;
+}
+
+async function resolveDealPrice(serviceId, itemId) {
+  const services = await query('SELECT id, type, price, items FROM services WHERE id = ? LIMIT 1', [serviceId]);
+  const service = services[0];
+  if (!service) return 0;
+
+  const items = parseJsonSafe(service.items, []);
+  if (Array.isArray(items) && itemId) {
+    const found = items.find((entry) => normalizeId(entry?.id) === normalizeId(itemId));
+    if (found) {
+      const priceField = service.type === 'barang' ? 'hargaPcs' : 'hargaSesi';
+      const itemPrice = Number(found?.[priceField] ?? found?.price ?? 0);
+      if (Number.isFinite(itemPrice) && itemPrice > 0) return itemPrice;
+    }
+  }
+
+  return Number(service.price ?? 0) || 0;
+}
+
+async function createNotification(userId, type, message, relatedId, relatedData = {}) {
+  try {
+    await query(
+      `INSERT INTO notifications (id, user_id, type, message, related_id, related_data, is_read, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)` ,
+      [
+        `notif_${Date.now()}`,
+        String(userId),
+        type,
+        message,
+        String(relatedId),
+        JSON.stringify(relatedData || {}),
+        0,
+        new Date().toISOString()
+      ]
+    );
+  } catch (error) {
+    console.warn('Failed to create notification:', error.message);
+  }
+}
+
+async function upsertPendingInvoice(deal, finalPrice) {
+  const pending = await query(
+    `SELECT * FROM invoices
+     WHERE deal_id = ? AND (status IS NULL OR status <> 'paid')
+     ORDER BY COALESCE(created_at, NOW()) DESC
+     LIMIT 1`,
+    [deal.id]
+  );
+
+  const deadline = new Date(Date.now() + (2 * 24 * 60 * 60 * 1000)).toISOString();
+  if (pending.length > 0) {
+    await query(
+      `UPDATE invoices
+       SET customer_id = ?, vendor_id = ?, service_id = ?, remaining_payment = ?, payment_deadline = ?,
+           payment_type = ?, status = ?, notes = ?
+       WHERE id = ?`,
+      [
+        deal.customerId,
+        deal.vendorId,
+        deal.serviceId,
+        Number(finalPrice || 0),
+        deadline,
+        'deal_pending',
+        'pending',
+        'Menunggu pembayaran setelah deal disepakati dan diskon diterapkan.',
+        pending[0].id
+      ]
+    );
+    return;
+  }
+
+  await query(
+    `INSERT INTO invoices (
+      id, deal_id, customer_id, vendor_id, service_id, transaction_id,
+      remaining_payment, payment_deadline, payment_method, payment_type,
+      status, created_at, paid_at, payment_transaction_id, notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      `INV-${Date.now()}`,
+      deal.id,
+      deal.customerId,
+      deal.vendorId,
+      deal.serviceId,
+      null,
+      Number(finalPrice || 0),
+      deadline,
+      null,
+      'deal_pending',
+      'pending',
+      new Date().toISOString(),
+      null,
+      null,
+      'Menunggu pembayaran setelah deal disepakati dan diskon diterapkan.'
+    ]
+  );
+}
+
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { action } = body;
+    const referer = request.headers.get('referer') || '';
+    const { action, chatId, customerId, vendorId, serviceId, resetDeadline } = body;
+    const actorIsVendorUI = normalizeId(vendorId || '') === normalizeId((await getChatById(chatId))?.vendor_id) || referer.includes('/vendor/chats');
 
     if (!action) {
       return NextResponse.json({ success: false, message: 'Action diperlukan' }, { status: 400 });
     }
 
+    if (!chatId) {
+      return NextResponse.json({ success: false, message: 'chatId wajib diisi' }, { status: 400 });
+    }
 
-    const chatsData = await readData('chats');
-    const chats = chatsData;
-    const dealsData = await readData('deals');
-    const deals = dealsData;
+    const chatRow = await getChatById(chatId);
+    if (!chatRow) {
+      return NextResponse.json({ success: false, message: 'Chat room tidak ditemukan' }, { status: 404 });
+    }
+    const chat = mapChatRow(chatRow);
 
-    // Handle vendor discount after deal is agreed
+    if (customerId && normalizeId(chat.customerId) !== normalizeId(customerId)) {
+      return NextResponse.json({ success: false, message: 'Data customer tidak valid' }, { status: 403 });
+    }
+    if (vendorId && normalizeId(chat.vendorId) !== normalizeId(vendorId)) {
+      return NextResponse.json({ success: false, message: 'Data vendor tidak valid' }, { status: 403 });
+    }
+    if (serviceId && normalizeId(chat.serviceId) !== normalizeId(serviceId)) {
+      return NextResponse.json({ success: false, message: 'Data service tidak valid' }, { status: 403 });
+    }
+
+    const existingDealRow = await getLatestDealByChatId(chatId);
+
+    if (action === 'cancel') {
+      if (resetDeadline && existingDealRow && ['completed', 'cancelled'].includes(existingDealRow.status)) {
+        await query(
+          'UPDATE deals SET status = ?, customer_accepted = ?, vendor_accepted = ? WHERE id = ?',
+          ['pending', 1, 0, existingDealRow.id]
+        );
+        await query('UPDATE chats SET deal_status = ? WHERE id = ?', ['pending', chatId]);
+
+        const refreshedDealRow = await getLatestDealByChatId(chatId);
+        const refreshedChat = mapChatRow(await getChatById(chatId));
+
+        await createNotification(vendorId || chat.vendorId, 'deal_pending', 'Ada penawaran baru dari customer', chatId, {
+          customerId: customerId || chat.customerId,
+          serviceId: serviceId || chat.serviceId
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: 'Deal direset untuk siklus baru',
+          data: { deal: mapDealRow(refreshedDealRow, refreshedChat), chat: refreshedChat }
+        }, { status: 200 });
+      }
+
+      if (existingDealRow) {
+        await query('UPDATE deals SET status = ? WHERE id = ?', ['cancelled', existingDealRow.id]);
+      }
+      await query('UPDATE chats SET deal_status = ? WHERE id = ?', ['cancelled', chatId]);
+
+      const refreshedDealRow = await getLatestDealByChatId(chatId);
+      const refreshedChat = mapChatRow(await getChatById(chatId));
+
+      await createNotification(vendorId || chat.vendorId, 'deal_cancelled', 'Deal dibatalkan oleh customer', chatId, {
+        customerId: customerId || chat.customerId,
+        serviceId: serviceId || chat.serviceId
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Deal dibatalkan',
+        data: { deal: mapDealRow(refreshedDealRow, refreshedChat), chat: refreshedChat }
+      }, { status: 200 });
+    }
+
+    if (action === 'accept') {
+      if (!existingDealRow || ['completed', 'cancelled'].includes(existingDealRow.status)) {
+        const resolvedPrice = await resolveDealPrice(chat.serviceId, chat.itemId);
+        const dealId = Date.now().toString();
+        const initialStatus = actorIsVendorUI ? 'agreed' : 'pending';
+        const vendorAccepted = actorIsVendorUI ? 1 : 0;
+        const agreedAt = actorIsVendorUI ? new Date().toISOString() : null;
+
+        await query(
+          `INSERT INTO deals (
+            id, chat_id, customer_id, vendor_id, service_id,
+            customer_accepted, vendor_accepted, status, created_at,
+            agreed_at, discount, original_price, final_price
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            dealId,
+            chatId,
+            chat.customerId,
+            chat.vendorId,
+            chat.serviceId,
+            1,
+            vendorAccepted,
+            initialStatus,
+            new Date().toISOString(),
+            agreedAt,
+            JSON.stringify({ type: null, value: 0, amount: 0 }),
+            resolvedPrice,
+            resolvedPrice
+          ]
+        );
+
+        await query('UPDATE chats SET deal_status = ? WHERE id = ?', [initialStatus, chatId]);
+        const createdDeal = await getLatestDealByChatId(chatId);
+        const refreshedChat = mapChatRow(await getChatById(chatId));
+
+        if (actorIsVendorUI) {
+          await createNotification(chat.customerId, 'deal_accepted', 'Vendor menerima penawaran Anda!', chatId, {
+            vendorId: chat.vendorId,
+            serviceId: chat.serviceId
+          });
+        } else {
+          await createNotification(chat.vendorId, 'deal_pending', 'Ada penawaran baru dari customer', chatId, {
+            customerId: chat.customerId,
+            serviceId: chat.serviceId
+          });
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: actorIsVendorUI ? 'Deal diterima.' : 'Penawaran dikirim, menunggu vendor menerima',
+          data: { deal: mapDealRow(createdDeal, refreshedChat), chat: refreshedChat }
+        }, { status: actorIsVendorUI ? 200 : 201 });
+      }
+
+      if (!actorIsVendorUI && existingDealRow.status === 'pending') {
+        return NextResponse.json({
+          success: true,
+          message: 'Penawaran sedang menunggu vendor menerima.',
+          data: { deal: mapDealRow(existingDealRow, chat), chat }
+        }, { status: 200 });
+      }
+
+      const agreedPrice = await resolveDealPrice(chat.serviceId, chat.itemId);
+      await query(
+        `UPDATE deals
+         SET vendor_accepted = ?, status = ?, agreed_at = ?,
+             original_price = COALESCE(original_price, ?),
+             final_price = COALESCE(final_price, ?)
+         WHERE id = ?`,
+        [1, 'agreed', new Date().toISOString(), agreedPrice, agreedPrice, existingDealRow.id]
+      );
+
+      await query('UPDATE chats SET deal_status = ? WHERE id = ?', ['agreed', chatId]);
+
+      const refreshedDealRow = await getLatestDealByChatId(chatId);
+      const refreshedChat = mapChatRow(await getChatById(chatId));
+
+      await createNotification(chat.customerId, 'deal_accepted', 'Vendor menerima penawaran Anda!', chatId, {
+        vendorId: chat.vendorId,
+        serviceId: chat.serviceId
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Deal diterima.',
+        data: { deal: mapDealRow(refreshedDealRow, refreshedChat), chat: refreshedChat, readyForRating: true }
+      }, { status: 200 });
+    }
+
     if (action === 'apply-discount') {
-      const { chatId, vendorId, discountType, discountValue } = body;
-      if (!chatId || !vendorId || !discountType || typeof discountValue !== 'number') {
+      const { discountType, discountValue } = body;
+      if (!discountType || typeof discountValue !== 'number') {
         return NextResponse.json({ success: false, message: 'Data diskon tidak lengkap' }, { status: 400 });
       }
 
-      const chatRoom = chats.find(c => c.id === chatId);
-      if (!chatRoom) {
-        return NextResponse.json({ success: false, message: 'Chat room tidak ditemukan' }, { status: 404 });
-      }
-
-      if (normalizeId(chatRoom.vendorId) !== normalizeId(vendorId)) {
-        return NextResponse.json({ success: false, message: 'Vendor tidak sesuai dengan chat ini' }, { status: 403 });
-      }
-
-      const deal = findLatestDealByChatId(deals, chatId);
-      if (!deal) {
+      if (!existingDealRow) {
         return NextResponse.json({ success: false, message: 'Deal belum dibuat' }, { status: 404 });
       }
 
-      if (normalizeId(deal.vendorId) !== normalizeId(vendorId)) {
+      if (normalizeId(existingDealRow.vendor_id) !== normalizeId(vendorId || chat.vendorId)) {
         return NextResponse.json({ success: false, message: 'Hanya vendor pemilik deal yang bisa memberi diskon' }, { status: 403 });
       }
 
-      if (deal.status !== 'agreed') {
+      if (existingDealRow.status !== 'agreed') {
         return NextResponse.json({ success: false, message: 'Diskon hanya bisa diterapkan setelah deal disetujui' }, { status: 400 });
       }
 
-      if (typeof deal.originalPrice === 'undefined' || deal.originalPrice === null) {
-        const servicesData = await readData('services');
-        const services = servicesData;
-        const svc = services.find(s => normalizeId(s.id) === normalizeId(deal.serviceId));
-        const chatRoom = chats.find(c => normalizeId(c.id) === normalizeId(chatId));
-        deal.originalPrice = resolveDealPrice(svc, deal.itemId || chatRoom?.itemId || null);
-      }
-
-      const originalPrice = Number(deal.originalPrice || 0);
-      if (originalPrice < 0) {
-        return NextResponse.json({ success: false, message: 'Harga asli tidak valid' }, { status: 400 });
+      let originalPrice = Number(existingDealRow.original_price ?? 0) || 0;
+      if (originalPrice <= 0) {
+        originalPrice = await resolveDealPrice(chat.serviceId, chat.itemId);
       }
 
       let normalizedValue = Number(discountValue);
@@ -156,368 +382,43 @@ export async function POST(request) {
 
       if (amount > originalPrice) amount = originalPrice;
       const finalPrice = Math.max(originalPrice - amount, 0);
+      const discount = { type: discountType, value: normalizedValue, amount };
 
-      deal.discountGiven = amount > 0;
-      deal.discount = {
-        type: discountType,
-        value: normalizedValue,
-        amount
+      await query(
+        `UPDATE deals
+         SET discount = ?, original_price = ?, final_price = ?, discount_updated_at = ?
+         WHERE id = ?`,
+        [JSON.stringify(discount), originalPrice, finalPrice, new Date().toISOString(), existingDealRow.id]
+      );
+
+      const dealForInvoice = {
+        id: existingDealRow.id,
+        customerId: existingDealRow.customer_id,
+        vendorId: existingDealRow.vendor_id,
+        serviceId: existingDealRow.service_id
       };
-      deal.finalPrice = finalPrice;
-      deal.discountUpdatedAt = new Date().toISOString();
-
-      await writeData('deal', deals);
-
-      // Ensure invoice pending exists right after deal + discount so vendor can track waiting payment.
-      try {
-        const invoices = await readData('invoices');
-
-        const now = new Date();
-        const deadline = new Date(now);
-        deadline.setDate(deadline.getDate() + 2);
-
-        const existingPendingInvoice = invoices.find(
-          (item) => normalizeId(item.dealId) === normalizeId(deal.id) && item.status !== 'paid'
-        );
-
-        if (existingPendingInvoice) {
-          existingPendingInvoice.customerId = existingPendingInvoice.customerId || deal.customerId;
-          existingPendingInvoice.vendorId = existingPendingInvoice.vendorId || deal.vendorId;
-          existingPendingInvoice.serviceId = existingPendingInvoice.serviceId || deal.serviceId;
-          existingPendingInvoice.remainingPayment = Number(finalPrice || 0);
-          existingPendingInvoice.paymentDeadline = existingPendingInvoice.paymentDeadline || deadline.toISOString();
-          existingPendingInvoice.paymentType = existingPendingInvoice.paymentType || 'deal_pending';
-          existingPendingInvoice.status = 'pending';
-          existingPendingInvoice.notes = existingPendingInvoice.notes || 'Menunggu pembayaran setelah deal disepakati dan diskon diterapkan.';
-        } else {
-          invoices.push({
-            id: `INV-${Date.now()}`,
-            dealId: deal.id,
-            customerId: deal.customerId,
-            vendorId: deal.vendorId,
-            serviceId: deal.serviceId,
-            transactionId: null,
-            remainingPayment: Number(finalPrice || 0),
-            paymentDeadline: deadline.toISOString(),
-            paymentMethod: null,
-            paymentType: 'deal_pending',
-            status: 'pending',
-            createdAt: now.toISOString(),
-            paidAt: null,
-            paymentTransactionId: null,
-            notes: 'Menunggu pembayaran setelah deal disepakati dan diskon diterapkan.'
-          });
-        }
-
-        await writeData('invoices', invoices);
-      } catch (invoiceError) {
-        console.warn('Could not create pending invoice after discount:', invoiceError);
-      }
+      await upsertPendingInvoice(dealForInvoice, finalPrice);
 
       await createNotification(
-        deal.customerId,
+        existingDealRow.customer_id,
         'deal_discount_applied',
         `Vendor memberikan diskon. Harga akhir: Rp ${finalPrice.toLocaleString('id-ID')}`,
         chatId,
-        { vendorId: deal.vendorId, serviceId: deal.serviceId, finalPrice, amount }
+        {
+          vendorId: existingDealRow.vendor_id,
+          serviceId: existingDealRow.service_id,
+          finalPrice,
+          amount
+        }
       );
 
+      const refreshedDealRow = await getLatestDealByChatId(chatId);
+      const refreshedChat = mapChatRow(await getChatById(chatId));
       return NextResponse.json({
         success: true,
         message: 'Diskon berhasil diterapkan',
-        data: { deal, chat: chatRoom }
+        data: { deal: mapDealRow(refreshedDealRow, refreshedChat), chat: refreshedChat }
       }, { status: 200 });
-    }
-
-    // Handle cancel/reset
-    if (action === 'cancel') {
-      const { chatId, customerId, vendorId, serviceId, resetDeadline } = body;
-      if (!chatId || !customerId || !vendorId || !serviceId) {
-        return NextResponse.json({ success: false, message: 'Semua field wajib diisi!' }, { status: 400 });
-      }
-
-      const chatRoom = chats.find(c => c.id === chatId);
-      if (!chatRoom) {
-        return NextResponse.json({ success: false, message: 'Chat room tidak ditemukan' }, { status: 404 });
-      }
-
-      if (normalizeId(chatRoom.vendorId) !== normalizeId(vendorId) || normalizeId(chatRoom.customerId) !== normalizeId(customerId)) {
-        return NextResponse.json({ success: false, message: 'Data pihak chat tidak valid' }, { status: 403 });
-      }
-
-      // Find existing deal
-      const existingDeal = findLatestDealByChatId(deals, chatId);
-      
-      // If resetDeadline is true and deal is completed, reset it to pending for new cycle
-      if (resetDeadline && existingDeal && (existingDeal.status === 'completed' || existingDeal.status === 'cancelled')) {
-        // Reset deal to pending for new cycle
-        existingDeal.status = 'pending';
-        existingDeal.customerAccepted = true;
-        existingDeal.vendorAccepted = false;
-        existingDeal.ratingCompleted = false;
-        chatRoom.dealStatus = 'pending';
-        await writeData('deal', deals);
-        await writeData('chat', chats);
-
-        await createNotification(vendorId, 'deal_pending', 'Ada penawaran baru dari customer', chatId, { customerId, serviceId });
-
-        return NextResponse.json({ success: true, message: 'Deal direset untuk siklus baru', data: { deal: existingDeal, chat: chatRoom } }, { status: 200 });
-      }
-
-      // Otherwise, cancel the deal normally
-      chatRoom.dealStatus = 'cancelled';
-      await writeData('chat', chats);
-
-      // Find and update deal status if exists
-      if (existingDeal) {
-        existingDeal.status = 'cancelled';
-      }
-      await writeData('deal', deals);
-
-      await createNotification(vendorId, 'deal_cancelled', 'Deal dibatalkan oleh customer', chatId, { customerId, serviceId });
-
-      return NextResponse.json({ success: true, message: 'Deal dibatalkan', data: { deal: existingDeal || null, chat: chatRoom } }, { status: 200 });
-    }
-
-    // Handle accept
-    if (action === 'accept') {
-      const { chatId, customerId, vendorId, serviceId } = body;
-      if (!chatId || !customerId || !vendorId || !serviceId) {
-        return NextResponse.json({ success: false, message: 'Semua field wajib diisi!' }, { status: 400 });
-      }
-
-      const chatRoom = chats.find(c => c.id === chatId);
-      if (!chatRoom) {
-        return NextResponse.json({ success: false, message: 'Chat room tidak ditemukan' }, { status: 404 });
-      }
-
-      if (normalizeId(chatRoom.vendorId) !== normalizeId(vendorId) || normalizeId(chatRoom.customerId) !== normalizeId(customerId)) {
-        return NextResponse.json({ success: false, message: 'Data pihak chat tidak valid' }, { status: 403 });
-      }
-
-      // Check if deal sudah ada dari pihak lain
-      const existingDeal = findLatestDealByChatId(deals, chatId);
-      const isSameCustomer = existingDeal && normalizeId(customerId) === normalizeId(existingDeal.customerId);
-      const isSameVendor = existingDeal && normalizeId(vendorId) === normalizeId(existingDeal.vendorId);
-      const isRequestFromCustomer = normalizeId(customerId) === normalizeId(chatRoom.customerId);
-      const isRequestFromVendor = normalizeId(vendorId) === normalizeId(chatRoom.vendorId);
-
-      if (!existingDeal) {
-        if (!isRequestFromCustomer) {
-          return NextResponse.json({ success: false, message: 'Vendor tidak dapat membuat deal secara langsung. Tunggu penawaran customer terlebih dahulu.' }, { status: 403 });
-        }
-
-        // Buat deal baru (dari pihak customer)
-        // load service price if available
-        let originalPrice = null;
-        try {
-          const servicesData = await readData('services');
-          const services = servicesData;
-          const svc = services.find(s => s.id === serviceId);
-          originalPrice = resolveDealPrice(svc, chatRoom.itemId || null) || null;
-        } catch (e) {
-          originalPrice = null;
-        }
-
-        const initialItemId = chatRoom.itemId || null;
-        const initialItemName = chatRoom.itemName || null;
-        const initialItemPrice = originalPrice;
-
-        const newDeal = {
-          id: Date.now().toString(),
-          chatId,
-          customerId,
-          vendorId,
-          serviceId,
-          itemId: initialItemId,
-          itemName: initialItemName,
-          itemPrice: initialItemPrice,
-          customerAccepted: true,
-          vendorAccepted: false,
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-          agreedAt: null,
-          discountGiven: false,
-          discount: { type: null, value: 0, amount: 0 },
-          originalPrice: originalPrice,
-          finalPrice: originalPrice,
-          borrowDate: null,
-          expectedReturnDate: null,
-          actualReturnDate: null,
-          returnDeadline: null,
-          returnStatus: 'pending',
-          daysLate: 0,
-          lateCharge: 0,
-          returnCondition: null,
-          returnNotes: '',
-          lastReminderSent: null,
-          ratingCompleted: false
-        };
-
-        deals.push(newDeal);
-        chatRoom.dealStatus = 'pending';
-        chatRoom.closedAt = null;
-        chatRoom.closedReason = null;
-        await writeData('deal', deals);
-        await writeData('chat', chats);
-
-        // Create notification untuk vendor
-        await createNotification(vendorId, 'deal_pending', 'Ada penawaran baru dari customer', chatId, { customerId, serviceId });
-
-        return NextResponse.json({ success: true, message: 'Penawaran dikirim, menunggu vendor menerima', data: { deal: newDeal, chat: chatRoom } }, { status: 201 });
-      } else {
-        // Vendor menerima deal dari customer
-        // If deal is completed/cancelled, create a fresh pending cycle first.
-        if (existingDeal.status === 'completed' || existingDeal.status === 'cancelled') {
-          console.log(`Deal ${existingDeal.id} is ${existingDeal.status}. Creating fresh pending deal for new rental cycle.`);
-          
-          // Create FRESH deal with reset dates
-          let originalPrice = null;
-          try {
-            const servicesData = await readData('services');
-            const services = servicesData;
-            const svc = services.find(s => s.id === existingDeal.serviceId);
-            originalPrice = resolveDealPrice(svc, existingDeal.itemId || chatRoom.itemId || null) || null;
-          } catch (e) {
-            originalPrice = null;
-          }
-
-          const freshItemId = existingDeal.itemId || chatRoom.itemId || null;
-          const freshItemName = existingDeal.itemName || chatRoom.itemName || null;
-
-          const freshDeal = {
-            id: Date.now().toString(),
-            chatId: chatId,
-            customerId: customerId,
-            vendorId: vendorId,
-            serviceId: existingDeal.serviceId,
-            itemId: freshItemId,
-            itemName: freshItemName,
-            itemPrice: originalPrice,
-            customerAccepted: true,
-            vendorAccepted: false,
-            status: 'pending',
-            createdAt: new Date().toISOString(),
-            agreedAt: null,
-            discountGiven: false,
-            discount: { type: null, value: 0, amount: 0 },
-            originalPrice: originalPrice,
-            finalPrice: originalPrice,
-            
-            // ✅ FRESH/RESET: All date fields are null
-            borrowDate: null,
-            expectedReturnDate: null,
-            actualReturnDate: null,
-            returnDeadline: null,
-            
-            // ✅ FRESH/RESET: All return fields are reset
-            returnStatus: 'pending',
-            returnCondition: null,
-            returnNotes: '',
-            daysLate: 0,
-            lateCharge: 0,
-            
-            // ✅ FRESH: No old data
-            lastReminderSent: null,
-            ratingCompleted: false,
-            totalPrice: null,
-            bookingId: null
-          };
-
-          deals.push(freshDeal);
-          chatRoom.dealStatus = 'pending';
-          chatRoom.closedAt = null;
-          chatRoom.closedReason = null;
-          await writeData('deal', deals);
-          await writeData('chat', chats);
-
-          // Notify vendor to accept this new cycle
-          await createNotification(vendorId, 'deal_pending', 'Ada penawaran baru dari customer', chatId, { customerId, serviceId });
-
-          return NextResponse.json({ success: true, message: 'Penawaran baru dikirim. Menunggu vendor menerima.', data: { deal: freshDeal, chat: chatRoom, readyForRating: false } }, { status: 200 });
-        }
-
-        // ❌ If deal is in other invalid states, reject
-        if (existingDeal.status !== 'pending' && existingDeal.status !== 'agreed' && existingDeal.status !== 'returning' && existingDeal.status !== 'active' && existingDeal.status !== 'completed') {
-          return NextResponse.json({ success: false, message: `Deal dengan status ${existingDeal.status} tidak bisa diproses` }, { status: 400 });
-        }
-
-        existingDeal.vendorAccepted = true;
-        existingDeal.status = 'agreed';
-        existingDeal.agreedAt = new Date().toISOString();
-
-        // ensure discount fields exist
-        if (typeof existingDeal.discountGiven === 'undefined') existingDeal.discountGiven = false;
-        if (!existingDeal.discount) existingDeal.discount = { type: null, value: 0, amount: 0 };
-        if (typeof existingDeal.borrowDate === 'undefined') existingDeal.borrowDate = null;
-        if (typeof existingDeal.expectedReturnDate === 'undefined') existingDeal.expectedReturnDate = null;
-        if (typeof existingDeal.actualReturnDate === 'undefined') existingDeal.actualReturnDate = null;
-        if (typeof existingDeal.returnDeadline === 'undefined') existingDeal.returnDeadline = null;
-        if (typeof existingDeal.returnStatus === 'undefined') existingDeal.returnStatus = 'pending';
-        if (typeof existingDeal.daysLate === 'undefined') existingDeal.daysLate = 0;
-        if (typeof existingDeal.lateCharge === 'undefined') existingDeal.lateCharge = 0;
-        if (typeof existingDeal.returnCondition === 'undefined') existingDeal.returnCondition = null;
-        if (typeof existingDeal.returnNotes === 'undefined') existingDeal.returnNotes = '';
-        if (typeof existingDeal.lastReminderSent === 'undefined') existingDeal.lastReminderSent = null;
-        // load original price if missing
-        if (typeof existingDeal.originalPrice === 'undefined' || existingDeal.originalPrice === null) {
-          try {
-            const servicesData = await readData('services');
-            const services = servicesData;
-            const svc = services.find(s => s.id === existingDeal.serviceId);
-            existingDeal.originalPrice = resolveDealPrice(svc, existingDeal.itemId || chatRoom.itemId || null) || null;
-            existingDeal.finalPrice = existingDeal.originalPrice;
-          } catch (e) {
-            // ignore
-          }
-        }
-
-        // ✅ FIX #2: Create booking record when deal is agreed (BEFORE payment)
-        try {
-          const parsedServices = await readData('services');
-          const serviceIndex = parsedServices.findIndex(s => String(s.id) === String(existingDeal.serviceId));
-          
-          if (serviceIndex !== -1) {
-            const service = parsedServices[serviceIndex];
-            if (!service.bookings) service.bookings = [];
-            
-            // Create new booking with status 'confirmed' (after payment)
-            const newBooking = {
-              id: `booking_${Date.now()}`,
-              dealId: existingDeal.id,
-              customerId: existingDeal.customerId,
-              vendorId: existingDeal.vendorId,
-              quantity: 1, // Will be updated during payment
-              status: 'confirmed', // Ready for pickup
-              createdAt: new Date().toISOString(),
-              pickupConfirmedAt: null,
-              returnRequestedAt: null,
-              returnConfirmedAt: null
-            };
-            
-            service.bookings.push(newBooking);
-            await writeData('parsedService', parsedServices);
-            
-            // Store bookingId in deal for reference
-            existingDeal.bookingId = newBooking.id;
-          }
-        } catch (e) {
-          console.warn('Could not create booking record:', e.message);
-          // Continue anyway - booking creation is enhancement, not blocking
-        }
-
-        chatRoom.dealStatus = 'agreed';
-        chatRoom.closedAt = null;
-        chatRoom.closedReason = null;
-        await writeData('deal', deals);
-        await writeData('chat', chats);
-
-        // Create notification untuk customer
-        await createNotification(customerId, 'deal_accepted', 'Vendor menerima penawaran Anda!', chatId, { vendorId, serviceId });
-
-        // Note: rating prompt will be handled later in UI; keep message short
-        return NextResponse.json({ success: true, message: 'Deal diterima.', data: { deal: existingDeal, chat: chatRoom, readyForRating: true } }, { status: 200 });
-      }
     }
 
     return NextResponse.json({ success: false, message: 'Action tidak dikenali' }, { status: 400 });
@@ -527,42 +428,39 @@ export async function POST(request) {
   }
 }
 
-// GET - Check deal status
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const chatId = searchParams.get('chatId');
 
     if (!chatId) {
-      return NextResponse.json({
-        success: false,
-        message: 'chatId diperlukan'
-      }, { status: 400 });
+      return NextResponse.json({ success: false, message: 'chatId diperlukan' }, { status: 400 });
     }
 
-    const dealsData = await readData('deals');
-    const deals = dealsData;
-    const chatsData = await readData('chats');
-    const chats = chatsData;
-    const servicesData = await readData('services');
-    const services = servicesData;
+    const chatRow = await getChatById(chatId);
+    const chat = mapChatRow(chatRow);
+    const dealRow = await getLatestDealByChatId(chatId);
 
-    const deal = findLatestDealByChatId(deals, chatId);
-    const chatRoom = chats.find((chat) => normalizeId(chat.id) === normalizeId(chatId));
-    const relatedService = deal
-      ? services.find((service) => normalizeId(service.id) === normalizeId(deal.serviceId))
-      : null;
-    const resolvedDeal = enrichDealWithItemContext(deal, chatRoom, relatedService);
+    if (!dealRow) {
+      return NextResponse.json({ success: true, data: null }, { status: 200 });
+    }
+
+    // If chat cycle has been reset, hide previous completed/cancelled/active deal from UI.
+    if (!chat?.dealStatus && ['active', 'completed', 'cancelled'].includes(String(dealRow.status || '').toLowerCase())) {
+      return NextResponse.json({ success: true, data: null }, { status: 200 });
+    }
+
+    let originalPrice = Number(dealRow.original_price ?? 0) || 0;
+    if (originalPrice <= 0 && chat) {
+      originalPrice = await resolveDealPrice(chat.serviceId, chat.itemId);
+    }
 
     return NextResponse.json({
       success: true,
-      data: resolvedDeal
+      data: mapDealRow(dealRow, chat, originalPrice)
     }, { status: 200 });
   } catch (error) {
     console.error('Error getting deal:', error);
-    return NextResponse.json({
-      success: false,
-      message: 'Terjadi kesalahan server.'
-    }, { status: 500 });
+    return NextResponse.json({ success: false, message: 'Terjadi kesalahan server.' }, { status: 500 });
   }
 }

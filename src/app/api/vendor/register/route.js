@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+const normalizeOptionalString = (value) => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+};
+
 function normalizeRegistration(reg) {
   if (!reg) return null;
   return {
@@ -20,14 +26,50 @@ function normalizeRegistration(reg) {
   };
 }
 
+async function ensureVendorRegistrationsTable() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS vendor_registrations (
+      id VARCHAR(255) PRIMARY KEY,
+      user_id VARCHAR(255) NOT NULL,
+      user_name VARCHAR(255),
+      user_email VARCHAR(255),
+      vendor_name VARCHAR(255) NOT NULL,
+      phone_number VARCHAR(255),
+      identity_file LONGTEXT,
+      identity_file_name VARCHAR(255),
+      status VARCHAR(50) DEFAULT 'pending',
+      rejection_reason TEXT,
+      created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+      submitted_at DATETIME(3),
+      approved_at DATETIME(3),
+      INDEX idx_status (status),
+      INDEX idx_user_id (user_id),
+      INDEX idx_created_at (created_at)
+    )
+  `);
+}
+
 // POST - Submit vendor registration
 export async function POST(request) {
   try {
+    await ensureVendorRegistrationsTable();
+
     const body = await request.json();
-    const { userId, vendorName, phoneNumber, identityFile, identityFileName } = body;
+    const {
+      userId,
+      vendorName,
+      phoneNumber,
+      identityFile,
+      identityFileName
+    } = body;
+
+    const normalizedVendorName = normalizeOptionalString(vendorName);
+    const normalizedPhoneNumber = normalizeOptionalString(phoneNumber);
+    const normalizedIdentityFile = normalizeOptionalString(identityFile);
+    const normalizedIdentityFileName = normalizeOptionalString(identityFileName);
 
     // Validasi input
-    if (!userId || !vendorName || !phoneNumber || !identityFile) {
+    if (!userId || !normalizedVendorName || !normalizedPhoneNumber || !normalizedIdentityFile) {
       return NextResponse.json({
         success: false,
         message: 'Semua field wajib diisi!'
@@ -35,7 +77,7 @@ export async function POST(request) {
     }
 
     // Validasi format nomor telepon (minimal 10 digit)
-    if (!/^\d{10,}$/.test(phoneNumber.replace(/\D/g, ''))) {
+    if (!/^\d{10,}$/.test(normalizedPhoneNumber.replace(/\D/g, ''))) {
       return NextResponse.json({
         success: false,
         message: 'Nomor telepon tidak valid (minimal 10 digit)'
@@ -43,7 +85,7 @@ export async function POST(request) {
     }
 
     // Check if user exists and is not already vendor
-    const users = await query('SELECT id, name, email, role, role_id FROM users WHERE id = ?', [userId]);
+    const users = await query('SELECT id, name, email, role FROM users WHERE id = ?', [userId]);
     
     if (users.length === 0) {
       return NextResponse.json({
@@ -54,7 +96,7 @@ export async function POST(request) {
 
     const user = users[0];
 
-    if (user.role === 'vendor' || user.role_id === 2) {
+    if (String(user.role || '').toLowerCase() === 'vendor') {
       return NextResponse.json({
         success: false,
         message: 'User sudah terdaftar sebagai vendor'
@@ -85,7 +127,14 @@ export async function POST(request) {
            SET vendor_name = ?, phone_number = ?, identity_file = ?, 
                identity_file_name = ?, status = 'pending', submitted_at = ?, rejection_reason = NULL
            WHERE id = ?`,
-          [vendorName, phoneNumber, identityFile, identityFileName, new Date().toISOString(), existingReg.id]
+          [
+            normalizedVendorName,
+            normalizedPhoneNumber,
+            normalizedIdentityFile,
+            normalizedIdentityFileName,
+            new Date().toISOString(),
+            existingReg.id
+          ]
         );
 
         const updated = await query('SELECT * FROM vendor_registrations WHERE id = ?', [existingReg.id]);
@@ -106,8 +155,18 @@ export async function POST(request) {
        (id, user_id, user_name, user_email, vendor_name, phone_number, identity_file, 
         identity_file_name, status, created_at, submitted_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
-      [registrationId, userId, user.name, user.email, vendorName, phoneNumber, 
-       identityFile, identityFileName, now, now]
+      [
+        registrationId,
+        userId,
+        user.name,
+        user.email,
+        normalizedVendorName,
+        normalizedPhoneNumber,
+        normalizedIdentityFile,
+        normalizedIdentityFileName,
+        now,
+        now
+      ]
     );
 
     const newReg = await query('SELECT * FROM vendor_registrations WHERE id = ?', [registrationId]);
@@ -129,6 +188,8 @@ export async function POST(request) {
 // GET - Check registration status
 export async function GET(request) {
   try {
+    await ensureVendorRegistrationsTable();
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 

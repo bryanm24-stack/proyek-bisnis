@@ -240,6 +240,7 @@ export default function VendorProductForm({
   const [draftSubCategory, setDraftSubCategory] = useState(formData.subCategory || '');
   const [draftSuperSubCategory, setDraftSuperSubCategory] = useState(formData.superSubCategory || '');
   const [customCategoryTree, setCustomCategoryTree] = useState({});
+  const [persistedCategoryTree, setPersistedCategoryTree] = useState({});
   const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
   const [editingVariasiId, setEditingVariasiId] = useState(null);
   const [variationName, setVariationName] = useState('');
@@ -274,6 +275,16 @@ export default function VendorProductForm({
   };
   const combinedCategorySource = { ...CATEGORIES };
 
+  Object.entries(persistedCategoryTree).forEach(([mainCategory, persistedSubNode]) => {
+    if (!combinedCategorySource[mainCategory]) {
+      combinedCategorySource[mainCategory] = persistedSubNode;
+      return;
+    }
+
+    const existingNode = combinedCategorySource[mainCategory];
+    combinedCategorySource[mainCategory] = mergeCategoryNodes(existingNode, persistedSubNode);
+  });
+
   Object.entries(customCategoryTree).forEach(([mainCategory, customSubNode]) => {
     if (!combinedCategorySource[mainCategory]) {
       combinedCategorySource[mainCategory] = customSubNode;
@@ -303,11 +314,34 @@ export default function VendorProductForm({
   // Determine if this is a Jasa (service) form based on passed categories or mainCategory
   const isJasaFormType = categories === SERVICE_CATEGORY_TREE;
 
+  useEffect(() => {
+    let active = true;
+
+    const fetchPersistedCategories = async () => {
+      try {
+        const response = await fetch('/api/categories', { cache: 'no-store' });
+        if (!response.ok) return;
+        const json = await response.json();
+        if (!active) return;
+        if (json?.success && json?.data && typeof json.data === 'object') {
+          setPersistedCategoryTree(json.data);
+        }
+      } catch {
+        // Keep static/local categories when SQL categories API is unavailable.
+      }
+    };
+
+    fetchPersistedCategories();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
   };
 
@@ -383,7 +417,7 @@ export default function VendorProductForm({
     setIsCustomCategoryModalOpen(false);
   };
 
-  const handleConfirmCustomCategory = () => {
+  const handleConfirmCustomCategory = async () => {
     const customEntry = buildCustomCategoryEntry();
     if (!customEntry) return;
 
@@ -399,6 +433,27 @@ export default function VendorProductForm({
 
       return { ...prev, [main]: mergeCategoryNodes(existingNode, value) };
     });
+
+    try {
+      await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: customCategoryMode,
+          parentName: draftMainCategory,
+          subName: draftSubCategory,
+          superSubName: draftSuperSubCategory
+        })
+      });
+
+      setPersistedCategoryTree((prev) => {
+        const existingNode = prev[main];
+        if (!existingNode) return { ...prev, [main]: value };
+        return { ...prev, [main]: mergeCategoryNodes(existingNode, value) };
+      });
+    } catch {
+      // Keep local UI flow even when SQL save fails.
+    }
 
     setFormData(prev => ({
       ...prev,
@@ -2212,6 +2267,34 @@ export default function VendorProductForm({
               ))}
             </div>
           )}
+        </div>
+
+        <div style={{
+          border: '1px solid #e5e7eb',
+          borderRadius: '14px',
+          padding: '20px',
+          background: '#f8fafc'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <input
+              type="checkbox"
+              name="pengirimanRentGuard"
+              checked={Boolean(formData.pengirimanRentGuard)}
+              onChange={handleInputChange}
+              style={{ width: '18px', height: '18px', marginTop: '4px' }}
+            />
+            <div>
+              <label style={{ display: 'block', fontSize: '15px', fontWeight: '700', color: '#111827', marginBottom: '8px' }}>
+                🚚 Dukungan Pengiriman Rent Guard
+              </label>
+              <div style={{ fontSize: '14px', color: '#374151' }}>
+                Aktifkan Layanan Antar-Jemput Rent Guard untuk Barang Ini.
+              </div>
+              <p style={{ marginTop: '12px', fontSize: '13px', color: '#6b7280' }}>
+                Gunakan ketika penyewaan membutuhkan alamat pengiriman dan penjemputan khusus melalui layanan Rent Guard.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Submit Button */}

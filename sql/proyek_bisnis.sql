@@ -59,6 +59,21 @@ CREATE TABLE IF NOT EXISTS vendor_registrations (
   INDEX idx_created_at (created_at)
 );
 
+-- Vendor Profiles (store vendor storefront data and metadata)
+CREATE TABLE IF NOT EXISTS vendor_profiles (
+  vendor_id VARCHAR(255) PRIMARY KEY,
+  vendor_name VARCHAR(255),
+  vendor_logo TEXT,
+  vendor_address TEXT,
+  vendor_bio TEXT,
+  is_online BOOLEAN DEFAULT false,
+  last_active_at DATETIME(3),
+  joined_at DATETIME(3),
+  created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Services (store complex nested fields as JSON)
 CREATE TABLE IF NOT EXISTS services (
   id VARCHAR(255) PRIMARY KEY,
@@ -89,6 +104,7 @@ CREATE TABLE IF NOT EXISTS services (
   variations JSON,
   available_quantity INTEGER,
   availability INTEGER,
+  pengiriman_rentguard BOOLEAN DEFAULT false,
   created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3)
 );
 
@@ -130,8 +146,8 @@ CREATE TABLE IF NOT EXISTS deals (
   completed_at DATETIME(3),
   actual_return_date DATE,
   return_status VARCHAR(255),
-  vendor_confirmed BOOLEAN,
-  customer_confirmed BOOLEAN,
+  vendor_confirmed BOOLEAN DEFAULT false,
+  customer_confirmed BOOLEAN DEFAULT false,
   settlement_date DATE,
   refund_status VARCHAR(255)
 );
@@ -141,6 +157,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   id VARCHAR(255) PRIMARY KEY,
   invoice_id VARCHAR(255),
   deal_id VARCHAR(255),
+  service_id VARCHAR(255),
   user_id VARCHAR(255),
   promo_id VARCHAR(255),
   payment_method VARCHAR(255),
@@ -158,6 +175,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   card_details JSON,
   qr_code VARCHAR(255),
   identity_verification JSON,
+  shipping_address TEXT,
   created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3)
 );
 
@@ -178,6 +196,58 @@ CREATE TABLE IF NOT EXISTS invoices (
   paid_at DATETIME(3),
   payment_transaction_id VARCHAR(255),
   notes TEXT
+);
+
+-- Return requests / complaints linked to invoices
+CREATE TABLE IF NOT EXISTS return_requests (
+  id VARCHAR(255) PRIMARY KEY,
+  invoice_id VARCHAR(255) NOT NULL,
+  deal_id VARCHAR(255),
+  customer_id VARCHAR(255),
+  vendor_id VARCHAR(255),
+  service_id VARCHAR(255),
+  request_type VARCHAR(50),
+  item_condition VARCHAR(255),
+  complaint_category VARCHAR(255),
+  description TEXT,
+  photos JSON,
+  status VARCHAR(255),
+  damage_status VARCHAR(50),
+  damage_charge DECIMAL(18,2) DEFAULT 0,
+  damage_invoice_id VARCHAR(255),
+  late_charge DECIMAL(18,2) DEFAULT 0,
+  total_refund DECIMAL(18,2) DEFAULT 0,
+  complaint_resolution VARCHAR(100),
+  complaint_penalty DECIMAL(18,2) DEFAULT 0,
+  vendor_notes TEXT,
+  customer_confirmed BOOLEAN DEFAULT false,
+  vendor_confirmed BOOLEAN DEFAULT false,
+  created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3),
+  resolved_at DATETIME(3)
+);
+
+-- Vendor-custom category hierarchy (parent > sub > super-sub)
+CREATE TABLE IF NOT EXISTS category_parents (
+  id VARCHAR(255) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL UNIQUE,
+  created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3)
+);
+
+CREATE TABLE IF NOT EXISTS category_sub_categories (
+  id VARCHAR(255) PRIMARY KEY,
+  parent_id VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY uq_sub_per_parent (parent_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS category_super_sub_categories (
+  id VARCHAR(255) PRIMARY KEY,
+  sub_category_id VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY uq_super_sub_per_sub (sub_category_id, name)
 );
 
 -- Favorites
@@ -206,8 +276,14 @@ CREATE TABLE IF NOT EXISTS ratings (
   service_id VARCHAR(255),
   customer_id VARCHAR(255),
   vendor_id VARCHAR(255),
+  deal_id VARCHAR(255),
   rating INTEGER,
   review TEXT,
+  vendor_reply TEXT,
+  vendor_reply_at DATETIME(3),
+  vendor_reply_by VARCHAR(255),
+  weight_multiplier DECIMAL(5,2) DEFAULT 1.00,
+  weighted_score DECIMAL(5,2) DEFAULT 0.00,
   created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3)
 );
 
@@ -258,6 +334,7 @@ ALTER TABLE chats
 ALTER TABLE transactions
   ADD CONSTRAINT fk_transactions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
   ADD CONSTRAINT fk_transactions_deal FOREIGN KEY (deal_id) REFERENCES deals(id) ON DELETE SET NULL,
+  ADD CONSTRAINT fk_transactions_service FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE SET NULL,
   ADD CONSTRAINT fk_transactions_invoice FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE SET NULL;
 
 ALTER TABLE invoices
@@ -265,6 +342,20 @@ ALTER TABLE invoices
   ADD CONSTRAINT fk_invoices_customer FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE SET NULL,
   ADD CONSTRAINT fk_invoices_vendor FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE SET NULL,
   ADD CONSTRAINT fk_invoices_transaction FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL;
+
+ALTER TABLE return_requests
+  ADD CONSTRAINT fk_return_requests_invoice FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
+  ADD CONSTRAINT fk_return_requests_deal FOREIGN KEY (deal_id) REFERENCES deals(id) ON DELETE SET NULL,
+  ADD CONSTRAINT fk_return_requests_customer FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE SET NULL,
+  ADD CONSTRAINT fk_return_requests_vendor FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE SET NULL,
+  ADD CONSTRAINT fk_return_requests_service FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE SET NULL,
+  ADD CONSTRAINT fk_return_requests_damage_invoice FOREIGN KEY (damage_invoice_id) REFERENCES invoices(id) ON DELETE SET NULL;
+
+ALTER TABLE category_sub_categories
+  ADD CONSTRAINT fk_category_sub_parent FOREIGN KEY (parent_id) REFERENCES category_parents(id) ON DELETE CASCADE;
+
+ALTER TABLE category_super_sub_categories
+  ADD CONSTRAINT fk_category_super_sub_sub FOREIGN KEY (sub_category_id) REFERENCES category_sub_categories(id) ON DELETE CASCADE;
 
 ALTER TABLE favorites
   ADD CONSTRAINT fk_favorites_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -278,6 +369,49 @@ ALTER TABLE ratings
   ADD CONSTRAINT fk_ratings_customer FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE SET NULL,
   ADD CONSTRAINT fk_ratings_vendor FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE SET NULL;
 
+DROP PROCEDURE IF EXISTS recalculate_ratings;
+CREATE PROCEDURE recalculate_ratings()
+UPDATE ratings r
+LEFT JOIN deals d ON d.id = r.deal_id
+SET
+  r.weight_multiplier = ROUND(
+    (
+      1.0
+      - LEAST(
+          0.5,
+          GREATEST(
+            0,
+            TIMESTAMPDIFF(DAY, COALESCE(d.created_at, r.created_at), NOW())
+          ) * 0.01
+        )
+      + CASE
+          WHEN COALESCE(d.final_price, 0) > 500000 THEN 0.5
+          WHEN COALESCE(d.final_price, 0) > 100000 THEN 0.25
+          ELSE 0
+        END
+    ),
+    2
+  ),
+  r.weighted_score = ROUND(
+    COALESCE(r.rating, 0) *
+    (
+      1.0
+      - LEAST(
+          0.5,
+          GREATEST(
+            0,
+            TIMESTAMPDIFF(DAY, COALESCE(d.created_at, r.created_at), NOW())
+          ) * 0.01
+        )
+      + CASE
+          WHEN COALESCE(d.final_price, 0) > 500000 THEN 0.5
+          WHEN COALESCE(d.final_price, 0) > 100000 THEN 0.25
+          ELSE 0
+        END
+    ),
+    2
+  );
+
 ALTER TABLE promos
   ADD CONSTRAINT fk_promos_vendor FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE SET NULL;
 
@@ -290,6 +424,10 @@ CREATE INDEX idx_chats_service ON chats(service_id);
 CREATE INDEX idx_transactions_user ON transactions(user_id);
 CREATE INDEX idx_invoices_deal ON invoices(deal_id);
 CREATE INDEX idx_services_vendor ON services(vendor_id);
+CREATE INDEX idx_return_requests_invoice ON return_requests(invoice_id);
+CREATE INDEX idx_return_requests_customer ON return_requests(customer_id);
+CREATE INDEX idx_return_requests_vendor ON return_requests(vendor_id);
+CREATE INDEX idx_return_requests_deal ON return_requests(deal_id);
 
 -- Combined INSERTs for JSON-derived data
 -- Run this after schema creation in proyek_bisnis_db
@@ -300,7 +438,9 @@ INSERT IGNORE INTO users (id, username, password, name, role_id, role, email, ph
 ('2','banana','123','Banana Vendor',2,'vendor','banana@rentguard.com','081234567891','2026-04-01 00:00:00'),
 ('3','orange','123','Orange Vendor',2,'vendor','orange@rentguard.com','081234567892','2026-04-01 00:00:00'),
 ('4','strawberry','123','Strawberry Customer',1,'customer','strawberry@rentguard.com','089876543210','2026-04-02 00:00:00'),
-('5','grape','123','Grape Customer',1,'customer','grape@rentguard.com','089876543211','2026-04-02 00:00:00')
+('5','grape','123','Grape Customer',1,'customer','grape@rentguard.com','089876543211','2026-04-02 00:00:00'),
+('6','admin','123','Admin Rentguard',3,'admin','admin@rentguard.com','089872391012','2026-04-03 00:00:00')
+
 ;
 
 -- TRANSACTIONS
@@ -385,3 +525,4 @@ VALUES
  ]', '{}', '{}', '{}', '{}', '[]', '{}', 3, 3)
 ;
 
+  CALL recalculate_ratings();

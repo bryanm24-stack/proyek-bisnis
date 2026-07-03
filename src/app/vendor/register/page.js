@@ -16,7 +16,8 @@ export default function VendorRegisterPage() {
   const [formData, setFormData] = useState({
     vendorName: '',
     phoneNumber: '',
-    identityFile: null
+    identityFile: null,
+    identityFileName: ''
   });
   
   const [errorMsg, setErrorMsg] = useState('');
@@ -86,7 +87,8 @@ export default function VendorRegisterPage() {
       reader.onload = (event) => {
         setFormData(prev => ({
           ...prev,
-          identityFile: event.target?.result
+          identityFile: event.target?.result,
+          identityFileName: file.name || ''
         }));
         setErrorMsg('');
       };
@@ -114,7 +116,8 @@ export default function VendorRegisterPage() {
           userId: user.id,
           vendorName: formData.vendorName,
           phoneNumber: formData.phoneNumber,
-          identityFile: formData.identityFile
+          identityFile: formData.identityFile,
+          identityFileName: formData.identityFileName
         })
       });
 
@@ -123,7 +126,7 @@ export default function VendorRegisterPage() {
       if (data.success) {
         setSuccessMsg('✓ Registrasi vendor berhasil dikirim! Silakan tunggu persetujuan admin.');
         setRegistrationStatus(data.data);
-        setFormData({ vendorName: '', phoneNumber: '', identityFile: null });
+        setFormData({ vendorName: '', phoneNumber: '', identityFile: null, identityFileName: '' });
         setTimeout(() => {
           window.location.reload();
         }, 2000);
@@ -217,6 +220,9 @@ export default function VendorRegisterPage() {
                     id="identityFile"
                     accept="application/pdf,image/jpeg,image/png,image/jpg"
                     onChange={handleFileChange}
+                    onClick={(e) => {
+                      e.target.value = null;
+                    }}
                     required
                   />
                   <small>Format: PDF, JPG, PNG (Max 5MB) - Dapat berupa KTP, SIM, atau Paspor</small>
@@ -280,6 +286,9 @@ export default function VendorRegisterPage() {
                     id="identityFile"
                     accept="application/pdf,image/jpeg,image/png,image/jpg"
                     onChange={handleFileChange}
+                    onClick={(e) => {
+                      e.target.value = null;
+                    }}
                     required
                   />
                   <small>Format: PDF, JPG, PNG (Max 5MB) - Dapat berupa KTP, SIM, atau Paspor</small>

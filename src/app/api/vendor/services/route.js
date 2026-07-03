@@ -33,10 +33,14 @@ function normalizeServiceCapacity(service) {
   const parsedItems = parseJsonSafe(normalized.items, []);
   const parsedVariations = parseJsonSafe(normalized.variations, {});
 
+  const parsedRentGuardShipping = normalized.pengirimanRentguard;
+  const hasRentGuardShipping = parsedRentGuardShipping === true || parsedRentGuardShipping === 1 || parsedRentGuardShipping === '1' || parsedRentGuardShipping === 'true';
+
   if (normalized.type === 'jasa') {
     const capacity = Number(normalized.availableQuantity ?? normalized.availability ?? normalized.quantity ?? 0);
     return {
       ...normalized,
+      pengirimanRentguard: Boolean(hasRentGuardShipping),
       availableQuantity: capacity,
       availability: capacity,
       quantity: capacity,
@@ -51,6 +55,7 @@ function normalizeServiceCapacity(service) {
 
   return {
     ...normalized,
+    pengirimanRentguard: Boolean(hasRentGuardShipping),
     images: Array.isArray(parsedImages) ? parsedImages : [],
     specifications: parsedSpecifications,
     descriptionTable: parsedDescriptionTable,
@@ -175,6 +180,7 @@ export async function POST(request) {
         quantity: normalizedQuantity,
         rental_policy: rentalPolicy || '',
         location,
+        pengiriman_rentguard: Boolean(body.pengirimanRentGuard),
         specifications: specifications && typeof specifications === 'object' ? specifications : {},
         description_table: descriptionTable && typeof descriptionTable === 'object' ? descriptionTable : {},
         checklist: checklist && typeof checklist === 'object' ? checklist : {},
@@ -189,8 +195,8 @@ export async function POST(request) {
         availability: normalizedAvailability
       };
 
-      const sql = `INSERT INTO services (id, vendor_id, vendor_name, main_category, sub_category, super_sub_category, category, title, short_description, description, detail_description, price, minimum_days, available_quantity, quantity, rental_policy, location, specifications, description_table, checklist, items, variations, type, rating, rent_count, images, availability)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      const sql = `INSERT INTO services (id, vendor_id, vendor_name, main_category, sub_category, super_sub_category, category, title, short_description, description, detail_description, price, minimum_days, available_quantity, quantity, rental_policy, location, pengiriman_rentguard, specifications, description_table, checklist, items, variations, type, rating, rent_count, images, availability)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       
       const values = [
         newService.id,
@@ -210,6 +216,7 @@ export async function POST(request) {
         newService.quantity,
         newService.rental_policy,
         newService.location,
+        newService.pengiriman_rentguard ? 1 : 0,
         JSON.stringify(newService.specifications),
         JSON.stringify(newService.description_table),
         JSON.stringify(newService.checklist),
@@ -264,6 +271,7 @@ export async function PUT(request) {
       quantity,
       rentalPolicy,
       location,
+      pengirimanRentGuard,
       images,
       category,
       specifications,
@@ -295,7 +303,7 @@ export async function PUT(request) {
       main_category = ?, sub_category = ?, super_sub_category = ?, title = ?,
       short_description = ?, description = ?, price = ?, minimum_days = ?,
       availability = ?, available_quantity = ?, quantity = ?, rental_policy = ?,
-      location = ?, type = ?, images = ?, category = ?, specifications = ?,
+      location = ?, type = ?, pengiriman_rentguard = ?, images = ?, category = ?, specifications = ?,
       description_table = ?, checklist = ?, items = ?
       WHERE id = ? AND vendor_id = ?`;
 
@@ -314,6 +322,7 @@ export async function PUT(request) {
       rentalPolicy || service.rental_policy,
       location || service.location,
       type || service.type,
+      pengirimanRentGuard !== undefined ? (pengirimanRentGuard ? 1 : 0) : (service.pengiriman_rentguard ? 1 : 0),
       JSON.stringify(images && images.length > 0 ? images : JSON.parse(service.images || '[]')),
       category || service.category,
       JSON.stringify(specifications || JSON.parse(service.specifications || '{}')),

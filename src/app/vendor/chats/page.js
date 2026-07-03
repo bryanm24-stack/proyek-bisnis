@@ -5,8 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import SharedNavbar from '../../components/SharedNavbar';
 
-
-import { readData, writeData } from '@/lib/storage';
 export default function VendorChatsPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -116,8 +114,8 @@ export default function VendorChatsPage() {
     try {
       const dealResponse = await fetch(`/api/deals?chatId=${chat.id}`);
       const dealDataResp = await dealResponse.json();
-      if (dealDataResp.success && dealDataResp.data) {
-        setDealData(dealDataResp.data);
+      if (dealDataResp.success) {
+        setDealData(dealDataResp.data || null);
         // reset discount ui state
         setDiscountMode(null);
         setDiscountType('percent');
@@ -227,6 +225,8 @@ export default function VendorChatsPage() {
         if (action === 'accept' && data.data.deal?.status === 'agreed') {
           setDiscountMode('prompt');
         }
+      } else {
+        alert(data.message || 'Aksi deal gagal diproses');
       }
     } catch (error) {
       console.error('Error processing deal:', error);
@@ -235,6 +235,14 @@ export default function VendorChatsPage() {
       setDealProcessing(false);
     }
   };
+
+  const resolvedDealStatus = dealData?.status || selectedChat?.dealStatus || null;
+  const canVendorAccept = !dealProcessing && (resolvedDealStatus === 'pending' || resolvedDealStatus === null);
+  const canVendorReject = !dealProcessing && (
+    resolvedDealStatus === 'pending' ||
+    resolvedDealStatus === null ||
+    resolvedDealStatus === 'agreed'
+  );
 
   const handleCustomerDealRequest = async () => {
     if (!selectedChat) return;
@@ -621,15 +629,15 @@ export default function VendorChatsPage() {
                       <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         <button
                           onClick={() => handleDealAction('accept')}
-                          disabled={dealProcessing || dealData?.status !== 'pending'}
-                          style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: dealProcessing || dealData?.status !== 'pending' ? '#94d3a2' : '#10b981', color: 'white', fontWeight: '700', cursor: dealProcessing || dealData?.status !== 'pending' ? 'not-allowed' : 'pointer', opacity: dealProcessing || dealData?.status !== 'pending' ? 0.6 : 1 }}
+                          disabled={!canVendorAccept}
+                          style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: !canVendorAccept ? '#94d3a2' : '#10b981', color: 'white', fontWeight: '700', cursor: !canVendorAccept ? 'not-allowed' : 'pointer', opacity: !canVendorAccept ? 0.6 : 1 }}
                         >
                           {dealProcessing ? 'Memproses...' : '✅ Terima Deal'}
                         </button>
                         <button
                           onClick={() => handleDealAction('cancel')}
-                          disabled={!dealData || dealData?.status === 'cancelled' || dealData?.status === 'completed'}
-                          style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: !dealData || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? '#fca5a5' : '#ef4444', color: 'white', fontWeight: '700', cursor: !dealData || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? 'not-allowed' : 'pointer', opacity: !dealData || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? 0.6 : 1 }}
+                          disabled={!canVendorReject}
+                          style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: !canVendorReject ? '#fca5a5' : '#ef4444', color: 'white', fontWeight: '700', cursor: !canVendorReject ? 'not-allowed' : 'pointer', opacity: !canVendorReject ? 0.6 : 1 }}
                         >
                           ❌ Tolak
                         </button>
@@ -915,15 +923,15 @@ export default function VendorChatsPage() {
                     handleDealAction('accept');
                     setShowCustomerModal(false);
                   }}
-                  disabled={dealProcessing || dealData?.status !== 'pending'}
+                  disabled={!canVendorAccept}
                   style={{
                     padding: '12px 16px',
                     border: 'none',
                     borderRadius: '8px',
-                    background: dealProcessing || dealData?.status !== 'pending' ? '#d1d5db' : '#10b981',
+                    background: !canVendorAccept ? '#d1d5db' : '#10b981',
                     color: 'white',
                     fontWeight: '600',
-                    cursor: dealProcessing || dealData?.status !== 'pending' ? 'not-allowed' : 'pointer',
+                    cursor: !canVendorAccept ? 'not-allowed' : 'pointer',
                     fontSize: '14px'
                   }}
                 >
@@ -934,15 +942,15 @@ export default function VendorChatsPage() {
                     handleDealAction('cancel');
                     setShowCustomerModal(false);
                   }}
-                  disabled={!dealData || dealData?.status === 'cancelled' || dealData?.status === 'completed'}
+                  disabled={!canVendorReject}
                   style={{
                     padding: '12px 16px',
                     border: 'none',
                     borderRadius: '8px',
-                    background: !dealData || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? '#d1d5db' : '#ef4444',
+                    background: !canVendorReject ? '#d1d5db' : '#ef4444',
                     color: 'white',
                     fontWeight: '600',
-                    cursor: !dealData || dealData?.status === 'cancelled' || dealData?.status === 'completed' ? 'not-allowed' : 'pointer',
+                    cursor: !canVendorReject ? 'not-allowed' : 'pointer',
                     fontSize: '14px'
                   }}
                 >
@@ -1017,7 +1025,7 @@ export default function VendorChatsPage() {
             {/* Customer action - lanjut pembayaran hanya setelah vendor accept */}
             {String(user?.id) === String(selectedChat.customerId) && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-                {dealData?.status === 'agreed' && dealData?.vendorAccepted && !selectedChat?.closedAt && selectedChat?.dealStatus !== 'closed' && (
+                {dealData?.status === 'agreed' && !selectedChat?.closedAt && selectedChat?.dealStatus !== 'closed' && (
                   <button
                     onClick={() => {
                       if (selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt || dealData?.status === 'completed') {

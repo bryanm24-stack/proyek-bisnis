@@ -59,6 +59,20 @@ export async function POST(request) {
       deal.complaintResolutionNotes = null;
       deal.penaltyAmount = 0;
       deal.refundAmount = 0;
+    } else if (action === 'request-refund') {
+      if (deal.inspectionStatus !== 'checking') {
+        return NextResponse.json(
+          { success: false, message: 'Refund hanya dapat diminta saat status checking' },
+          { status: 400 }
+        );
+      }
+      deal.inspectionStatus = 'refund_requested';
+      deal.status = 'refund_requested';
+      deal.refundRequestedAt = new Date().toISOString();
+      deal.refundAmount = 0;
+      deal.refundReason = resolutionNotes || 'Permintaan refund customer';
+      deal.complaintResolution = 'refund_requested';
+      deal.complaintResolutionNotes = resolutionNotes || '';
     } else if (action === 'confirm-complaint') {
       // Vendor setuju komplain - trigger refund
       if (deal.inspectionStatus !== 'complaint') {
@@ -75,6 +89,35 @@ export async function POST(request) {
       deal.refundAmount = deal.totalPrice || 0;
       deal.refundReason = 'Komplain customer disetujui vendor';
       deal.complaintResolution = 'full_refund';
+      deal.complaintResolutionNotes = resolutionNotes || '';
+      deal.penaltyAmount = 0;
+    } else if (action === 'approve-refund') {
+      if (deal.inspectionStatus !== 'refund_requested') {
+        return NextResponse.json(
+          { success: false, message: 'Hanya permintaan refund yang bisa disetujui' },
+          { status: 400 }
+        );
+      }
+      deal.inspectionStatus = 'refunded';
+      deal.status = 'refunded';
+      deal.refundedAt = new Date().toISOString();
+      deal.refundAmount = deal.totalPrice || 0;
+      deal.refundReason = resolutionNotes || 'Refund disetujui vendor';
+      deal.complaintResolution = 'refund_approved';
+      deal.complaintResolutionNotes = resolutionNotes || '';
+      deal.penaltyAmount = 0;
+    } else if (action === 'reject-refund') {
+      if (deal.inspectionStatus !== 'refund_requested') {
+        return NextResponse.json(
+          { success: false, message: 'Hanya permintaan refund yang bisa ditolak' },
+          { status: 400 }
+        );
+      }
+      deal.inspectionStatus = 'refund_rejected';
+      deal.status = deal.status || 'paid';
+      deal.refundAmount = 0;
+      deal.refundReason = resolutionNotes || 'Refund ditolak vendor';
+      deal.complaintResolution = 'refund_rejected';
       deal.complaintResolutionNotes = resolutionNotes || '';
       deal.penaltyAmount = 0;
     } else if (action === 'resolve-partial-refund') {

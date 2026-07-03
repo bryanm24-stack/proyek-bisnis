@@ -5,9 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import SearchBar from './SearchBar';
 import SharedNavbar from './SharedNavbar';
-
-
-import { readData, writeData } from '@/lib/storage';
 export default function HomePageClient() {
   const router = useRouter();
   const [services, setServices] = useState([]);
@@ -35,6 +32,7 @@ export default function HomePageClient() {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [serviceReviews, setServiceReviews] = useState([]);
+  const [selectedVendorProfile, setSelectedVendorProfile] = useState(null);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewFilter, setReviewFilter] = useState('all');
   const [reviewPage, setReviewPage] = useState(1);
@@ -43,7 +41,7 @@ export default function HomePageClient() {
   const [searchFilters, setSearchFilters] = useState({
     locationTerm: '',
     minRating: 'all',
-    priceRange: 'all',
+    budget: '',
     sortBy: 'recommended'
   });
   const [activePromoIndex, setActivePromoIndex] = useState(0);
@@ -339,6 +337,7 @@ export default function HomePageClient() {
 
   const openModal = (service) => {
     setSelectedService(service);
+    setSelectedVendorProfile(null);
     setDetailTab('packages');
     setSelectedItemDetail(null);
     setModalImageIndex(0);
@@ -348,6 +347,23 @@ export default function HomePageClient() {
     setReviewFilter('all');
     setReviewPage(1);
     setModalOpen(true);
+
+    const fetchVendorProfile = async () => {
+      try {
+        const response = await fetch(`/api/vendor/profile?vendorId=${encodeURIComponent(service.vendorId)}`);
+        const data = await response.json();
+        if (data.success && data.data) {
+          setSelectedVendorProfile(data.data);
+        } else {
+          setSelectedVendorProfile(null);
+        }
+      } catch (error) {
+        console.error('Error fetching vendor profile:', error);
+        setSelectedVendorProfile(null);
+      }
+    };
+
+    fetchVendorProfile();
 
     // Fetch reviews for this service
     console.log('Fetching reviews for serviceId:', service.id);
@@ -379,6 +395,7 @@ export default function HomePageClient() {
   const closeModal = () => {
     setModalOpen(false);
     setSelectedService(null);
+    setSelectedVendorProfile(null);
     setSelectedItemDetail(null);
     setModalImageIndex(0);
     setActivePromoIndex(0);
@@ -663,13 +680,9 @@ export default function HomePageClient() {
         setRatingValue(5);
         setRatingReview('');
         
-        // Mark deal as rating completed
-        if (dealData) {
-          setDealData({
-            ...dealData,
-            ratingCompleted: true
-          });
-        }
+        // Reset chat/deal cycle locally after rating success.
+        setDealData(null);
+        setChatData((prev) => (prev ? { ...prev, dealStatus: null } : prev));
         
         setServices(services.map(s =>
           s.id === selectedService.id
@@ -783,14 +796,12 @@ export default function HomePageClient() {
       filtered = filtered.filter(service => Number(service.rating || 0) >= minimumRating);
     }
 
-    if (searchFilters.priceRange !== 'all') {
+    const budgetRaw = String(searchFilters.budget || '').replace(/[^\d]/g, '');
+    const budgetValue = Number(budgetRaw);
+    if (Number.isFinite(budgetValue) && budgetValue > 0) {
       filtered = filtered.filter((service) => {
         const price = getServicePriceNumber(service);
-        if (searchFilters.priceRange === 'under_100k') return price > 0 && price < 100000;
-        if (searchFilters.priceRange === '100k_250k') return price >= 100000 && price < 250000;
-        if (searchFilters.priceRange === '250k_500k') return price >= 250000 && price < 500000;
-        if (searchFilters.priceRange === 'above_500k') return price >= 500000;
-        return true;
+        return price > 0 && price >= budgetValue;
       });
     }
 
@@ -963,7 +974,10 @@ export default function HomePageClient() {
     selectedService?.superSubCategory
   ].filter(Boolean).join(' > ');
   const REVIEWS_PER_PAGE = 5;
-  const filteredReviews = serviceReviews.filter((review) =>
+  const itemScopedReviews = selectedItemDetail?.id
+    ? serviceReviews.filter((review) => String(review.itemId || '') === String(selectedItemDetail.id))
+    : serviceReviews;
+  const filteredReviews = itemScopedReviews.filter((review) =>
     reviewFilter === 'all' ? true : Number(review.rating) === Number(reviewFilter)
   );
   const totalReviewPages = Math.max(1, Math.ceil(filteredReviews.length / REVIEWS_PER_PAGE));
@@ -973,10 +987,10 @@ export default function HomePageClient() {
     currentReviewPage * REVIEWS_PER_PAGE
   );
   const reviewAverage =
-    serviceReviews.length > 0
+    itemScopedReviews.length > 0
       ? (
-          serviceReviews.reduce((sum, item) => sum + Number(item.rating || 0), 0) /
-          serviceReviews.length
+          itemScopedReviews.reduce((sum, item) => sum + Number(item.rating || 0), 0) /
+          itemScopedReviews.length
         ).toFixed(1)
       : '0.0';
 
@@ -1643,6 +1657,34 @@ export default function HomePageClient() {
                                   </div>
                                 )}
                               </div>
+                              {(() => {
+                                const selectedItemReviews = serviceReviews.filter((review) => String(review.itemId || '') === String(selectedItemDetail.id));
+                                const latestItemReviews = selectedItemReviews.slice(0, 3);
+                                if (latestItemReviews.length === 0) {
+                                  return (
+                                    <div style={{ marginBottom: '16px', padding: '10px 12px', borderRadius: '10px', background: '#fff', border: '1px solid #e5e7eb' }}>
+                                      <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: '700' }}>Review Paket Ini</div>
+                                      <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>Belum ada review untuk paket terpilih.</div>
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <div style={{ marginBottom: '16px', padding: '10px 12px', borderRadius: '10px', background: '#fff', border: '1px solid #e5e7eb' }}>
+                                    <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: '700', marginBottom: '6px' }}>
+                                      Review Paket Ini ({selectedItemReviews.length})
+                                    </div>
+                                    <div style={{ display: 'grid', gap: '6px' }}>
+                                      {latestItemReviews.map((review) => (
+                                        <div key={review.id} style={{ fontSize: '12px', color: '#374151', background: '#f9fafb', borderRadius: '8px', padding: '8px' }}>
+                                          <div style={{ fontWeight: '700' }}>⭐ {Number(review.rating || 0).toFixed(1)} - {review.customerName || 'Customer'}</div>
+                                          <div style={{ marginTop: '3px' }}>{review.review?.trim() || 'Customer tidak menulis komentar.'}</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                               <button
                                 className="btn-primary-modal"
                                 onClick={() => openChatModal(selectedService, selectedItemDetail)}
@@ -1848,10 +1890,42 @@ export default function HomePageClient() {
 
                   {detailTab === 'information' && (
                     <>
-                      <div className="info-section">
-                        <h4>📍 Vendor</h4>
-                        <p>{selectedService.vendorName}</p>
+                      <div className="info-section" style={{ paddingBottom: '16px', borderBottom: '1px solid #e5e7eb', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                          {selectedVendorProfile?.vendorLogo ? (
+                            <img
+                              src={selectedVendorProfile.vendorLogo}
+                              alt={selectedVendorProfile.vendorName || selectedService.vendorName}
+                              style={{ width: '72px', height: '72px', borderRadius: '18px', objectFit: 'cover', border: '1px solid #e2e8f0' }}
+                            />
+                          ) : (
+                            <div style={{ width: '72px', height: '72px', borderRadius: '18px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '14px', border: '1px solid #e2e8f0' }}>
+                              Logo
+                            </div>
+                          )}
+
+                          <div style={{ minWidth: 0 }}>
+                            <p style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#111' }}>
+                              {selectedVendorProfile?.vendorName || selectedService.vendorName || 'Vendor'}
+                            </p>
+                            <p style={{ margin: '8px 0 0 0', color: '#475569', fontSize: '14px', lineHeight: '1.6' }}>
+                              {selectedVendorProfile?.vendorBio || selectedService.shortDescription || 'Belum ada informasi toko tersedia.'}
+                            </p>
+                          </div>
+                        </div>
                       </div>
+
+                      {selectedVendorProfile?.vendorAddress ? (
+                        <div className="info-section">
+                          <h4>📍 Alamat Toko</h4>
+                          <p>{selectedVendorProfile.vendorAddress}</p>
+                        </div>
+                      ) : (selectedService.location || selectedService.lokasi) && (
+                        <div className="info-section">
+                          <h4>📍 Lokasi Penjemputan</h4>
+                          <p>{locationLabel}</p>
+                        </div>
+                      )}
 
                       <div className="info-section">
                         <h4>🏷️ Kategori</h4>
@@ -1859,34 +1933,32 @@ export default function HomePageClient() {
                       </div>
 
                       <div className="info-section">
+                        <h4>⭐ Rating Vendor</h4>
+                        <p>{selectedVendorProfile ? `${selectedVendorProfile.averageRating?.toFixed?.(1) ?? '0.0'} • ${selectedVendorProfile.totalReviews} review` : (selectedService.rating?.toFixed?.(1) ?? selectedService.rating)}</p>
+                      </div>
+
+                      <div className="info-section">
                         <h4>📈 Terjual</h4>
                         <p>{selectedService.rentCount ?? '0'}</p>
                       </div>
 
-                      {(selectedService.location || selectedService.lokasi) && (
+                      {(selectedVendorProfile?.totalServices ?? 0) > 0 && (
                         <div className="info-section">
-                          <h4>📍 Lokasi Penjemputan</h4>
-                          <p>{locationLabel}</p>
+                          <h4>🛒 Jumlah Layanan</h4>
+                          <p>{selectedVendorProfile.totalServices}</p>
                         </div>
                       )}
 
-                      {selectedService.minimumDays && (
+                      {selectedVendorProfile?.memberSince && (
                         <div className="info-section">
-                          <h4>📅 Minimum Sewa</h4>
-                          <p>{selectedService.minimumDays} hari</p>
-                        </div>
-                      )}
-
-                      {selectedService.rentalPolicy && (
-                        <div className="info-section">
-                          <h4>📜 Kebijakan Sewa</h4>
-                          <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.rentalPolicy}</p>
+                          <h4>📅 Bergabung Sejak</h4>
+                          <p>{new Date(selectedVendorProfile.memberSince).toLocaleDateString('id-ID')}</p>
                         </div>
                       )}
 
                       <div className="info-section">
                         <h4>🕒 Status</h4>
-                        <p>Terakhir online baru-baru ini</p>
+                        <p>{selectedVendorProfile?.isOnline ? 'Sedang online' : 'Terakhir online baru-baru ini'}</p>
                       </div>
                     </>
                   )}
@@ -2024,7 +2096,12 @@ export default function HomePageClient() {
                         {!reviewsLoading && serviceReviews.length > 0 && (
                           <div className="review-summary-row">
                             <span className="review-summary-chip">Rata-rata ulasan: ⭐ {reviewAverage}</span>
-                            <span className="review-summary-chip">Total review: {serviceReviews.length}</span>
+                            <span className="review-summary-chip">Total review: {itemScopedReviews.length}</span>
+                          </div>
+                        )}
+                        {selectedItemDetail?.id && (
+                          <div className="review-summary-row" style={{ marginTop: '8px' }}>
+                            <span className="review-summary-chip">Filter item aktif: {selectedItemDetail.namaBarang || selectedItemDetail.namaJasa}</span>
                           </div>
                         )}
                         <div className="review-filter-row">
@@ -2190,7 +2267,7 @@ export default function HomePageClient() {
                   const statusConfig = getDealStatusConfig();
                   const finalPrice = dealData?.finalPrice || dealData?.originalPrice || 0;
                   // Buttons disabled jika: pending, agreed, cancelled, closed, atau completed tapi belum rating
-                  const dealDisabled = dealData?.status === 'pending' || dealData?.status === 'agreed' || dealData?.status === 'cancelled' || chatData?.dealStatus === 'closed' || chatData?.closedAt;
+                  const dealDisabled = dealData?.status === 'pending' || dealData?.status === 'agreed' || dealData?.status === 'cancelled' || dealData?.status === 'active' || chatData?.dealStatus === 'closed' || chatData?.closedAt;
 
                   return (
                     <div

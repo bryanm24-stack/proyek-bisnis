@@ -1,64 +1,5 @@
 import { NextResponse } from 'next/server';
-
-
-import { readData, writeData } from '@/lib/storage';
-function getChatContextKey(chat) {
-  return [
-    String(chat.serviceId || ''),
-    String(chat.customerId || ''),
-    String(chat.vendorId || ''),
-    String(chat.itemId || '')
-  ].join('|');
-}
-
-function mergeChatMessages(target, source) {
-  const existing = new Set((target.messages || []).map((message) => {
-    return message.id || `${message.senderId}|${message.timestamp}|${message.message}`;
-  }));
-
-  for (const message of source.messages || []) {
-    const messageKey = message.id || `${message.senderId}|${message.timestamp}|${message.message}`;
-    if (!existing.has(messageKey)) {
-      target.messages.push(message);
-      existing.add(messageKey);
-    }
-  }
-
-  target.messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-}
-
-function dedupeChats(chats) {
-  const mergedChats = new Map();
-
-  for (const chat of chats) {
-    const key = getChatContextKey(chat);
-    const existing = mergedChats.get(key);
-
-    if (!existing) {
-      mergedChats.set(key, {
-        ...chat,
-        messages: [...(chat.messages || [])].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-      });
-      continue;
-    }
-
-    if (new Date(chat.createdAt || 0) > new Date(existing.createdAt || 0)) {
-      mergedChats.set(key, {
-        ...chat,
-        messages: [...(existing.messages || [])]
-      });
-      mergeChatMessages(mergedChats.get(key), chat);
-    } else {
-      mergeChatMessages(existing, chat);
-    }
-  }
-
-  return Array.from(mergedChats.values()).sort((a, b) => {
-    const aTime = new Date(a.updatedAt || a.createdAt || a.messages?.[a.messages.length - 1]?.timestamp || 0).getTime();
-    const bTime = new Date(b.updatedAt || b.createdAt || b.messages?.[b.messages.length - 1]?.timestamp || 0).getTime();
-    return bTime - aTime;
-  });
-}
+import { query } from '@/lib/db';
 
 // GET - Get all chats for customer
 export async function GET(request) {
@@ -73,17 +14,30 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    const chatsData = await readData('chats');
-    const chats = chatsData;
-
-    // Filter chats untuk customer ini
-    const customerChats = dedupeChats(
-      chats.filter(c => String(c.customerId) === String(customerId))
+    const chats = await query(
+      'SELECT * FROM chats WHERE customer_id = ? ORDER BY created_at DESC',
+      [customerId]
     );
+
+    // Convert to camelCase and parse JSON
+    const processedChats = chats.map(chat => ({
+      id: chat.id,
+      serviceId: chat.service_id,
+      serviceTitle: chat.service_title,
+      vendorId: chat.vendor_id,
+      vendorName: chat.vendor_name,
+      customerId: chat.customer_id,
+      customerName: chat.customer_name,
+      itemId: chat.item_id,
+      itemName: chat.item_name,
+      messages: typeof chat.messages === 'string' ? JSON.parse(chat.messages) : chat.messages || [],
+      createdAt: chat.created_at,
+      dealStatus: chat.deal_status
+    }));
 
     return NextResponse.json({
       success: true,
-      data: customerChats
+      data: processedChats
     }, { status: 200 });
   } catch (error) {
     console.error('Error getting customer chats:', error);
