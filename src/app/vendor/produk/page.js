@@ -91,7 +91,9 @@ export default function VendorProdukPage() {
       const response = await fetch(`/api/promos?vendorId=${vendorId}`);
       const data = await response.json();
       if (data.success) {
-        setVendorPromos(Array.isArray(data.data) ? data.data : []);
+        const allPromos = Array.isArray(data.data) ? data.data : [];
+        setVendorPromos(allPromos);
+        console.log(`✅ Loaded ${allPromos.length} promos for vendor ${vendorId}:`, allPromos.map(p => ({id: p.id, title: p.title, active: p.active})));
       } else {
         setVendorPromos([]);
       }
@@ -132,7 +134,7 @@ export default function VendorProdukPage() {
     if (promoNow === 0) return 'Memuat...';
     
     const diff = new Date(endAt).getTime() - promoNow;
-    if (diff <= 0) return 'Berakhir';
+    if (diff < 0) return 'Berakhir';
 
     const totalSeconds = Math.floor(diff / 1000);
     const days = Math.floor(totalSeconds / 86400);
@@ -251,19 +253,25 @@ export default function VendorProdukPage() {
     setPromoMessage('');
 
     try {
-      const response = await fetch('/api/promos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          vendorId: user.id,
-          vendorName: user.name,
-          title: promoForm.title,
-          image: promoForm.image,
-          promoPrice: parsedPrice,
-          description: promoForm.description,
-          active: promoForm.active,
-          startAt: promoForm.startAt || null,
-          endAt: promoForm.endAt || null,
+const parseLocalDateTime = (value) => {
+      if (!value) return null;
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    };
+
+    const response = await fetch('/api/promos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        vendorId: user.id,
+        vendorName: user.name,
+        title: promoForm.title,
+        image: promoForm.image,
+        promoPrice: parsedPrice,
+        description: promoForm.description,
+        active: promoForm.active,
+        startAt: parseLocalDateTime(promoForm.startAt),
+        endAt: parseLocalDateTime(promoForm.endAt),
           maxApplicants: promoForm.maxApplicants === '' ? null : Number.parseInt(promoForm.maxApplicants, 10)
         })
       });
@@ -359,7 +367,7 @@ export default function VendorProdukPage() {
                 const maxApplicants = Number.isFinite(Number(promo.maxApplicants)) ? Number(promo.maxApplicants) : null;
                 const claimedCount = Number(promo.claimedCount || 0);
                 const remaining = maxApplicants === null ? null : Math.max(0, maxApplicants - claimedCount);
-                const isExpired = Boolean(promo.endAt && promoNow > 0 && new Date(promo.endAt).getTime() <= promoNow);
+                const isExpired = Boolean(promo.endAt && promoNow > 0 && new Date(promo.endAt).getTime() < promoNow);
                 const isUpcoming = Boolean(promo.startAt && promoNow > 0 && new Date(promo.startAt).getTime() > promoNow);
 
                 return (

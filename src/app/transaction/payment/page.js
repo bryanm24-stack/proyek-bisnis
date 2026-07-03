@@ -335,7 +335,7 @@ function PaymentContent() {
         return;
       }
 
-      if (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() <= promoNow) {
+      if (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() < promoNow) {
         alert('Promo sudah berakhir.');
         return;
       }
@@ -801,6 +801,11 @@ function PaymentContent() {
                       <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Catatan (Opsional)</label>
                       <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Tambahkan catatan khusus..." style={{ width: '100%', border: '1px solid #ddd', borderRadius: '8px', padding: '12px', fontSize: '14px', fontFamily: 'inherit', minHeight: '80px', boxSizing: 'border-box' }} />
                     </div>
+
+                    {/* Continue Button */}
+                    <button onClick={() => setStep('payment')} disabled={selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() < promoNow)} style={{ width: '100%', padding: '14px 16px', background: (selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() < promoNow)) ? '#C8A587' : '#B28A67', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '16px', cursor: (selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() < promoNow)) ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }} onMouseEnter={(e) => { if (!(selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() < promoNow))) e.target.style.background = '#8F6B4A'; }} onMouseLeave={(e) => { if (!(selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() < promoNow))) e.target.style.background = '#B28A67'; }}>
+                      Lanjut ke Pembayaran →
+                    </button>
                   </div>
                 ) : deal ? (
                   // DEAL FLOW - Full options
