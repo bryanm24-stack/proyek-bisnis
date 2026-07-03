@@ -181,8 +181,8 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const referer = request.headers.get('referer') || '';
-    const actorIsVendorUI = referer.includes('/vendor/chats');
     const { action, chatId, customerId, vendorId, serviceId, resetDeadline } = body;
+    const actorIsVendorUI = normalizeId(vendorId || '') === normalizeId((await getChatById(chatId))?.vendor_id) || referer.includes('/vendor/chats');
 
     if (!action) {
       return NextResponse.json({ success: false, message: 'Action diperlukan' }, { status: 400 });

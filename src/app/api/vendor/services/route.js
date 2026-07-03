@@ -196,7 +196,7 @@ export async function POST(request) {
       };
 
       const sql = `INSERT INTO services (id, vendor_id, vendor_name, main_category, sub_category, super_sub_category, category, title, short_description, description, detail_description, price, minimum_days, available_quantity, quantity, rental_policy, location, pengiriman_rentguard, specifications, description_table, checklist, items, variations, type, rating, rent_count, images, availability)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       
       const values = [
         newService.id,
