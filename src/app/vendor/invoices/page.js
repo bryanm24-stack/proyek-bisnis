@@ -71,6 +71,18 @@ export default function VendorInvoicesPage() {
     }).format(num);
   };
 
+  const copyInvoiceId = async (invoiceId, event) => {
+    event.stopPropagation();
+    if (!invoiceId) return;
+    try {
+      await navigator.clipboard.writeText(String(invoiceId));
+      alert(`Invoice ID berhasil disalin: ${invoiceId}`);
+    } catch (error) {
+      console.error('Error copying invoice ID:', error);
+      alert('Gagal menyalin Invoice ID');
+    }
+  };
+
   const handleSubmitRating = async (invoice) => {
     if (!invoice?.serviceId || !invoice?.vendorId || !user?.id) {
       alert('Data layanan untuk rating belum lengkap.');
@@ -211,11 +223,18 @@ export default function VendorInvoicesPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <div>
                     <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: '600' }}>
-                      Invoice #{invoice.id?.substring(0, 8) || 'N/A'}
+                      Invoice #{invoice.id || 'N/A'}
                     </h3>
                     <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>
                       {counterpartyLabel}: <strong>{counterpartyName}</strong>
                     </p>
+                    <button
+                      type="button"
+                      onClick={(event) => copyInvoiceId(invoice.id, event)}
+                      style={{ marginTop: '8px', border: '1px solid #d6d3d1', background: '#fff', color: '#44403c', borderRadius: '8px', padding: '6px 10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      Salin Invoice ID
+                    </button>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '20px', fontWeight: '700', color: '#B28A67', marginBottom: '4px' }}>
@@ -275,6 +294,19 @@ export default function VendorInvoicesPage() {
                     }}>
                       <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>📋 Detail Invoice</h4>
                       <div style={{ display: 'grid', gap: '8px', fontSize: '13px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
+                          <span style={{ color: '#666' }}>Invoice ID Lengkap:</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            <strong style={{ wordBreak: 'break-all', textAlign: 'right' }}>{invoice.id || 'N/A'}</strong>
+                            <button
+                              type="button"
+                              onClick={(event) => copyInvoiceId(invoice.id, event)}
+                              style={{ border: '1px solid #d6d3d1', background: '#fff', color: '#44403c', borderRadius: '8px', padding: '5px 8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#666' }}>Tanggal Invoice:</span>
                           <strong>{invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('id-ID') : 'N/A'}</strong>

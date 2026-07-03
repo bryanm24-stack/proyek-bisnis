@@ -113,6 +113,7 @@ export default function SharedNavbar() {
   });
 
   const isActive = (href) => pathname === href || pathname.startsWith(href + '/');
+  const isExactPath = (href) => pathname === href;
 
   const handleLogout = () => {
     localStorage.removeItem('user');
@@ -130,14 +131,6 @@ export default function SharedNavbar() {
       console.error('Error deleting notification:', error);
     }
   };
-
-  useEffect(() => {
-    if (user) {
-      setSidebarOpen(true);
-      return;
-    }
-    setSidebarOpen(false);
-  }, [user]);
 
   if (!user) {
     return (
@@ -532,6 +525,18 @@ export default function SharedNavbar() {
           </NavLink>
 
           {(user.role === 'customer' || user.role === 'member') && (
+            <NavLink href="/complaints" active={isExactPath('/complaints')}>
+              ⚠️ Complaint
+            </NavLink>
+          )}
+
+          {(user.role === 'customer' || user.role === 'member' || user.role === 'vendor') && (
+            <NavLink href="/riwayat-transaksi" active={isActive('/riwayat-transaksi')}>
+              🧾 Riwayat Transaksi
+            </NavLink>
+          )}
+
+          {(user.role === 'customer' || user.role === 'member') && (
             <>
               <NavLink href="/customer/invoices" active={isActive('/customer/invoices')}>
                 📋 Invoice
@@ -546,6 +551,9 @@ export default function SharedNavbar() {
             <>
               <NavLink href="/vendor/invoices" active={isActive('/vendor/invoices')}>
                 📋 Invoice
+              </NavLink>
+              <NavLink href="/vendor/complaints" active={isActive('/vendor/complaints')}>
+                ⚠️ Instruksi Complaint
               </NavLink>
               <NavLink href="/vendor/favorites" active={isActive('/vendor/favorites')}>
                 ❤️ Favorit
@@ -566,6 +574,9 @@ export default function SharedNavbar() {
               </NavLink>
               <NavLink href="/admin/transaction-verification" active={isActive('/admin/transaction-verification')}>
                 🪪 Verifikasi Transaksi
+              </NavLink>
+              <NavLink href="/admin/complaints" active={isActive('/admin/complaints')}>
+                ⚠️ Manajemen Keluhan
               </NavLink>
             </>
           )}

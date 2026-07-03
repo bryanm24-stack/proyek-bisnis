@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { createComplaintDraft, isPaidTransactionContext, resolveComplaintReference } from '@/lib/complaints';
 
 const normalizeId = (id) => String(id ?? '').trim();
 
@@ -181,8 +182,7 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const referer = request.headers.get('referer') || '';
-    const { action, chatId, customerId, vendorId, serviceId, resetDeadline } = body;
-    const actorIsVendorUI = normalizeId(vendorId || '') === normalizeId((await getChatById(chatId))?.vendor_id) || referer.includes('/vendor/chats');
+    const { action, chatId, customerId, vendorId, serviceId, resetDeadline, actorId } = body;
 
     if (!action) {
       return NextResponse.json({ success: false, message: 'Action diperlukan' }, { status: 400 });
@@ -197,6 +197,7 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Chat room tidak ditemukan' }, { status: 404 });
     }
     const chat = mapChatRow(chatRow);
+    const actorIsVendorUI = normalizeId(actorId || '') === normalizeId(chat.vendorId || '') || referer.includes('/vendor/chats');
 
     if (customerId && normalizeId(chat.customerId) !== normalizeId(customerId)) {
       return NextResponse.json({ success: false, message: 'Data customer tidak valid' }, { status: 403 });
@@ -231,6 +232,30 @@ export async function POST(request) {
           message: 'Deal direset untuk siklus baru',
           data: { deal: mapDealRow(refreshedDealRow, refreshedChat), chat: refreshedChat }
         }, { status: 200 });
+      }
+
+      if (existingDealRow) {
+        const transactionContext = await resolveComplaintReference(existingDealRow.id);
+        if (transactionContext && isPaidTransactionContext(transactionContext)) {
+          const complaint = await createComplaintDraft({
+            userId: chat.customerId,
+            vendorId: chat.vendorId,
+            transactionId: transactionContext.transaction_id,
+            type: 'pembatalan',
+            description: 'Permintaan pembatalan transaksi yang sudah dibayar, menunggu mediasi admin.'
+          });
+
+          return NextResponse.json({
+            success: true,
+            message: 'Transaksi sudah dibayar. Permintaan pembatalan diteruskan ke admin melalui complaint.',
+            data: {
+              deal: mapDealRow(existingDealRow, chat),
+              chat,
+              complaint,
+              cancellationEscalated: true
+            }
+          }, { status: 202 });
+        }
       }
 
       if (existingDealRow) {

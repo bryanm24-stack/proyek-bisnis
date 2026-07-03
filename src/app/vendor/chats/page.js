@@ -212,7 +212,8 @@ export default function VendorChatsPage() {
           chatId: selectedChat.id,
           customerId: selectedChat.customerId,
           vendorId: selectedChat.vendorId,
-          serviceId: selectedChat.serviceId
+          serviceId: selectedChat.serviceId,
+          actorId: user.id
         })
       });
 
@@ -256,7 +257,8 @@ export default function VendorChatsPage() {
           chatId: selectedChat.id,
           customerId: selectedChat.customerId,
           vendorId: selectedChat.vendorId,
-          serviceId: selectedChat.serviceId
+          serviceId: selectedChat.serviceId,
+          actorId: user.id
         })
       });
 
@@ -300,6 +302,7 @@ export default function VendorChatsPage() {
         action: 'apply-discount',
         chatId: selectedChat.id,
         vendorId: user.id,
+        actorId: user.id,
         discountType,
         discountValue: Number(discountValue)
       };

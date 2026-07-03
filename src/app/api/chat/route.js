@@ -2,6 +2,18 @@ import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+function buildActiveChatLookup(serviceId, customerId, itemId) {
+  const baseWhere = itemId
+    ? 'WHERE service_id = ? AND customer_id = ? AND item_id = ?'
+    : 'WHERE service_id = ? AND customer_id = ? AND item_id IS NULL';
+  const params = itemId ? [serviceId, customerId, itemId] : [serviceId, customerId];
+
+  return {
+    sql: `SELECT * FROM chats ${baseWhere} AND (deal_status IS NULL OR deal_status <> ?) ORDER BY COALESCE(updated_at, created_at) DESC LIMIT 1`,
+    params: [...params, 'closed']
+  };
+}
+
 // Format date untuk MySQL DATETIME(3)
 function formatMySQLDate(date = new Date()) {
   const year = date.getFullYear();
@@ -42,12 +54,8 @@ export async function GET(request) {
       );
     }
 
-    const whereClause = itemId
-      ? 'WHERE service_id = ? AND customer_id = ? AND (item_id = ? OR item_id IS NULL)'
-      : 'WHERE service_id = ? AND customer_id = ? AND item_id IS NULL';
-    
-    const params = itemId ? [serviceId, customerId, itemId] : [serviceId, customerId];
-    const chats = await query(`SELECT * FROM chats ${whereClause}`, params);
+    const lookup = buildActiveChatLookup(serviceId, customerId, itemId);
+    const chats = await query(lookup.sql, lookup.params);
     
     const chat = chats[0] || null;
     if (chat && chat.messages) {
@@ -90,12 +98,8 @@ export async function POST(request) {
     }
 
     // Find or create chat room
-    const whereClause = itemId
-      ? 'WHERE service_id = ? AND customer_id = ? AND (item_id = ? OR item_id IS NULL)'
-      : 'WHERE service_id = ? AND customer_id = ? AND item_id IS NULL';
-    
-    const params = itemId ? [serviceId, customerId, itemId] : [serviceId, customerId];
-    const existingChats = await query(`SELECT * FROM chats ${whereClause}`, params);
+    const lookup = buildActiveChatLookup(serviceId, customerId, itemId);
+    const existingChats = await query(lookup.sql, lookup.params);
     
     let chatRoom;
     if (existingChats.length > 0) {

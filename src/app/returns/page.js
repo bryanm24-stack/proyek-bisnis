@@ -237,10 +237,9 @@ export default function ReturnsPage() {
     <div>
       <SharedNavbar />
       <div className={styles.container}>
-      <h2>{mode === 'end' ? 'Retur (Pengembalian Akhir)' : 'Complaint (Lapor Keluhan)'}</h2>
+      <h2>Retur (Pengembalian Akhir)</h2>
       <div style={{ margin: '12px 0 18px', display: 'flex', gap: 8 }}>
         <button type="button" onClick={() => setMode('end')} className={mode === 'end' ? styles.btn : styles.btn + ' ' + styles.secondary}>Retur</button>
-        <button type="button" onClick={() => setMode('complaint')} className={mode === 'complaint' ? styles.btn : styles.btn + ' ' + styles.secondary}>Complaint</button>
       </div>
       {!user && (
         <div style={{ color: '#6b7280' }}>Silakan login untuk melihat atau mengajukan retur atau complaint.</div>

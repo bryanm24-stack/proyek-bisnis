@@ -139,6 +139,8 @@ export default function CustomerChatsPage() {
           vendorName: selectedChat.vendorName,
           customerId: user.id,
           customerName: user.name,
+          itemId: selectedChat.itemId || null,
+          itemName: selectedChat.itemName || null,
           message: newMessage,
           senderId: user.id,
           senderName: user.name

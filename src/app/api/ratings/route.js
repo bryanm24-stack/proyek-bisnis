@@ -312,7 +312,7 @@ export async function POST(request) {
 
       const dealRows = await query('SELECT chat_id FROM deals WHERE id = ? LIMIT 1', [String(dealId)]);
       if (dealRows.length > 0 && dealRows[0].chat_id) {
-        await query('UPDATE chats SET deal_status = ? WHERE id = ?', [null, String(dealRows[0].chat_id)]);
+        await query('UPDATE chats SET deal_status = ?, updated_at = ? WHERE id = ?', ['closed', newRating.createdAt, String(dealRows[0].chat_id)]);
       }
     }
 

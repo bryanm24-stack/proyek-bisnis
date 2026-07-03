@@ -60,7 +60,8 @@ export async function GET(request) {
     const searchParams = request.nextUrl.searchParams;
     const customerId = searchParams.get('customerId');
     const vendorId = searchParams.get('vendorId');
-    const status = searchParams.get('status');
+    const statusRaw = searchParams.get('status');
+    const status = statusRaw && statusRaw !== 'all' ? statusRaw : null;
 
     const conditions = [];
     const params = [];

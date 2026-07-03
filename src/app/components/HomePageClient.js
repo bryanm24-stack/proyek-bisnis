@@ -557,7 +557,8 @@ export default function HomePageClient() {
           chatId: chatData.id,
           customerId: user.id,
           vendorId: selectedService.vendorId,
-          serviceId: selectedService.id
+          serviceId: selectedService.id,
+          actorId: user.id
         })
       });
 

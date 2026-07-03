@@ -53,24 +53,29 @@ function toValidDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function normalizePromo(promo, now = Date.now()) {
+function normalizePromo(promo, options = {}) {
+  const { userId = null, claimedUsersByPromo = new Map(), now = Date.now() } = options;
   const startAtDate = toValidDate(promo.startAt);
   const endAtDate = toValidDate(promo.endAt);
   const claimedUserIds = Array.isArray(promo.claimedUserIds)
-    ? promo.claimedUserIds.map((userId) => String(userId))
+    ? promo.claimedUserIds.map((entryUserId) => String(entryUserId))
     : [];
+  const claimedUsersFromTransactions = Array.from(claimedUsersByPromo.get(String(promo.id)) || []);
+  const claimedUsersUnion = Array.from(new Set([
+    ...claimedUserIds,
+    ...claimedUsersFromTransactions
+  ]));
   const maxApplicants = promo.maxApplicants === undefined || promo.maxApplicants === null || promo.maxApplicants === ''
     ? null
     : Number(promo.maxApplicants);
   const claimedCount = Number.isFinite(Number(promo.claimedCount))
     ? Number(promo.claimedCount)
-    : claimedUserIds.length;
+    : claimedUsersUnion.length;
   const hasStarted = !startAtDate || startAtDate.getTime() <= now;
   const hasEnded = !endAtDate || endAtDate.getTime() >= now;
   const remainingApplicants = Number.isFinite(maxApplicants)
     ? Math.max(0, maxApplicants - claimedCount)
     : null;
-  const now = Date.now();
   const normalizedUserId = userId ? String(userId) : null;
   const userHasClaimed = Boolean(normalizedUserId && claimedUsersUnion.includes(normalizedUserId));
 
@@ -87,6 +92,8 @@ function normalizePromo(promo, now = Date.now()) {
     endAt: endAtDate ? endAtDate.toISOString() : null,
     maxApplicants: maxApplicants ? Number(maxApplicants) : null,
     claimedCount,
+    claimedUserIds: claimedUsersUnion,
+    userHasClaimed,
     remainingApplicants,
     isUpcoming: Boolean(startAtDate && startAtDate.getTime() > now),
     isExpired: Boolean(endAtDate && endAtDate.getTime() < now),
@@ -113,8 +120,8 @@ export async function GET(request) {
     }
 
     if (vendorId) {
-      // Compare as strings to handle both number and string IDs from database
-      promos = promos.filter((promo) => String(promo.vendorId) === String(vendorId));
+      sql += ' AND vendor_id = ?';
+      params.push(vendorId);
     }
 
     sql += ' ORDER BY created_at DESC';
