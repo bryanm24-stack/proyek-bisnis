@@ -62,9 +62,18 @@ const handleSubmit = async (e) => {
       {/* Sisi Kiri - Branding */}
       <div className="login-left">
         <div className="login-branding">
+          <div className="area-badge">Khusus Area Surabaya</div>
           <h1>🛡️ RentGuard</h1>
-          <h2>Mulai perjalanan sewa kamu bersama 🛡️ RentGuard</h2>
-          <p>Bergabunglah dengan ribuan pengguna yang sudah mempercayai kami</p>
+          <h2>Mulai sewa lebih aman untuk area Surabaya</h2>
+          <p>
+            Registrasi sekarang untuk terhubung dengan vendor lokal Surabaya
+            yang sudah terkurasi.
+          </p>
+
+          <div className="coverage-card">
+            <div className="coverage-title">Cakupan layanan Surabaya</div>
+            <div className="coverage-list">Surabaya Pusat • Surabaya Barat • Surabaya Timur • Surabaya Utara • Surabaya Selatan</div>
+          </div>
           
           <div className="benefits">
             <div className="benefit-item">
@@ -197,13 +206,39 @@ const handleSubmit = async (e) => {
           display: flex;
           flex-direction: column;
           justify-content: center;
-          align-items: flex-start;
+          align-items: center;
           padding: 60px 40px;
           color: white;
         }
 
         .login-branding {
+          width: 100%;
           max-width: 400px;
+        }
+
+        .area-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 20px;
+          font-weight: 700;
+          letter-spacing: 1px;
+          text-transform: uppercase;
+          padding: 14px 22px;
+          border-radius: 999px;
+          margin-bottom: 18px;
+          background: rgba(255, 255, 255, 0.26);
+          border: 2px solid rgba(255, 255, 255, 0.45);
+          box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
+        }
+
+        .area-headline {
+          font-size: 34px;
+          font-weight: 900;
+          letter-spacing: 1.2px;
+          text-transform: uppercase;
+          margin: 0 0 10px 0;
+          text-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
         }
 
         .logo {
@@ -214,7 +249,7 @@ const handleSubmit = async (e) => {
         .login-left h1 {
           font-size: 48px;
           font-weight: 700;
-          margin: 0 0 12px 0;
+          margin: 0 0 8px 0;
           letter-spacing: -1px;
         }
 
@@ -230,6 +265,27 @@ const handleSubmit = async (e) => {
           opacity: 0.9;
           margin: 0 0 40px 0;
           line-height: 1.6;
+        }
+
+        .coverage-card {
+          background: rgba(255, 255, 255, 0.14);
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          border-radius: 14px;
+          padding: 16px;
+          margin-bottom: 26px;
+          backdrop-filter: blur(8px);
+        }
+
+        .coverage-title {
+          font-size: 14px;
+          font-weight: 700;
+          margin-bottom: 8px;
+        }
+
+        .coverage-list {
+          font-size: 13px;
+          line-height: 1.6;
+          opacity: 0.95;
         }
 
         .benefits {
@@ -470,6 +526,7 @@ const handleSubmit = async (e) => {
           .login-left {
             padding: 40px 24px;
             justify-content: flex-start;
+            align-items: flex-start;
             padding-top: 30px;
           }
 
@@ -477,8 +534,21 @@ const handleSubmit = async (e) => {
             font-size: 20px;
           }
 
+          .area-badge {
+            font-size: 16px;
+            padding: 10px 16px;
+          }
+
+          .area-headline {
+            font-size: 26px;
+          }
+
           .login-left p {
             font-size: 14px;
+          }
+
+          .coverage-card {
+            margin-bottom: 20px;
           }
 
           .login-right {

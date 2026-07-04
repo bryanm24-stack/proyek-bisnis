@@ -606,7 +606,7 @@ export default function HomePageClient() {
   const getDealStatusConfig = () => {
     if (!dealData) {
       return {
-        label: 'Belum ada status deal',
+        label: 'Ajukan Kesepakatan',
         description: 'Transaksi diproses vendor. Kamu cukup lanjut negosiasi di chat.',
         background: '#f3f4f6',
         color: '#374151'
@@ -2324,7 +2324,7 @@ export default function HomePageClient() {
                             transition: 'all 0.3s ease'
                           }}
                         >
-                          {dealProcessing ? 'Memproses...' : dealData?.status === 'agreed' ? 'Deal Diterima' : 'Terima Deal'}
+                          {dealProcessing ? 'Memproses...' : dealData?.status === 'agreed' ? 'Deal Diterima' : 'Kirim Permintaan'}
                         </button>
                         <button
                           type="button"
@@ -2349,7 +2349,7 @@ export default function HomePageClient() {
                             transition: 'all 0.3s ease'
                           }}
                         >
-                          {dealData?.status === 'cancelled' ? 'Mulai Ulang Negosiasi' : 'Cancel'}
+                          {dealData?.status === 'cancelled' ? 'Mulai Ulang Negosiasi' : 'Batal'}
                         </button>
                       </div>
 

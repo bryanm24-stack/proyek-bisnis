@@ -167,7 +167,6 @@ const DESCRIPTION_TABLE_BY_TYPE = {
     buildField('descCondition', 'Kondisi Barang', 'Baru, mulus, bekas terawat, dll', true),
     buildField('descCompleteness', 'Kelengkapan Dalam Paket', 'Unit utama, kabel, adaptor, tas, dll', true),
     buildField('descUsageRules', 'Aturan Pemakaian', 'Hal yang boleh/tidak boleh dilakukan', true),
-    buildField('descDelivery', 'Skema Pengiriman/Pickup', 'Pickup, antar, jam operasional', true),
     buildField('descDamagePolicy', 'Catatan Kerusakan & Tanggung Jawab', 'Biaya ganti rugi, denda, dll')
   ],
   jasa: [
@@ -2267,34 +2266,6 @@ export default function VendorProductForm({
               ))}
             </div>
           )}
-        </div>
-
-        <div style={{
-          border: '1px solid #e5e7eb',
-          borderRadius: '14px',
-          padding: '20px',
-          background: '#f8fafc'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-            <input
-              type="checkbox"
-              name="pengirimanRentGuard"
-              checked={Boolean(formData.pengirimanRentGuard)}
-              onChange={handleInputChange}
-              style={{ width: '18px', height: '18px', marginTop: '4px' }}
-            />
-            <div>
-              <label style={{ display: 'block', fontSize: '15px', fontWeight: '700', color: '#111827', marginBottom: '8px' }}>
-                🚚 Dukungan Pengiriman Rent Guard
-              </label>
-              <div style={{ fontSize: '14px', color: '#374151' }}>
-                Aktifkan Layanan Antar-Jemput Rent Guard untuk Barang Ini.
-              </div>
-              <p style={{ marginTop: '12px', fontSize: '13px', color: '#6b7280' }}>
-                Gunakan ketika penyewaan membutuhkan alamat pengiriman dan penjemputan khusus melalui layanan Rent Guard.
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* Submit Button */}

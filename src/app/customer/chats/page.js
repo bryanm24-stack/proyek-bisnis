@@ -616,7 +616,7 @@ export default function CustomerChatsPage() {
                   fontWeight: '600',
                   textAlign: 'center'
                 }}>
-                  Belum ada status deal. Lanjutkan negosiasi lewat chat.
+                  Ajukan Kesepakatan. Lanjutkan negosiasi lewat chat.
                 </div>
               )}
 

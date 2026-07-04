@@ -56,9 +56,18 @@ export default function LoginPage() {
       {/* Sisi Kiri - Branding */}
       <div className="login-left">
         <div className="login-branding">
+          <div className="area-badge">Khusus Area Surabaya</div>
           <h1>🛡️ RentGuard</h1>
-          <h2>Platform penyewaan terpercaya</h2>
-          <p>Temukan vendor terbaik untuk semua kebutuhan sewa kamu</p>
+          <h2>Platform penyewaan terpercaya untuk Surabaya</h2>
+          <p>
+            Fokus layanan untuk wilayah Surabaya dan sekitarnya,
+            dengan vendor lokal yang siap melayani cepat.
+          </p>
+
+          <div className="coverage-card">
+            <div className="coverage-title">Cakupan layanan Surabaya</div>
+            <div className="coverage-list">Surabaya Pusat • Surabaya Barat • Surabaya Timur • Surabaya Utara • Surabaya Selatan</div>
+          </div>
           
           <div className="stats-container">
             <div className="stat-box">
@@ -166,13 +175,39 @@ export default function LoginPage() {
           display: flex;
           flex-direction: column;
           justify-content: center;
-          align-items: flex-start;
+          align-items: center;
           padding: 60px 40px;
           color: white;
         }
 
         .login-branding {
+          width: 100%;
           max-width: 400px;
+        }
+
+        .area-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 20px;
+          font-weight: 700;
+          letter-spacing: 1px;
+          text-transform: uppercase;
+          padding: 14px 22px;
+          border-radius: 999px;
+          margin-bottom: 18px;
+          background: rgba(255, 255, 255, 0.26);
+          border: 2px solid rgba(255, 255, 255, 0.45);
+          box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
+        }
+
+        .area-headline {
+          font-size: 34px;
+          font-weight: 900;
+          letter-spacing: 1.2px;
+          text-transform: uppercase;
+          margin: 0 0 10px 0;
+          text-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
         }
 
         .logo {
@@ -183,7 +218,7 @@ export default function LoginPage() {
         .login-left h1 {
           font-size: 48px;
           font-weight: 700;
-          margin: 0 0 12px 0;
+          margin: 0 0 8px 0;
           letter-spacing: -1px;
         }
 
@@ -199,6 +234,27 @@ export default function LoginPage() {
           opacity: 0.9;
           margin: 0 0 40px 0;
           line-height: 1.6;
+        }
+
+        .coverage-card {
+          background: rgba(255, 255, 255, 0.14);
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          border-radius: 14px;
+          padding: 16px;
+          margin-bottom: 28px;
+          backdrop-filter: blur(8px);
+        }
+
+        .coverage-title {
+          font-size: 14px;
+          font-weight: 700;
+          margin-bottom: 8px;
+        }
+
+        .coverage-list {
+          font-size: 13px;
+          line-height: 1.6;
+          opacity: 0.95;
         }
 
         .stats-container {
@@ -464,6 +520,7 @@ export default function LoginPage() {
           .login-left {
             padding: 40px 24px;
             justify-content: flex-start;
+            align-items: flex-start;
             padding-top: 30px;
           }
 
@@ -471,8 +528,21 @@ export default function LoginPage() {
             font-size: 20px;
           }
 
+          .area-badge {
+            font-size: 16px;
+            padding: 10px 16px;
+          }
+
+          .area-headline {
+            font-size: 26px;
+          }
+
           .login-left p {
             font-size: 14px;
+          }
+
+          .coverage-card {
+            margin-bottom: 20px;
           }
 
           .login-right {

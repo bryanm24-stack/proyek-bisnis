@@ -138,7 +138,7 @@ export default function SearchBar({ services, onSearch, onCategoryChange, catego
           <label>Lokasi</label>
           <input
             type="text"
-            placeholder="Kota, area, atau alamat"
+            placeholder="Kecamatan atau area Surabaya"
             value={locationTerm}
             onChange={(e) => {
               const nextValue = e.target.value;

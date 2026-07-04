@@ -405,7 +405,7 @@ export default function FavoritesPage() {
   const getDealStatusConfig = () => {
     if (!dealData) {
       return {
-        label: 'Belum ada status deal',
+        label: 'Ajukan Kesepakatan',
         description: 'Transaksi diproses vendor. Kamu cukup lanjut negosiasi di chat.',
         background: '#f3f4f6',
         color: '#374151'
@@ -1403,7 +1403,7 @@ export default function FavoritesPage() {
                             opacity: dealDisabled ? 0.55 : 1
                           }}
                         >
-                          {dealData?.status === 'agreed' ? 'Deal Diterima' : 'Terima Deal'}
+                          {dealData?.status === 'agreed' ? 'Deal Diterima' : 'Kirim Permintaan'}
                         </button>
                         <button
                           type="button"
@@ -1421,7 +1421,7 @@ export default function FavoritesPage() {
                             opacity: dealData?.status === 'cancelled' ? 0.55 : 1
                           }}
                         >
-                          {dealData?.status === 'cancelled' ? 'Dibatalkan' : 'Cancel'}
+                          {dealData?.status === 'cancelled' ? 'Dibatalkan' : 'Batal'}
                         </button>
                       </div>
 
