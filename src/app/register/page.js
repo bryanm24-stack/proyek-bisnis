@@ -2,12 +2,15 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // Ini router khusus Next.js
+import { useRouter } from 'next/navigation'; 
+import { readData, writeData } from '@/lib/storage';
+// Ini router khusus Next.js
 
 export default function RegisterPage() {
   const router = useRouter(); 
   
   const [formData, setFormData] = useState({
+    username: '',
     name: '',
     email: '',
     password: ''
@@ -24,7 +27,7 @@ const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (!formData.name || !formData.email || !formData.password) {
+    if (!formData.username || !formData.name || !formData.email || !formData.password) {
       setErrorMsg('Semua kolom wajib diisi!');
       return;
     }
@@ -59,7 +62,6 @@ const handleSubmit = async (e) => {
       {/* Sisi Kiri - Branding */}
       <div className="login-left">
         <div className="login-branding">
-          <div className="logo">🛡️</div>
           <h1>🛡️ RentGuard</h1>
           <h2>Mulai perjalanan sewa kamu bersama 🛡️ RentGuard</h2>
           <p>Bergabunglah dengan ribuan pengguna yang sudah mempercayai kami</p>
@@ -96,6 +98,21 @@ const handleSubmit = async (e) => {
           )}
 
           <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label>Username</label>
+              <div className="input-wrapper">
+                <span className="input-icon">🎫</span>
+                <input 
+                  type="text" 
+                  name="username" 
+                  value={formData.username} 
+                  onChange={handleChange} 
+                  placeholder="Masukkan username unik"
+                  required
+                />
+              </div>
+            </div>
+
             <div className="form-group">
               <label>Nama Lengkap</label>
               <div className="input-wrapper">
@@ -171,7 +188,7 @@ const handleSubmit = async (e) => {
         .login-container {
           display: flex;
           height: 100vh;
-          background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 50%, #1e3a8a 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 50%, #8F6B4A 100%);
           font-family: system-ui, -apple-system, sans-serif;
         }
 
@@ -315,8 +332,8 @@ const handleSubmit = async (e) => {
 
         .form-group input:focus {
           outline: none;
-          border-color: #7c3aed;
-          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+          border-color: #B28A67;
+          box-shadow: 0 0 0 3px rgba(178, 138, 103, 0.1);
         }
 
         .form-actions {
@@ -337,13 +354,13 @@ const handleSubmit = async (e) => {
           cursor: pointer;
           width: 16px;
           height: 16px;
-          accent-color: #7c3aed;
+          accent-color: #B28A67;
           margin-top: 3px;
           flex-shrink: 0;
         }
 
         .terms-checkbox a {
-          color: #7c3aed;
+          color: #B28A67;
           text-decoration: none;
           font-weight: 500;
         }
@@ -355,7 +372,7 @@ const handleSubmit = async (e) => {
         .btn-primary {
           width: 100%;
           padding: 12px 16px;
-          background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+          background: linear-gradient(135deg, #C8A587 0%, #B28A67 100%);
           color: white;
           border: none;
           border-radius: 8px;
@@ -368,7 +385,7 @@ const handleSubmit = async (e) => {
 
         .btn-primary:hover:not(:disabled) {
           transform: translateY(-2px);
-          box-shadow: 0 8px 20px rgba(124, 58, 237, 0.3);
+          box-shadow: 0 8px 20px rgba(178, 138, 103, 0.3);
         }
 
         .btn-primary:disabled {
@@ -425,7 +442,7 @@ const handleSubmit = async (e) => {
         }
 
         .register-link a {
-          color: #7c3aed;
+          color: #B28A67;
           text-decoration: none;
           font-weight: 600;
           transition: opacity 0.2s;

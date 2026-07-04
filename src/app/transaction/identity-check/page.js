@@ -4,6 +4,8 @@ import { useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
+
+import { readData, writeData } from '@/lib/storage';
 function IdentityCheckContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -189,10 +191,39 @@ function IdentityCheckContent() {
     setIsSubmitting(true);
 
     try {
-      // Save verification data to localStorage for payment page
+      const userData = localStorage.getItem('user');
+      const parsedUser = userData ? JSON.parse(userData) : null;
+      if (!parsedUser) {
+        alert('User tidak ditemukan. Silakan login ulang.');
+        router.push('/login');
+        return;
+      }
+
+      const payload = {
+        userId: parsedUser.id,
+        name: formData.fullName,
+        email: formData.email,
+        idType: formData.idType,
+        nik: formData.idNumber,
+        idPhotoPreview: formData.idPhotoPreview,
+        selfiePhotoPreview: formData.selfiePhotoPreview,
+        notes: formData.notes,
+        status: 'pending'
+      };
+
+      const response = await fetch('/api/auth/verify-ktp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        alert(result.message || 'Gagal mengirim data verifikasi KTP.');
+        return;
+      }
+
       localStorage.setItem('verificationData', JSON.stringify(formData));
-      
-      // Redirect to payment page
       router.push(`/transaction/payment?dealId=${dealId}`);
     } catch (error) {
       console.error('Error:', error);
@@ -232,7 +263,7 @@ function IdentityCheckContent() {
             
             <div className="form-row">
               <div className="form-group">
-                <label htmlFor="fullName">Nama Lengkap *</label>
+                <label htmlFor="fullName">Nama Lengkap</label>
                 <input
                   type="text"
                   id="fullName"
@@ -246,7 +277,7 @@ function IdentityCheckContent() {
               </div>
 
               <div className="form-group">
-                <label htmlFor="phoneNumber">Nomor Telepon *</label>
+                <label htmlFor="phoneNumber">Nomor Telepon</label>
                 <input
                   type="tel"
                   id="phoneNumber"
@@ -261,7 +292,7 @@ function IdentityCheckContent() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="email">Email *</label>
+              <label htmlFor="email">Email</label>
               <input
                 type="email"
                 id="email"
@@ -279,7 +310,7 @@ function IdentityCheckContent() {
             <h3>🪪 Identitas</h3>
             
             <div className="form-group">
-              <label htmlFor="idType">Jenis Identitas *</label>
+              <label htmlFor="idType">Jenis Identitas</label>
               <select
                 id="idType"
                 name="idType"
@@ -293,7 +324,7 @@ function IdentityCheckContent() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="idNumber">Nomor Identitas *</label>
+              <label htmlFor="idNumber">Nomor Identitas</label>
               <input
                 type="text"
                 id="idNumber"
@@ -307,7 +338,7 @@ function IdentityCheckContent() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="idPhoto">Foto {formData.idType === 'ktp' ? 'KTP' : formData.idType === 'sim' ? 'SIM' : 'Paspor'} *</label>
+              <label htmlFor="idPhoto">Foto {formData.idType === 'ktp' ? 'KTP' : formData.idType === 'sim' ? 'SIM' : 'Paspor'}</label>
               <div className="file-upload-wrapper">
                 <input
                   type="file"
@@ -335,7 +366,7 @@ function IdentityCheckContent() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="selfiePhoto">Foto Selfie (Wajah) *</label>
+              <label htmlFor="selfiePhoto">Foto Selfie (Wajah)</label>
               <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#666' }}>
                 📸 Ambil foto selfie untuk verifikasi wajah sesuai dengan foto KTP/identitas Anda
               </p>
@@ -512,8 +543,8 @@ function IdentityCheckContent() {
         .form-group textarea:focus,
         .form-group select:focus {
           outline: none;
-          border-color: #5A45D1;
-          box-shadow: 0 0 0 3px rgba(90, 69, 209, 0.1);
+          border-color: #B28A67;
+          box-shadow: 0 0 0 3px rgba(178, 138, 103, 0.1);
         }
 
         .form-group input.input-error,
@@ -547,7 +578,7 @@ function IdentityCheckContent() {
         }
 
         .file-upload-label:hover {
-          border-color: #5A45D1;
+          border-color: #B28A67;
           background: #f5f0ff;
         }
 
@@ -584,7 +615,7 @@ function IdentityCheckContent() {
         .photo-change {
           margin-top: 12px;
           padding: 8px 16px;
-          background: #5A45D1;
+          background: #B28A67;
           color: white;
           border-radius: 6px;
           font-size: 12px;
@@ -619,14 +650,14 @@ function IdentityCheckContent() {
         }
 
         .btn-primary {
-          background: #5A45D1;
+          background: #B28A67;
           color: white;
         }
 
         .btn-primary:hover:not(:disabled) {
-          background: #4a38b0;
+          background: #8F6B4A;
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(90, 69, 209, 0.3);
+          box-shadow: 0 4px 12px rgba(178, 138, 103, 0.3);
         }
 
         .btn-primary:disabled,
@@ -665,11 +696,11 @@ function IdentityCheckContent() {
         .summary-item.total {
           padding-top: 12px;
           border-top: 1px solid #ddd;
-          color: #5A45D1;
+          color: #B28A67;
         }
 
         .summary-item.total strong {
-          color: #5A45D1;
+          color: #B28A67;
           font-size: 16px;
         }
 

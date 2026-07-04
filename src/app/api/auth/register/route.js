@@ -1,45 +1,106 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
+import { query } from '@/lib/db';
 
 export async function POST(request) {
   try {
-    const body = await request.json(); // Ambil data dari form React
-    const { name, email, password } = body;
+    const body = await request.json();
+    const { username, name, email, password } = body;
 
-    // Lokasi file users.json di root folder
-    const filePath = path.join(process.cwd(), 'users.json');
-    
-    // Baca isi file
-    const fileData = await fs.readFile(filePath, 'utf-8');
-    const users = JSON.parse(fileData);
-
-    // Cek apakah email sudah terdaftar
-    const userExists = users.find(u => u.email === email);
-    if (userExists) {
-      return NextResponse.json({ success: false, message: 'Email sudah terdaftar!' }, { status: 400 });
+    if (!username || !name || !email || !password) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Semua field wajib diisi!' 
+      }, { status: 400 });
     }
 
-    // Tambahkan user baru
-    const newUser = {
-      id: Date.now().toString(),
-      name,
-      email,
-      password, // Di dunia nyata password harus di-hash (misal pakai bcrypt), tapi ini gapapa untuk belajar
-      role: 'member'
-    };
-    users.push(newUser);
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Format email tidak valid!' 
+      }, { status: 400 });
+    }
 
-    // Simpan kembali ke file
-    await fs.writeFile(filePath, JSON.stringify(users, null, 2));
+    // Validate username (alphanumeric, min 3 chars)
+    if (username.length < 3 || !/^[a-zA-Z0-9_]+$/.test(username)) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Username minimal 3 karakter, hanya huruf, angka, dan underscore' 
+      }, { status: 400 });
+    }
+
+    // Validate password strength (min 6 chars)
+    if (password.length < 6) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Password minimal 6 karakter' 
+      }, { status: 400 });
+    }
+
+    const now = new Date().toISOString();
+    const newId = Date.now().toString();
+
+    // Check if username or email already exists
+    const existingUsers = await query(
+      'SELECT id, username, email FROM users WHERE username = ? OR email = ? LIMIT 1',
+      [username, email]
+    );
+
+    if (existingUsers.length > 0) {
+      const existing = existingUsers[0];
+      if (existing.username === username) {
+        return NextResponse.json({ 
+          success: false, 
+          message: 'Username sudah digunakan!' 
+        }, { status: 400 });
+      }
+      if (existing.email === email) {
+        return NextResponse.json({ 
+          success: false, 
+          message: 'Email sudah terdaftar!' 
+        }, { status: 400 });
+      }
+    }
+
+    // Insert new user
+    await query(
+      `INSERT INTO users (id, username, password, name, role_id, role, email, phone, ktp_status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [newId, username, password, name, 1, 'customer', email, '', 'not_submitted', now]
+    );
+
+    // Verify insert was successful
+    const newUser = await query(
+      'SELECT id, username, name, email, role, ktp_status FROM users WHERE id = ? LIMIT 1',
+      [newId]
+    );
+
+    if (!newUser || newUser.length === 0) {
+      throw new Error('Failed to retrieve newly created user');
+    }
+
+    console.log(`[REGISTER] User ${newId} (${email}) successfully registered in SQL database`);
 
     return NextResponse.json({ 
       success: true, 
       message: 'Registrasi berhasil!',
-      user: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role }
+      user: {
+        id: String(newUser[0].id),
+        username: newUser[0].username,
+        name: newUser[0].name,
+        email: newUser[0].email,
+        phone: newUser[0].phone || '',
+        role: newUser[0].role,
+        ktp_status: newUser[0].ktp_status || 'not_submitted'
+      }
     }, { status: 201 });
+
   } catch (error) {
     console.error('Error di API Register:', error);
-    return NextResponse.json({ success: false, message: 'Terjadi kesalahan server.' }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      message: 'Terjadi kesalahan server: ' + error.message
+    }, { status: 500 });
   }
 }

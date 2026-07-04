@@ -1,6 +1,5 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
+import { query } from '@/lib/db';
 
 // GET - Get all chats for vendor
 export async function GET(request) {
@@ -15,17 +14,30 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    const chatsPath = path.join(process.cwd(), 'chats.json');
-    const chatsData = await fs.readFile(chatsPath, 'utf-8');
-    const chats = JSON.parse(chatsData);
+    const chats = await query(
+      'SELECT * FROM chats WHERE vendor_id = ? OR customer_id = ? ORDER BY created_at DESC',
+      [vendorId, vendorId]
+    );
 
-    // Filter chats untuk vendor ini - bisa sebagai vendor (vendorId) atau sebagai customer (customerId)
-    // Ini memungkinkan vendor menjalin hubungan dengan vendor lain dengan bertindak sebagai customer
-    const vendorChats = chats.filter(c => c.vendorId === vendorId || c.customerId === vendorId);
+    // Convert to camelCase and parse JSON
+    const processedChats = chats.map(chat => ({
+      id: chat.id,
+      serviceId: chat.service_id,
+      serviceTitle: chat.service_title,
+      vendorId: chat.vendor_id,
+      vendorName: chat.vendor_name,
+      customerId: chat.customer_id,
+      customerName: chat.customer_name,
+      itemId: chat.item_id,
+      itemName: chat.item_name,
+      messages: typeof chat.messages === 'string' ? JSON.parse(chat.messages) : chat.messages || [],
+      createdAt: chat.created_at,
+      dealStatus: chat.deal_status
+    }));
 
     return NextResponse.json({
       success: true,
-      data: vendorChats
+      data: processedChats
     }, { status: 200 });
   } catch (error) {
     console.error('Error getting vendor chats:', error);

@@ -3,7 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import styles from './page.module.css';
+import SharedNavbar from '../../components/SharedNavbar';
 
+
+import { readData, writeData } from '@/lib/storage';
 export default function CustomerOngoingPage() {
   const [user, setUser] = useState(null);
   const [ongoingDeals, setOngoingDeals] = useState([]);
@@ -125,25 +128,8 @@ export default function CustomerOngoingPage() {
 
   if (loading) {
     return (
-      <div className={styles.container}>
-        {/* Navbar */}
-        <div className={styles.navbar}>
-          <Link href="/" style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '24px', lineHeight: '1' }}>🛡️</span>
-            RentGuard
-          </Link>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <Link href="/customer/chats" style={{ fontSize: '14px', color: '#666', textDecoration: 'none', fontWeight: '500' }}>
-              💬 Chat
-            </Link>
-            <Link href="/customer/ongoing" className={styles.active} style={{ fontSize: '14px', fontWeight: '600', padding: '6px 12px', background: '#f0e6ff' }}>
-              ⏳ Sedang Berlangsung
-            </Link>
-            <Link href="/customer/invoices" style={{ fontSize: '14px', color: '#666', textDecoration: 'none', fontWeight: '500' }}>
-              📋 Invoice
-            </Link>
-          </div>
-        </div>
+      <div>
+        <SharedNavbar />
         <div className={styles.content}>
           <p>Memuat data...</p>
         </div>
@@ -152,25 +138,8 @@ export default function CustomerOngoingPage() {
   }
 
   return (
-    <div className={styles.container}>
-      {/* Navbar */}
-      <div className={styles.navbar}>
-        <Link href="/" style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '24px', lineHeight: '1' }}>🛡️</span>
-          RentGuard
-        </Link>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <Link href="/customer/chats" style={{ fontSize: '14px', color: '#666', textDecoration: 'none', fontWeight: '500' }}>
-            💬 Chat
-          </Link>
-          <Link href="/customer/ongoing" className={styles.active} style={{ fontSize: '14px', fontWeight: '600', padding: '6px 12px', background: '#f0e6ff' }}>
-            ⏳ Sedang Berlangsung
-          </Link>
-          <Link href="/customer/invoices" style={{ fontSize: '14px', color: '#666', textDecoration: 'none', fontWeight: '500' }}>
-            📋 Invoice
-          </Link>
-        </div>
-      </div>
+    <div>
+      <SharedNavbar />
 
       <div className={styles.content}>
         <h1>Pesanan Sedang Berlangsung</h1>
@@ -186,6 +155,17 @@ export default function CustomerOngoingPage() {
           <div className={styles.dealsList}>
             {ongoingDeals.map(deal => {
               const imageUrl = deal.service?.image || (deal.service?.images && deal.service.images.length > 0 ? deal.service.images[0] : 'https://via.placeholder.com/300x200?text=' + encodeURIComponent(deal.service?.title || 'Service'));
+              const borrowDateLabel = deal.borrowDate
+                ? new Date(deal.borrowDate).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' })
+                : '-';
+              const expectedReturnDateLabel = deal.expectedReturnDate
+                ? new Date(deal.expectedReturnDate).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' })
+                : '-';
+              const returnStatusLabel = deal.returnStatus === 'late'
+                ? 'Terlambat'
+                : deal.returnStatus === 'returned'
+                  ? 'Sudah Dikembalikan'
+                  : 'Menunggu Pengembalian';
               
               return (
               <div key={deal.id} className={styles.dealCard}>
@@ -210,6 +190,17 @@ export default function CustomerOngoingPage() {
                     </span>
                     <span className={deal.vendorConfirmed ? styles.confirmed : styles.pending}>
                       {deal.vendorConfirmed ? '✓ Vendor Confirm' : '⊘ Vendor Belum Confirm'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className={styles.dealStatus}>
+                  <span className={styles.statusLabel}>Tanggal Peminjaman:</span>
+                  <div className={styles.statusContainer}>
+                    <span className={styles.confirmed}>Mulai: {borrowDateLabel}</span>
+                    <span className={styles.pending}>Kembali: {expectedReturnDateLabel}</span>
+                    <span className={deal.returnStatus === 'returned' ? styles.confirmed : styles.pending}>
+                      {returnStatusLabel}
                     </span>
                   </div>
                 </div>

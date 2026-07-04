@@ -3,7 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import styles from './page.module.css';
+import SharedNavbar from '../../components/SharedNavbar';
 
+
+import { readData, writeData } from '@/lib/storage';
 export default function VendorOngoingPage() {
   const [user, setUser] = useState(null);
   const [ongoingDeals, setOngoingDeals] = useState([]);
@@ -70,22 +73,8 @@ export default function VendorOngoingPage() {
 
   if (loading) {
     return (
-      <div className={styles.container}>
-        {/* Navbar */}
-        <div className={styles.navbar}>
-          <Link href="/vendor" style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '24px', lineHeight: '1' }}>🛡️</span>
-            RentGuard
-          </Link>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <Link href="/vendor/chats" style={{ fontSize: '14px', color: '#666', textDecoration: 'none', fontWeight: '500' }}>
-              💬 Chat
-            </Link>
-            <Link href="/vendor/ongoing" className={styles.active} style={{ fontSize: '14px', fontWeight: '600', padding: '6px 12px', background: '#f0e6ff' }}>
-              ⏳ Sedang Berlangsung
-            </Link>
-          </div>
-        </div>
+      <div>
+        <SharedNavbar />
         <div className={styles.content}>
           <p>Memuat data...</p>
         </div>
@@ -94,22 +83,8 @@ export default function VendorOngoingPage() {
   }
 
   return (
-    <div className={styles.container}>
-      {/* Navbar */}
-      <div className={styles.navbar}>
-        <Link href="/vendor" style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '24px', lineHeight: '1' }}>🛡️</span>
-          RentGuard
-        </Link>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <Link href="/vendor/chats" style={{ fontSize: '14px', color: '#666', textDecoration: 'none', fontWeight: '500' }}>
-            💬 Chat
-          </Link>
-          <Link href="/vendor/ongoing" className={styles.active} style={{ fontSize: '14px', fontWeight: '600', padding: '6px 12px', background: '#f0e6ff' }}>
-            ⏳ Sedang Berlangsung
-          </Link>
-        </div>
-      </div>
+    <div>
+      <SharedNavbar />
 
       <div className={styles.content}>
         <h1>Pesanan Sedang Berlangsung</h1>

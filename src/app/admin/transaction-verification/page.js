@@ -3,7 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import SharedNavbar from '@/app/components/SharedNavbar';
 
+
+import { readData, writeData } from '@/lib/storage';
 export default function TransactionVerificationPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -90,13 +93,7 @@ export default function TransactionVerificationPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
-      <nav style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Link href='/' style={{ fontWeight: '700', color: '#1f2937', textDecoration: 'none' }}>🛡️ RentGuard Admin</Link>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <Link href='/admin/vendor-approval' style={{ textDecoration: 'none', color: '#0369a1', fontWeight: '600' }}>Verifikasi Vendor</Link>
-          <span style={{ color: '#6b7280' }}>Admin: {user?.name}</span>
-        </div>
-      </nav>
+      <SharedNavbar />
 
       <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '24px' }}>
         <h1 style={{ margin: '0 0 8px', fontSize: '28px', color: '#0f172a' }}>Verifikasi Identitas Transaksi</h1>

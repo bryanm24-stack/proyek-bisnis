@@ -1,5 +1,11 @@
 # 🔧 Bug Fix: Vendor Chat Message Attribution
 
+**Status:** ✅ FIXED
+
+## ✅ VERIFICATION NOTE
+
+Chat vendor sekarang memakai `senderId` dan `senderName` dari request, jadi pesan vendor tidak lagi tercatat sebagai pesan customer.
+
 ## Problem Identified ❌
 Ketika vendor mengirim pesan dari halaman `/vendor/chats`, pesan masuk dengan `senderId` = customer ID, bukan vendor ID. Akibatnya:
 - Vendor message muncul di KIRI (customer side) bukan KANAN (vendor side)

@@ -3,7 +3,10 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import SharedNavbar from '../../components/SharedNavbar';
 
+
+import { readData, writeData } from '@/lib/storage';
 function SuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -51,6 +54,8 @@ function SuccessContent() {
 
   const serviceFee = transaction?.serviceFee || 1000;
   const totalAmount = transaction?.totalAmount || ((transaction?.amount || 0) + serviceFee);
+  const invoicePath = user?.role === 'vendor' ? '/vendor/invoices' : '/customer/invoices';
+  const chatPath = user?.role === 'vendor' ? '/vendor/chats' : '/customer/chats';
 
   if (isLoading) {
     return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>;
@@ -58,15 +63,7 @@ function SuccessContent() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f3ff 0%, #f0f4ff 100%)' }}>
-      {/* Navbar */}
-      <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', padding: '16px 24px' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Link href="/" style={{ fontSize: '20px', fontWeight: '700', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '24px', lineHeight: '1' }}>🛡️</span>
-            RentGuard
-          </Link>
-        </div>
-      </div>
+      <SharedNavbar />
 
       {/* Main Content */}
       <div style={{ maxWidth: '800px', margin: '40px auto', padding: '20px' }}>
@@ -147,9 +144,25 @@ function SuccessContent() {
           </div>
 
           {/* Action Buttons */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
             <button
-              onClick={() => router.push('/customer/chats')}
+              onClick={() => router.push(invoicePath)}
+              style={{
+                padding: '14px 24px',
+                background: '#ecfeff',
+                color: '#0f766e',
+                border: '1px solid #99f6e4',
+                borderRadius: '8px',
+                fontWeight: '700',
+                fontSize: '16px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              📄 Lihat Invoice
+            </button>
+            <button
+              onClick={() => router.push(chatPath)}
               style={{
                 padding: '14px 24px',
                 background: '#f3f4f6',
@@ -168,7 +181,7 @@ function SuccessContent() {
               onClick={() => router.push('/')}
               style={{
                 padding: '14px 24px',
-                background: '#7c3aed',
+                background: '#B28A67',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',

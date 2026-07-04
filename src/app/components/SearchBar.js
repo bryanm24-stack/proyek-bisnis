@@ -1,23 +1,77 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-export default function SearchBar({ services, onSearch, onCategoryChange }) {
+export default function SearchBar({ services, onSearch, onCategoryChange, categoriesSource, onFiltersChange }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [locationTerm, setLocationTerm] = useState('');
+  const [minRating, setMinRating] = useState('all');
+  const [budget, setBudget] = useState('');
+  const [sortBy, setSortBy] = useState('recommended');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const categorySource = categoriesSource || services;
 
-  const categories = [
-    { id: 'all', label: 'Semua Kategori', icon: '📦' },
-    { id: 'barang', label: 'Vendor Penyedia Barang', icon: '📦' },
-    { id: 'jasa', label: 'Vendor Layanan Jasa', icon: '🛠️' }
-  ];
-
-  useEffect(() => {
-    if (onSearch) {
-      onSearch(searchTerm, selectedCategory);
+  // Extract unique categories from all services (not filtered results)
+  const categories = React.useMemo(() => {
+    const uniqueCategories = new Set();
+    
+    if (categorySource && categorySource.length > 0) {
+      categorySource.forEach(service => {
+        if (service.mainCategory) {
+          uniqueCategories.add(service.mainCategory);
+        } else if (service.category) {
+          // Fallback untuk kompatibilitas
+          uniqueCategories.add(service.category);
+        }
+      });
     }
-  }, [searchTerm, selectedCategory, onSearch]);
+
+    const categoryList = [
+      { id: 'all', label: 'Semua Kategori', icon: '📦' }
+    ];
+
+    // Map kategori dengan icon yang sesuai
+    const categoryIcons = {
+      'Elektronik': '💻',
+      'Alat Olahraga': '⚽',
+      'Furniture': '🪑',
+      'Peralatan Acara': '🎉',
+      'Peralatan Rumah Tangga': '🏠',
+      'Peralatan Konstruksi': '🏗️',
+      'Kendaraan': '🚗',
+      'Peralatan Dapur': '🍳',
+      'Kostum & Fashion': '👗',
+      'Peralatan Fotografi': '📷',
+      'Peralatan Musik': '🎸',
+      'Mainan & Anak': '🎨',
+      'Jasa Profesional': '🛠️',
+      'Peralatan Outdoor': '⛰️',
+      'Lainnya': '✨'
+    };
+
+    Array.from(uniqueCategories).sort().forEach(category => {
+      categoryList.push({
+        id: category,
+        label: category,
+        icon: categoryIcons[category] || '📦'
+      });
+    });
+
+    return categoryList;
+  }, [categorySource]);
+
+  const syncSearch = (nextSearchTerm = searchTerm, nextCategory = selectedCategory) => {
+    if (onSearch) {
+      onSearch(nextSearchTerm, nextCategory);
+    }
+  };
+
+  const syncFilters = (nextFilters) => {
+    if (onFiltersChange) {
+      onFiltersChange(nextFilters);
+    }
+  };
 
   const handleCategorySelect = (categoryId) => {
     setSelectedCategory(categoryId);
@@ -40,7 +94,11 @@ export default function SearchBar({ services, onSearch, onCategoryChange }) {
             type="text"
             placeholder="Cari vendor, layanan sewa..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              setSearchTerm(nextValue);
+              syncSearch(nextValue, selectedCategory);
+            }}
             className="search-input"
           />
         </div>
@@ -75,12 +133,96 @@ export default function SearchBar({ services, onSearch, onCategoryChange }) {
         </div>
       </div>
 
+      <div className="search-filter-row">
+        <div className="filter-field">
+          <label>Lokasi</label>
+          <input
+            type="text"
+            placeholder="Kota, area, atau alamat"
+            value={locationTerm}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              setLocationTerm(nextValue);
+              syncFilters({
+                locationTerm: nextValue,
+                minRating,
+                budget,
+                sortBy
+              });
+            }}
+          />
+        </div>
+        <div className="filter-field">
+          <label>Rating minimum</label>
+          <select
+            value={minRating}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              setMinRating(nextValue);
+              syncFilters({
+                locationTerm,
+                minRating: nextValue,
+                budget,
+                sortBy
+              });
+            }}
+          >
+            <option value="all">Semua</option>
+            <option value="4.5">4.5+</option>
+            <option value="4">4+</option>
+            <option value="3">3+</option>
+          </select>
+        </div>
+        <div className="filter-field">
+          <label>Budget minimum</label>
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="Min harga, contoh 20.000"
+            value={budget}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              setBudget(nextValue);
+              syncFilters({
+                locationTerm,
+                minRating,
+                budget: nextValue,
+                sortBy
+              });
+            }}
+          />
+        </div>
+        <div className="filter-field">
+          <label>Urutkan</label>
+          <select
+            value={sortBy}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              setSortBy(nextValue);
+              syncFilters({
+                locationTerm,
+                minRating,
+                priceRange,
+                sortBy: nextValue
+              });
+            }}
+          >
+            <option value="recommended">Rekomendasi</option>
+            <option value="popular">Paling populer</option>
+            <option value="rating">Rating tertinggi</option>
+            <option value="price_low">Harga termurah</option>
+            <option value="price_high">Harga termahal</option>
+            <option value="newest">Terbaru</option>
+          </select>
+        </div>
+      </div>
+
       {/* Results Counter */}
       {services && services.length > 0 && (
         <div className="search-results-info">
           {searchTerm && (
             <p>
-              Ditemukan <strong>{services.length}</strong> hasil pencarian untuk "<strong>{searchTerm}</strong>"
+              Ditemukan <strong>{services.length}</strong> hasil pencarian untuk &quot;<strong>{searchTerm}</strong>&quot;
               {selectedCategory !== 'all' && ` pada kategori ${selectedCategoryLabel.toLowerCase()}`}
             </p>
           )}
@@ -113,8 +255,8 @@ export default function SearchBar({ services, onSearch, onCategoryChange }) {
         }
 
         .search-input-wrapper:focus-within {
-          border-color: #5a45d1;
-          box-shadow: 0 0 0 3px rgba(90, 69, 209, 0.1);
+          border-color: #B28A67;
+          box-shadow: 0 0 0 3px rgba(178, 138, 103, 0.1);
         }
 
         .search-icon {
@@ -159,12 +301,12 @@ export default function SearchBar({ services, onSearch, onCategoryChange }) {
         }
 
         .category-dropdown-btn:hover {
-          border-color: #5a45d1;
+          border-color: #B28A67;
           background: #f8f7ff;
         }
 
         .category-dropdown-btn:active {
-          border-color: #5a45d1;
+          border-color: #B28A67;
           background: #f0edff;
         }
 
@@ -223,12 +365,12 @@ export default function SearchBar({ services, onSearch, onCategoryChange }) {
 
         .category-option:hover {
           background: #f8f7ff;
-          color: #5a45d1;
+          color: #B28A67;
         }
 
         .category-option.active {
           background: #f0edff;
-          color: #5a45d1;
+          color: #B28A67;
           font-weight: 600;
         }
 
@@ -241,7 +383,7 @@ export default function SearchBar({ services, onSearch, onCategoryChange }) {
         }
 
         .checkmark {
-          color: #5a45d1;
+          color: #B28A67;
           font-weight: bold;
         }
 
@@ -252,9 +394,50 @@ export default function SearchBar({ services, onSearch, onCategoryChange }) {
           color: #666;
         }
 
+        .search-filter-row {
+          margin-top: 14px;
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 12px;
+        }
+
+        .filter-field {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .filter-field label {
+          font-size: 12px;
+          font-weight: 700;
+          color: #475569;
+        }
+
+        .filter-field input,
+        .filter-field select {
+          border: 2px solid #ddd;
+          border-radius: 12px;
+          padding: 10px 12px;
+          font-size: 14px;
+          background: #fff;
+          color: #111827;
+          outline: none;
+          font-family: inherit;
+        }
+
+        .filter-field input:focus,
+        .filter-field select:focus {
+          border-color: #B28A67;
+          box-shadow: 0 0 0 3px rgba(178, 138, 103, 0.12);
+        }
+
         @media (max-width: 768px) {
           .search-wrapper {
             gap: 10px;
+          }
+
+          .search-filter-row {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
 
           .search-input-wrapper {
@@ -280,6 +463,10 @@ export default function SearchBar({ services, onSearch, onCategoryChange }) {
         @media (max-width: 480px) {
           .search-wrapper {
             flex-direction: column;
+          }
+
+          .search-filter-row {
+            grid-template-columns: 1fr;
           }
 
           .search-input-wrapper,

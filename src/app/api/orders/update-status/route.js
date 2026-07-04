@@ -1,30 +1,7 @@
 'use server';
 
-import fs from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
-
-const readJsonFile = async (filePath) => {
-  try {
-    const data = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error(`Error reading ${filePath}:`, error);
-    return [];
-  }
-};
-
-const writeJsonFile = async (filePath, data) => {
-  try {
-    const utf8 = new TextEncoder();
-    const jsonString = JSON.stringify(data, null, 2);
-    await fs.writeFile(filePath, jsonString, 'utf-8');
-    return true;
-  } catch (error) {
-    console.error(`Error writing ${filePath}:`, error);
-    return false;
-  }
-};
+import { readData, writeData } from '@/lib/storage';
 
 export async function POST(request) {
   try {
@@ -48,8 +25,7 @@ export async function POST(request) {
       );
     }
 
-    const dealsPath = path.join(process.cwd(), 'deals.json');
-    const deals = await readJsonFile(dealsPath);
+    const deals = await readData('deals');
 
     const dealIndex = deals.findIndex(d => d.id === orderId);
     if (dealIndex === -1) {
@@ -83,6 +59,20 @@ export async function POST(request) {
       deal.complaintResolutionNotes = null;
       deal.penaltyAmount = 0;
       deal.refundAmount = 0;
+    } else if (action === 'request-refund') {
+      if (deal.inspectionStatus !== 'checking') {
+        return NextResponse.json(
+          { success: false, message: 'Refund hanya dapat diminta saat status checking' },
+          { status: 400 }
+        );
+      }
+      deal.inspectionStatus = 'refund_requested';
+      deal.status = 'refund_requested';
+      deal.refundRequestedAt = new Date().toISOString();
+      deal.refundAmount = 0;
+      deal.refundReason = resolutionNotes || 'Permintaan refund customer';
+      deal.complaintResolution = 'refund_requested';
+      deal.complaintResolutionNotes = resolutionNotes || '';
     } else if (action === 'confirm-complaint') {
       // Vendor setuju komplain - trigger refund
       if (deal.inspectionStatus !== 'complaint') {
@@ -99,6 +89,35 @@ export async function POST(request) {
       deal.refundAmount = deal.totalPrice || 0;
       deal.refundReason = 'Komplain customer disetujui vendor';
       deal.complaintResolution = 'full_refund';
+      deal.complaintResolutionNotes = resolutionNotes || '';
+      deal.penaltyAmount = 0;
+    } else if (action === 'approve-refund') {
+      if (deal.inspectionStatus !== 'refund_requested') {
+        return NextResponse.json(
+          { success: false, message: 'Hanya permintaan refund yang bisa disetujui' },
+          { status: 400 }
+        );
+      }
+      deal.inspectionStatus = 'refunded';
+      deal.status = 'refunded';
+      deal.refundedAt = new Date().toISOString();
+      deal.refundAmount = deal.totalPrice || 0;
+      deal.refundReason = resolutionNotes || 'Refund disetujui vendor';
+      deal.complaintResolution = 'refund_approved';
+      deal.complaintResolutionNotes = resolutionNotes || '';
+      deal.penaltyAmount = 0;
+    } else if (action === 'reject-refund') {
+      if (deal.inspectionStatus !== 'refund_requested') {
+        return NextResponse.json(
+          { success: false, message: 'Hanya permintaan refund yang bisa ditolak' },
+          { status: 400 }
+        );
+      }
+      deal.inspectionStatus = 'refund_rejected';
+      deal.status = deal.status || 'paid';
+      deal.refundAmount = 0;
+      deal.refundReason = resolutionNotes || 'Refund ditolak vendor';
+      deal.complaintResolution = 'refund_rejected';
       deal.complaintResolutionNotes = resolutionNotes || '';
       deal.penaltyAmount = 0;
     } else if (action === 'resolve-partial-refund') {
@@ -171,7 +190,7 @@ export async function POST(request) {
     }
 
     // Save updated deals
-    const success = await writeJsonFile(dealsPath, deals);
+    const success = await writeData('deals', deals);
     if (!success) {
       return NextResponse.json(
         { success: false, message: 'Gagal menyimpan perubahan' },

@@ -1,5 +1,6 @@
 // INI BARIS YANG BIKIN TAMPILANNYA JADI CANTIK!
-import './globals.css'; 
+import './globals.css';
+import SharedFooter from './components/SharedFooter';
 
 export const metadata = {
   title: '🛡️ RentGuard - Platform Sewa',
@@ -9,9 +10,14 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="id" suppressHydrationWarning>
-      <body>
-        {/* 'children' di sini otomatis akan diisi oleh page.js (Login, Register, Home) */}
-        {children}
+      <body style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', margin: 0, padding: 0 }}>
+        {/* Main content area yang bisa grow */}
+        <div style={{ flex: '1', display: 'flex', flexDirection: 'column' }}>
+          {/* 'children' di sini otomatis akan diisi oleh page.js (Login, Register, Home) */}
+          {children}
+        </div>
+        {/* Footer akan selalu ada di bawah */}
+        <SharedFooter />
       </body>
     </html>
   );

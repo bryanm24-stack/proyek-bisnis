@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-
+import SharedNavbar from '@/app/components/SharedNavbar';
 export default function VendorApprovalPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -14,6 +14,9 @@ export default function VendorApprovalPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [identityModalOpen, setIdentityModalOpen] = useState(false);
+  const [identityFileData, setIdentityFileData] = useState(null);
+  const [identityFileName, setIdentityFileName] = useState('');
 
   useEffect(() => {
     // Cek apakah user adalah admin
@@ -118,10 +121,43 @@ export default function VendorApprovalPage() {
     return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    setUser(null);
-    router.push('/login');
+  const handleViewIdentity = (identityFile, fileName) => {
+    setIdentityFileData(identityFile);
+    setIdentityFileName(fileName);
+    setIdentityModalOpen(true);
+  };
+
+  const handleDownloadIdentity = (identityFile, fileName) => {
+    try {
+      // Extract base64 data
+      let base64Data = identityFile;
+      if (identityFile.startsWith('data:')) {
+        const parts = identityFile.split(';base64,');
+        base64Data = parts[1];
+      }
+
+      // Convert base64 to blob
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/octet-stream' });
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName || 'identity-file';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      alert('Gagal mengunduh file');
+    }
   };
 
   const pendingRegistrations = registrations.filter(r => r.status === 'pending');
@@ -131,21 +167,7 @@ export default function VendorApprovalPage() {
   return (
     <div className="admin-page">
       {/* Navbar */}
-      <nav className="navbar">
-        <div className="nav-left">
-          <Link href="/" className="nav-logo">
-            🛡️ RentGuard
-          </Link>
-        </div>
-        <div className="nav-right">
-          <span className="user-info">Admin: {user?.name}</span>
-          <Link href="/admin/transaction-verification" className="nav-link">Verifikasi Transaksi</Link>
-          <Link href="/" className="nav-link">Home</Link>
-          <button className="btn-logout" onClick={handleLogout}>
-            Logout
-          </button>
-        </div>
-      </nav>
+      <SharedNavbar />
 
       {/* Main Content */}
       <div className="admin-content">
@@ -189,7 +211,43 @@ export default function VendorApprovalPage() {
                     </div>
                     <div className="detail-row">
                       <span className="detail-label">File Identitas</span>
-                      <span className="detail-value">{reg.identityFileName}</span>
+                      <div className="detail-value" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span>{reg.identityFileName}</span>
+                        {reg.identityFile && (
+                          <>
+                            <button
+                              className="btn-view-file"
+                              onClick={() => handleViewIdentity(reg.identityFile, reg.identityFileName)}
+                              style={{
+                                padding: '4px 8px',
+                                background: '#0284c7',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '12px'
+                              }}
+                            >
+                              👁️ Lihat
+                            </button>
+                            <button
+                              className="btn-download-file"
+                              onClick={() => handleDownloadIdentity(reg.identityFile, reg.identityFileName)}
+                              style={{
+                                padding: '4px 8px',
+                                background: '#16a34a',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '12px'
+                              }}
+                            >
+                              ⬇️ Download
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                     <div className="detail-row">
                       <span className="detail-label">Tanggal Registrasi</span>
@@ -321,7 +379,126 @@ export default function VendorApprovalPage() {
         )}
       </div>
 
+      {/* Identity File Modal */}
+      {identityModalOpen && (
+        <div className="modal-overlay" onClick={() => setIdentityModalOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>File Identitas: {identityFileName}</h2>
+              <button
+                className="modal-close"
+                onClick={() => setIdentityModalOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#666'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              {identityFileData ? (
+                <img
+                  src={identityFileData}
+                  alt={identityFileName}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '600px',
+                    borderRadius: '8px'
+                  }}
+                />
+              ) : (
+                <p>File tidak dapat ditampilkan</p>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button
+                onClick={() => handleDownloadIdentity(identityFileData, identityFileName)}
+                style={{
+                  padding: '10px 16px',
+                  background: '#16a34a',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                ⬇️ Download
+              </button>
+              <button
+                onClick={() => setIdentityModalOpen(false)}
+                style={{
+                  padding: '10px 16px',
+                  background: '#e5e7eb',
+                  color: '#1a1a1a',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+        }
+
+        .modal-content {
+          background: white;
+          border-radius: 12px;
+          max-width: 700px;
+          width: 90%;
+          max-height: 90vh;
+          overflow-y: auto;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 20px;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .modal-header h2 {
+          margin: 0;
+          font-size: 18px;
+          color: #1a1a1a;
+        }
+
+        .modal-body {
+          padding: 20px;
+          text-align: center;
+        }
+
+        .modal-footer {
+          display: flex;
+          gap: 12px;
+          padding: 20px;
+          border-top: 1px solid #e5e7eb;
+          justify-content: flex-end;
+        }
+
         /* Page Layout */
         .admin-page {
           min-height: 100vh;
@@ -351,7 +528,7 @@ export default function VendorApprovalPage() {
         .nav-logo {
           font-size: 20px;
           font-weight: 700;
-          color: #7c3aed;
+          color: #B28A67;
           text-decoration: none;
           display: flex;
           align-items: center;
@@ -360,7 +537,7 @@ export default function VendorApprovalPage() {
         }
 
         .nav-logo:hover {
-          color: #a855f7;
+          color: #C8A587;
           opacity: 0.9;
         }
 
@@ -390,7 +567,7 @@ export default function VendorApprovalPage() {
         }
 
         .nav-link:hover {
-          color: #7c3aed;
+          color: #B28A67;
           background: #f3f4f6;
         }
 
@@ -526,7 +703,7 @@ export default function VendorApprovalPage() {
 
         .registration-card:hover {
           box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-          border-color: #7c3aed;
+          border-color: #B28A67;
         }
 
         /* Card Header */

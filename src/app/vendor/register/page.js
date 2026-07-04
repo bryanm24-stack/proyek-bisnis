@@ -3,7 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import SharedNavbar from '../../components/SharedNavbar';
 
+
+import { readData, writeData } from '@/lib/storage';
 export default function VendorRegisterPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -13,7 +16,8 @@ export default function VendorRegisterPage() {
   const [formData, setFormData] = useState({
     vendorName: '',
     phoneNumber: '',
-    identityFile: null
+    identityFile: null,
+    identityFileName: ''
   });
   
   const [errorMsg, setErrorMsg] = useState('');
@@ -32,7 +36,7 @@ export default function VendorRegisterPage() {
 
     // Cek apakah user sudah vendor
     if (parsedUser.role === 'vendor') {
-      router.push('/vendor');
+      router.push('/vendor/produk');
       return;
     }
 
@@ -83,7 +87,8 @@ export default function VendorRegisterPage() {
       reader.onload = (event) => {
         setFormData(prev => ({
           ...prev,
-          identityFile: event.target?.result
+          identityFile: event.target?.result,
+          identityFileName: file.name || ''
         }));
         setErrorMsg('');
       };
@@ -111,7 +116,8 @@ export default function VendorRegisterPage() {
           userId: user.id,
           vendorName: formData.vendorName,
           phoneNumber: formData.phoneNumber,
-          identityFile: formData.identityFile
+          identityFile: formData.identityFile,
+          identityFileName: formData.identityFileName
         })
       });
 
@@ -120,7 +126,7 @@ export default function VendorRegisterPage() {
       if (data.success) {
         setSuccessMsg('✓ Registrasi vendor berhasil dikirim! Silakan tunggu persetujuan admin.');
         setRegistrationStatus(data.data);
-        setFormData({ vendorName: '', phoneNumber: '', identityFile: null });
+        setFormData({ vendorName: '', phoneNumber: '', identityFile: null, identityFileName: '' });
         setTimeout(() => {
           window.location.reload();
         }, 2000);
@@ -140,15 +146,7 @@ export default function VendorRegisterPage() {
 
   return (
     <div className="vendor-register-container">
-      {/* Navbar */}
-      <nav className="navbar">
-        <div className="nav-brand">
-          <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>🛡️ RentGuard</Link>
-        </div>
-        <div className="nav-actions">
-          <Link href="/" className="btn-link">Kembali ke Home</Link>
-        </div>
-      </nav>
+      <SharedNavbar />
 
       {/* Main Content */}
       <div className="vendor-register-main">
@@ -222,6 +220,9 @@ export default function VendorRegisterPage() {
                     id="identityFile"
                     accept="application/pdf,image/jpeg,image/png,image/jpg"
                     onChange={handleFileChange}
+                    onClick={(e) => {
+                      e.target.value = null;
+                    }}
                     required
                   />
                   <small>Format: PDF, JPG, PNG (Max 5MB) - Dapat berupa KTP, SIM, atau Paspor</small>
@@ -285,6 +286,9 @@ export default function VendorRegisterPage() {
                     id="identityFile"
                     accept="application/pdf,image/jpeg,image/png,image/jpg"
                     onChange={handleFileChange}
+                    onClick={(e) => {
+                      e.target.value = null;
+                    }}
                     required
                   />
                   <small>Format: PDF, JPG, PNG (Max 5MB) - Dapat berupa KTP, SIM, atau Paspor</small>
@@ -307,7 +311,7 @@ export default function VendorRegisterPage() {
               <p style={{ margin: 0, color: '#166534', fontWeight: '500' }}>
                 Selamat! Anda sudah terdaftar sebagai vendor.
               </p>
-              <Link href="/vendor" style={{
+              <Link href="/vendor/produk" style={{
                 display: 'inline-block',
                 marginTop: '12px',
                 padding: '10px 20px',
@@ -317,7 +321,7 @@ export default function VendorRegisterPage() {
                 borderRadius: '6px',
                 fontWeight: '600'
               }}>
-                → Pergi ke Dashboard Vendor
+                → Pergi ke Barang/Jasa Saya
               </Link>
             </div>
           )}
@@ -393,7 +397,7 @@ export default function VendorRegisterPage() {
 
         .btn-primary {
           padding: 12px 24px;
-          background-color: #5A45D1;
+          background-color: #B28A67;
           color: white;
           border: none;
           border-radius: 6px;
@@ -404,7 +408,7 @@ export default function VendorRegisterPage() {
         }
 
         .btn-primary:hover:not(:disabled) {
-          background-color: #3B2B85;
+          background-color: #8F6B4A;
         }
 
         .btn-primary:disabled {
@@ -413,7 +417,7 @@ export default function VendorRegisterPage() {
         }
 
         .btn-link {
-          color: #5A45D1;
+          color: #B28A67;
           text-decoration: none;
           font-weight: 600;
           cursor: pointer;

@@ -1,14 +1,9 @@
-import { promises as fs } from 'fs';
-import path from 'path';
 import { NextResponse } from 'next/server';
+import { readData, writeData } from '@/lib/storage';
 
-const notificationsPath = path.join(process.cwd(), 'notifications.json');
-
-// Read notifications file
 async function readNotifications() {
   try {
-    const data = await fs.readFile(notificationsPath, 'utf-8');
-    return JSON.parse(data);
+    return await readData('notifications');
   } catch (error) {
     return [];
   }
@@ -16,7 +11,7 @@ async function readNotifications() {
 
 // Write notifications file
 async function writeNotifications(notifications) {
-  await fs.writeFile(notificationsPath, JSON.stringify(notifications, null, 2));
+  await writeData('notification', notifications);
 }
 
 // GET - Retrieve notifications for user

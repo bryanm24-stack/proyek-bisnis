@@ -3,6 +3,8 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 
+
+import { readData, writeData } from '@/lib/storage';
 function VendorInspectionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -11,6 +13,7 @@ function VendorInspectionContent() {
   const [order, setOrder] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittingRefundDecision, setSubmittingRefundDecision] = useState(false);
   const [penaltyAmount, setPenaltyAmount] = useState('');
   const [resolutionNotes, setResolutionNotes] = useState('');
 
@@ -86,6 +89,41 @@ function VendorInspectionContent() {
     }
   };
 
+  // New: allow vendor to mark refund as paid and provide customer bank/account info view
+  const handleMarkRefunded = async () => {
+    if (!order) return;
+    const amount = prompt('Masukkan jumlah yang Anda transfer ke customer (tanpa pemisah):');
+    if (!amount) return;
+    const ref = prompt('Masukkan referensi transaksi/ID (opsional):') || '';
+
+    setSubmittingRefundDecision(true);
+    try {
+      const form = new FormData();
+      form.append('actorRole', 'vendor');
+      form.append('vendorId', localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).id : '');
+      form.append('action', 'submit_refund_payment');
+      form.append('refundMethod', 'transfer');
+      form.append('refundReference', ref);
+      form.append('refundPaidAt', new Date().toISOString());
+      form.append('refundAmount', amount);
+
+      const response = await fetch(`/api/admin/complaints/${order.complaintId}`, {
+        method: 'PATCH',
+        body: form
+      });
+      const result = await response.json();
+      if (!response.ok || result.success === false) {
+        throw new Error(result.message || 'Gagal mengirim bukti refund');
+      }
+      alert('Bukti refund terkirim. Menunggu verifikasi admin.');
+      router.push('/vendor/orders');
+    } catch (error) {
+      alert(error.message || 'Gagal mengirim bukti refund');
+    } finally {
+      setSubmittingRefundDecision(false);
+    }
+  };
+
   const handleComplaintResolution = async (action) => {
     if (!order) return;
 
@@ -98,7 +136,9 @@ function VendorInspectionContent() {
       'confirm-complaint': 'full refund',
       'resolve-partial-refund': 'partial refund',
       'apply-penalty': 'denda',
-      'reject-complaint': 'tolak komplain'
+      'reject-complaint': 'tolak komplain',
+      'approve-refund': 'setujui refund',
+      'reject-refund': 'tolak refund'
     };
 
     if (!window.confirm(`Yakin memproses aksi ${actionLabel[action] || action}?`)) {
@@ -156,6 +196,8 @@ function VendorInspectionContent() {
     checking: '⏳ Sedang Diperiksa Customer',
     approved: '✅ Customer Setuju',
     complaint: '⚠️ Customer Komplain',
+    refund_requested: '⏳ Refund Diminta Customer',
+    refund_rejected: '❌ Refund Ditolak Vendor',
     refunded: '💰 Refund Selesai',
     partially_refunded: '💸 Partial Refund Selesai',
     penalty_applied: '⚠️ Denda Diterapkan',
@@ -188,7 +230,7 @@ function VendorInspectionContent() {
           </h1>
 
           {/* Status Info */}
-          <div style={{ background: '#f9f9f9', padding: '15px', borderRadius: '8px', marginBottom: '20px', borderLeft: '4px solid #5A45D1' }}>
+          <div style={{ background: '#f9f9f9', padding: '15px', borderRadius: '8px', marginBottom: '20px', borderLeft: '4px solid #B28A67' }}>
             <div style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>Status Saat Ini</div>
             <div style={{ fontSize: '18px', fontWeight: '600', color: '#333' }}>
               {statusLabels[order.inspectionStatus] || statusLabels.checking}
@@ -316,6 +358,36 @@ function VendorInspectionContent() {
                 </div>
               </div>
             </>
+          )}
+
+          {order.inspectionStatus === 'refund_requested' && (
+            <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '20px', marginBottom: '20px' }}>
+              <h3 style={{ margin: '0 0 12px 0', color: '#2563eb', fontSize: '16px' }}>💸 Permintaan Refund Customer</h3>
+              <p style={{ margin: '0 0 12px 0', color: '#1d4ed8', fontSize: '14px' }}>
+                Customer meminta refund karena barang belum dikirim atau belum disetujui. Anda dapat menyetujui atau menolak permintaan berikut.
+              </p>
+              {order.refundRequestedAt && (
+                <div style={{ fontSize: '13px', color: '#1d4ed8' }}>
+                  Waktu permintaan: {new Date(order.refundRequestedAt).toLocaleDateString('id-ID')} {new Date(order.refundRequestedAt).toLocaleTimeString('id-ID')}
+                </div>
+              )}
+              <div style={{ marginTop: '15px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <button
+                  onClick={() => handleComplaintResolution('approve-refund')}
+                  disabled={isSubmitting}
+                  style={{ padding: '12px', background: '#16a34a', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', opacity: isSubmitting ? 0.6 : 1 }}
+                >
+                  ✅ Setujui Refund
+                </button>
+                <button
+                  onClick={() => handleComplaintResolution('reject-refund')}
+                  disabled={isSubmitting}
+                  style={{ padding: '12px', background: '#dc2626', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', opacity: isSubmitting ? 0.6 : 1 }}
+                >
+                  ❌ Tolak Refund
+                </button>
+              </div>
+            </div>
           )}
 
           {order.inspectionStatus === 'approved' && (

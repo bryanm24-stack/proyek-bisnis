@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import SharedNavbar from '../../components/SharedNavbar';
 
 export default function CustomerChatsPage() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export default function CustomerChatsPage() {
   const [dealData, setDealData] = useState(null);
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showVendorModal, setShowVendorModal] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -31,13 +33,26 @@ export default function CustomerChatsPage() {
 
   const fetchCustomerChats = async (customerId) => {
     try {
+      console.log('[customer/chats] Fetching chats for customerId:', customerId);
       const response = await fetch(`/api/customer/chats?customerId=${customerId}`);
+      
+      if (!response.ok) {
+        throw new Error(`API responded with status ${response.status}`);
+      }
+      
       const data = await response.json();
-      if (data.success) {
-        setChats(data.data || []);
+      console.log('[customer/chats] API response:', data);
+      
+      if (data.success && data.data) {
+        console.log('[customer/chats] Setting chats:', data.data.length, 'items');
+        setChats(data.data);
+      } else {
+        console.error('[customer/chats] API returned success:false -', data.message);
+        setChats([]); // Explicitly set empty
       }
     } catch (error) {
-      console.error('Error fetching chats:', error);
+      console.error('[customer/chats] Error fetching chats:', error);
+      setChats([]); // Explicitly set empty on error
     } finally {
       setLoading(false);
     }
@@ -56,6 +71,17 @@ export default function CustomerChatsPage() {
       return vendorName.includes(searchLower) || serviceTitle.includes(searchLower);
     });
   }, [chats, searchQuery]);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('[customer/chats] State:');
+    console.log('  - user.id:', user?.id, '(type:', typeof user?.id, ')');
+    console.log('  - total chats:', chats.length);
+    console.log('  - filtered chats:', filteredChats.length);
+    if (chats.length > 0) {
+      console.log('  - chats:', chats.map(c => `${c.vendorName} - ${c.serviceTitle}`));
+    }
+  }, [chats, filteredChats, user]);
 
   const openChat = async (chat) => {
     setSelectedChat(chat);
@@ -82,8 +108,25 @@ export default function CustomerChatsPage() {
     setDealData(null);
   };
 
+  const proceedToPayment = () => {
+    if (selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt || dealData?.status === 'completed') {
+      alert('Pembayaran sudah selesai. Chat ini sudah ditutup.');
+      return;
+    }
+
+    if (!dealData?.id) {
+      alert('Deal belum siap untuk pembayaran.');
+      return;
+    }
+    router.push(`/transaction/payment?dealId=${dealData.id}`);
+  };
+
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
+    if (selectedChat?.dealStatus === 'closed') {
+      alert('Chat sudah ditutup setelah pembayaran selesai.');
+      return;
+    }
 
     try {
       const response = await fetch('/api/chat', {
@@ -96,6 +139,8 @@ export default function CustomerChatsPage() {
           vendorName: selectedChat.vendorName,
           customerId: user.id,
           customerName: user.name,
+          itemId: selectedChat.itemId || null,
+          itemName: selectedChat.itemName || null,
           message: newMessage,
           senderId: user.id,
           senderName: user.name
@@ -119,84 +164,16 @@ export default function CustomerChatsPage() {
     }
   };
 
-  const handleDealAction = async (action) => {
-    try {
-      const response = await fetch('/api/deals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action,
-          chatId: selectedChat.id,
-          customerId: user.id,
-          vendorId: selectedChat.vendorId,
-          serviceId: selectedChat.serviceId
-        })
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setDealData(data.data.deal);
-        setSelectedChat(data.data.chat);
-        alert(data.message);
-      }
-    } catch (error) {
-      console.error('Error processing deal:', error);
-      alert('Gagal memproses deal');
-    }
-  };
-
-  if (!user || user.role === 'vendor') {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Akses ditolak</div>;
+  if (!user) {
+    return <div style={{ padding: '40px', textAlign: 'center' }}>Memuat...</div>;
   }
 
   return (
     <div>
-      {/* Navbar */}
-      <nav style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '20px 40px',
-        borderBottom: '1px solid #eee',
-        background: 'white'
-      }}>
-        <Link href="/" style={{ fontSize: '24px', fontWeight: 'bold', color: '#7c3aed', textDecoration: 'none' }}>
-          🛡️ RentGuard
-        </Link>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <Link href="/" style={{ color: '#666', textDecoration: 'none', fontWeight: '500', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.3s' }}>
-            🏠 Home
-          </Link>
-          <Link href="/customer/chats" style={{ color: '#7c3aed', textDecoration: 'none', fontWeight: '600', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', background: '#f0e6ff', transition: 'all 0.3s' }}>
-            💬 Chat
-          </Link>
-          <Link href="/customer/ongoing" style={{ color: '#666', textDecoration: 'none', fontWeight: '500', fontSize: '14px', padding: '6px 12px', borderRadius: '6px', transition: 'all 0.3s' }}>
-            ⏳ Sedang Berlangsung
-          </Link>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ 
-              background: 'linear-gradient(135deg, #7c3aed, #a855f7)', 
-              color: 'white', 
-              padding: '6px 12px', 
-              borderRadius: '50%', 
-              fontWeight: 'bold',
-              minWidth: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{user.name}</div>
-              <div style={{ fontSize: '12px', color: '#666' }}>Customer</div>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <SharedNavbar />
 
       {/* Main Content */}
-      <div style={{ display: 'flex', height: 'calc(100vh - 80px)' }}>
+      <div style={{ display: 'flex', height: 'calc(100vh - 70px)' }}>
         {/* Chat List */}
         <div style={{
           width: '300px',
@@ -228,8 +205,8 @@ export default function CustomerChatsPage() {
                     backgroundColor: '#fff'
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#7c3aed';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.1)';
+                    e.target.style.borderColor = '#B28A67';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(178, 138, 103, 0.1)';
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = '#eee';
@@ -277,7 +254,7 @@ export default function CustomerChatsPage() {
             ) : filteredChats.length === 0 ? (
               <div style={{ textAlign: 'center' }}>
                 <p style={{ color: '#999', fontSize: '13px' }}>
-                  ❌ Tidak ada hasil untuk "{searchQuery}"
+                  ❌ Tidak ada hasil untuk &quot;{searchQuery}&quot;
                 </p>
                 <p style={{ color: '#bbb', fontSize: '12px', marginTop: '8px' }}>
                   Coba kata kunci lain
@@ -285,18 +262,18 @@ export default function CustomerChatsPage() {
               </div>
             ) : (
               <div>
-                {filteredChats.map((chat) => (
+                {filteredChats.map((chat, index) => (
                   <div
-                    key={chat.id}
+                    key={`${chat.id || chat.createdAt}-${index}`}
                     onClick={() => openChat(chat)}
                     style={{
                       padding: '12px',
                       marginBottom: '8px',
                       borderRadius: '8px',
                       cursor: 'pointer',
-                      background: selectedChat?.id === chat.id ? '#7c3aed' : '#fff',
+                      background: selectedChat?.id === chat.id ? '#B28A67' : '#fff',
                       color: selectedChat?.id === chat.id ? '#fff' : '#333',
-                      border: selectedChat?.id === chat.id ? '2px solid #7c3aed' : '1px solid #eee',
+                      border: selectedChat?.id === chat.id ? '2px solid #B28A67' : '1px solid #eee',
                       transition: 'all 0.3s'
                     }}
                   >
@@ -324,99 +301,68 @@ export default function CustomerChatsPage() {
               <div style={{
                 padding: '20px',
                 borderBottom: '1px solid #eee',
-                background: '#fff'
-              }}>
-                <h2 style={{ margin: 0, fontSize: '18px' }}>
-                  {user.id === selectedChat.customerId ? selectedChat.vendorName : selectedChat.customerName} 🏪
-                </h2>
-                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#666' }}>
-                  {selectedChat.serviceTitle}
-                </p>
-              </div>
-
-              {/* Deal Buttons */}
-              <div style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid #eee',
+                background: '#fff',
                 display: 'flex',
-                gap: '10px',
+                justifyContent: 'space-between',
                 alignItems: 'center'
               }}>
-                <button
-                  onClick={() => handleDealAction('accept')}
-                  disabled={dealData?.status === 'agreed' || dealData?.status === 'cancelled'}
-                  style={{
-                    padding: '10px 16px',
-                    border: 'none',
-                    borderRadius: '8px',
-                    background: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? '#d1d5db' : '#10b981',
-                    color: 'white',
-                    fontWeight: '600',
-                    cursor: dealData?.status === 'agreed' || dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  ✅ Setuju Deal
-                </button>
-                <button
-                  onClick={() => handleDealAction('cancel')}
-                  disabled={dealData?.status === 'cancelled'}
-                  style={{
-                    padding: '10px 16px',
-                    border: 'none',
-                    borderRadius: '8px',
-                    background: dealData?.status === 'cancelled' ? '#d1d5db' : '#ef4444',
-                    color: 'white',
-                    fontWeight: '600',
-                    cursor: dealData?.status === 'cancelled' ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  ❌ Tolak Deal
-                </button>
-                {dealData?.status === 'agreed' && (
-                  <>
-                    <span style={{
-                      padding: '8px 12px',
-                      background: '#dbeafe',
-                      color: '#0284c7',
-                      borderRadius: '6px',
-                      fontSize: '13px',
-                      fontWeight: '600'
-                    }}>
-                      ✓ Deal Diterima
-                    </span>
+                <div>
+                  <h2 
+                    style={{ 
+                      margin: 0, 
+                      fontSize: '18px',
+                      cursor: 'pointer',
+                      color: '#B28A67',
+                      transition: 'all 0.2s'
+                    }}
+                    onClick={() => setShowVendorModal(true)}
+                    onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                    onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                  >
+                    {user.id === selectedChat.customerId ? selectedChat.vendorName : selectedChat.customerName} 🏪
+                  </h2>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#666' }}>
+                    {selectedChat.serviceTitle}
+                  </p>
+                </div>
                     <button
-                      onClick={() => router.push(`/transaction/identity-check?dealId=${dealData.id}`)}
+                      onClick={() => setShowVendorModal(true)}
                       style={{
-                        padding: '10px 16px',
+                        padding: '8px 12px',
                         border: 'none',
-                        borderRadius: '8px',
-                        background: '#f59e0b',
+                        borderRadius: '6px',
+                        background: '#B28A67',
                         color: 'white',
                         fontWeight: '600',
                         cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        marginLeft: '8px'
+                        fontSize: '12px'
                       }}
-                      onMouseEnter={(e) => e.target.style.background = '#d97706'}
-                      onMouseLeave={(e) => e.target.style.background = '#f59e0b'}
                     >
-                      💳 Bayar Sekarang
+                      👤 Profil
                     </button>
-                  </>
-                )}
-                {dealData?.status === 'cancelled' && (
-                  <span style={{
-                    padding: '8px 12px',
-                    background: '#fee2e2',
-                    color: '#dc2626',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    fontWeight: '600'
-                  }}>
-                    ✗ Deal Ditolak
-                  </span>
-                )}
               </div>
+
+              {/* Show payment action when deal agreed, without displaying price */}
+              {dealData?.status === 'agreed' && selectedChat?.dealStatus !== 'closed' && !selectedChat?.closedAt && (
+                <div style={{ padding: '12px 20px', borderBottom: '1px solid #eee', background: '#fff', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '13px', color: '#666' }}>Deal telah disetujui</div>
+                    {dealData.discountGiven && dealData.discount && (
+                      <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                        Potongan: Rp {dealData.discount.amount.toLocaleString('id-ID')} ({dealData.discount.type === 'percent' ? `${dealData.discount.value}%` : `Rp ${dealData.discount.value.toLocaleString('id-ID')}`})
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <button
+                      onClick={proceedToPayment}
+                      style={{ padding: '8px 12px', borderRadius: '8px', border: 'none', background: '#B28A67', color: 'white', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Lanjut ke Pembayaran
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Messages */}
               <div style={{
@@ -437,12 +383,12 @@ export default function CustomerChatsPage() {
                     Mulai percakapan
                   </div>
                 ) : (
-                  messages.map((msg) => {
+                  messages.map((msg, index) => {
                     const isCustomerMessage = msg.senderId === user?.id;
                     
                     return (
                       <div
-                        key={msg.id}
+                        key={`${msg.id || msg.timestamp}-${index}`}
                         style={{
                           display: 'flex',
                           justifyContent: isCustomerMessage ? 'flex-end' : 'flex-start',
@@ -453,7 +399,7 @@ export default function CustomerChatsPage() {
                           maxWidth: '65%',
                           padding: '12px 14px',
                           borderRadius: '16px',
-                          background: isCustomerMessage ? '#7c3aed' : '#e5e7eb',
+                          background: isCustomerMessage ? '#B28A67' : '#e5e7eb',
                           color: isCustomerMessage ? 'white' : '#333',
                           wordWrap: 'break-word'
                         }}>
@@ -499,11 +445,17 @@ export default function CustomerChatsPage() {
                 display: 'flex',
                 gap: '10px'
               }}>
+                {selectedChat?.dealStatus === 'closed' && (
+                  <div style={{ marginBottom: '10px', padding: '10px 12px', borderRadius: '8px', background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e', fontSize: '13px', width: '100%' }}>
+                    Chat sudah ditutup setelah pembayaran selesai.
+                  </div>
+                )}
                 <input
                   type="text"
                   placeholder="Ketik pesan..."
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
+                  disabled={selectedChat?.dealStatus === 'closed'}
                   onKeyPress={(e) => {
                     if (e.key === 'Enter') {
                       sendMessage();
@@ -515,19 +467,23 @@ export default function CustomerChatsPage() {
                     border: '1px solid #ddd',
                     borderRadius: '8px',
                     fontSize: '14px',
-                    fontFamily: 'inherit'
+                    fontFamily: 'inherit',
+                    opacity: selectedChat?.dealStatus === 'closed' ? 0.6 : 1,
+                    cursor: selectedChat?.dealStatus === 'closed' ? 'not-allowed' : 'text'
                   }}
                 />
                 <button
                   onClick={sendMessage}
+                  disabled={selectedChat?.dealStatus === 'closed'}
                   style={{
                     padding: '10px 16px',
                     border: 'none',
                     borderRadius: '8px',
-                    background: '#7c3aed',
+                    background: '#B28A67',
                     color: 'white',
                     fontWeight: '600',
-                    cursor: 'pointer'
+                    cursor: selectedChat?.dealStatus === 'closed' ? 'not-allowed' : 'pointer',
+                    opacity: selectedChat?.dealStatus === 'closed' ? 0.6 : 1
                   }}
                 >
                   Kirim
@@ -548,6 +504,167 @@ export default function CustomerChatsPage() {
           )}
         </div>
       </div>
+
+      {/* Vendor Profile Modal */}
+      {showVendorModal && selectedChat && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '30px',
+            maxWidth: '400px',
+            width: '90%',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)'
+          }}>
+            {/* Close Button */}
+            <button
+              onClick={() => setShowVendorModal(false)}
+              style={{
+                position: 'absolute',
+                top: '15px',
+                right: '15px',
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#999'
+              }}
+            >
+              ✕
+            </button>
+
+            {/* Vendor Info */}
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>
+                {selectedChat.vendorName}
+              </h2>
+              <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#666' }}>
+                {selectedChat.serviceTitle}
+              </p>
+            </div>
+
+            {/* Status Deal */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              marginBottom: '20px'
+            }}>
+              {!dealData && (
+                <div style={{
+                  padding: '12px',
+                  background: '#f3f4f6',
+                  color: '#4b5563',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  textAlign: 'center'
+                }}>
+                  Belum ada status deal. Lanjutkan negosiasi lewat chat.
+                </div>
+              )}
+
+              {dealData?.status === 'pending' && (
+                <div style={{
+                  padding: '12px',
+                  background: '#fff7ed',
+                  color: '#c2410c',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  textAlign: 'center'
+                }}>
+                  Menunggu konfirmasi vendor.
+                </div>
+              )}
+
+              {dealData?.status === 'agreed' && (
+                <>
+                  <div style={{
+                    padding: '12px',
+                    background: '#dbeafe',
+                    color: '#0284c7',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    textAlign: 'center'
+                  }}>
+                    ✓ Deal sudah disetujui.
+                  </div>
+                  <div style={{
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    background: '#f5f3ff',
+                    color: '#5b21b6',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    textAlign: 'center'
+                  }}>
+                    Gunakan tombol ungu Lanjut ke Pembayaran di area chat untuk melanjutkan pembayaran.
+                  </div>
+                </>
+              )}
+
+              {(selectedChat?.dealStatus === 'closed' || selectedChat?.closedAt) && (
+                <div style={{
+                  padding: '12px',
+                  background: '#ecfdf5',
+                  color: '#065f46',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  textAlign: 'center'
+                }}>
+                  Pembayaran sudah selesai dan chat telah ditutup.
+                </div>
+              )}
+
+              {dealData?.status === 'cancelled' && (
+                <div style={{
+                  padding: '12px',
+                  background: '#fee2e2',
+                  color: '#dc2626',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  textAlign: 'center'
+                }}>
+                  Deal dibatalkan.
+                </div>
+              )}
+            </div>
+
+            {/* Close Modal Button */}
+            <button
+              onClick={() => setShowVendorModal(false)}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                background: 'white',
+                color: '#333',
+                fontWeight: '600',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

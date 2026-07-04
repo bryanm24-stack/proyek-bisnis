@@ -5,5 +5,48 @@
     "customerId": "4",
     "vendorId": "1",
     "serviceId": "s1"
+  },
+  {
+    "id": "1776954691440",
+    "chatId": "1775939466935",
+    "customerId": "1775589203562",
+    "vendorId": "2",
+    "serviceId": "s2",
+    "customerAccepted": true,
+    "vendorAccepted": true,
+    "status": "completed",
+    "createdAt": "2026-04-23T14:31:31.440Z",
+    "agreedAt": "2026-04-23T14:31:39.581Z",
+    "invoiceStatus": "paid",
+    "paymentConfirmedAt": "2026-05-25T18:22:27.113Z",
+    "actualReturnDate": "2026-05-25",
+    "returnStatus": "completed",
+    "vendorConfirmed": true,
+    "customerConfirmed": true,
+    "settlementDate": "2026-05-25",
+    "refundStatus": "processed"
+  },
+  {
+    "id": "1777493759494",
+    "chatId": "1777493750510",
+    "customerId": "4",
+    "vendorId": "3",
+    "serviceId": "1704067202000",
+    "customerAccepted": true,
+    "vendorAccepted": true,
+    "status": "completed",
+    "createdAt": "2026-04-29T20:15:59.494Z",
+    "agreedAt": "2026-04-29T20:16:45.405Z",
+    "discountGiven": true,
+    "discount": {
+      "type": "percent",
+      "value": 20,
+      "amount": 10000
+    },
+    "originalPrice": 50000,
+    "finalPrice": 40000,
+    "discountUpdatedAt": "2026-04-29T20:17:00.762Z",
+    "invoiceStatus": "paid",
+    "completedAt": "2026-04-29T20:25:46.277Z"
   }
 ]
