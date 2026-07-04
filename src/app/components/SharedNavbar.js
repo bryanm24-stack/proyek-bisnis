@@ -572,6 +572,9 @@ export default function SharedNavbar() {
               <NavLink href="/admin/vendor-approval" active={isActive('/admin/vendor-approval')}>
                 ✓ Verifikasi Vendor
               </NavLink>
+              <NavLink href="/admin/customer-verification" active={isActive('/admin/customer-verification')}>
+                👤 Verifikasi Customer
+              </NavLink>
               <NavLink href="/admin/transaction-verification" active={isActive('/admin/transaction-verification')}>
                 🪪 Verifikasi Transaksi
               </NavLink>

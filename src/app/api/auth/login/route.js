@@ -15,10 +15,21 @@ export async function POST(request) {
 
     // Try DB first
     try {
-      const res = await query(
-        'SELECT id, name, email, role, phone FROM users WHERE email = ? AND password = ? LIMIT 1',
-        [email, password]
-      );
+      let res;
+      try {
+        res = await query(
+          'SELECT id, name, email, role, phone, bankName, accountNumber, accountHolder, ktp_status FROM users WHERE email = ? AND password = ? LIMIT 1',
+          [email, password]
+        );
+      } catch (columnErr) {
+        // Fallback if bank/ktp columns don't exist (legacy DB)
+        console.log('Bank/KTP columns not found, trying without them');
+        res = await query(
+          'SELECT id, name, email, role, phone FROM users WHERE email = ? AND password = ? LIMIT 1',
+          [email, password]
+        );
+      }
+      
       const user = Array.isArray(res) ? res[0] : undefined;
       if (!user) {
         throw new Error('User not found in DB');
@@ -32,6 +43,10 @@ export async function POST(request) {
           name: user.name,
           email: user.email,
           phone: user.phone || '',
+          bankName: user.bankName || '',
+          accountNumber: user.accountNumber || '',
+          accountHolder: user.accountHolder || '',
+          ktp_status: user.ktp_status || 'not_submitted',
           role: user.role
         }
       }, { status: 200 });
@@ -51,6 +66,10 @@ export async function POST(request) {
           id: String(user.id),
           name: user.name,
           email: user.email,
+          bankName: user.bankName || '',
+          accountNumber: user.accountNumber || '',
+          accountHolder: user.accountHolder || '',
+          ktp_status: user.ktp_status || 'not_submitted',
           role: user.role
         }
       }, { status: 200 });

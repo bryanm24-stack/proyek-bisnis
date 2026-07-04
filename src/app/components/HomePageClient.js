@@ -543,9 +543,25 @@ export default function HomePageClient() {
     }
   };
 
+  const isCustomerProfileComplete = (profile) => {
+    return !!(
+      profile &&
+      profile.role === 'customer' &&
+      profile.name &&
+      profile.bankName &&
+      profile.accountNumber &&
+      profile.accountHolder
+    );
+  };
+
   const handleDealAction = async (action) => {
     if (dealProcessing) return;
     if (!selectedService || !user || !chatData?.id) return;
+
+    if (action === 'accept' && user.role === 'customer' && !isCustomerProfileComplete(user)) {
+      alert('Lengkapi profil Anda di halaman Pengaturan (Nama Lengkap, Nama Bank, Nomor Rekening, Nama Pemilik Rekening) sebelum mengajukan deal.');
+      return;
+    }
 
     setDealProcessing(true);
     try {
@@ -2295,7 +2311,7 @@ export default function HomePageClient() {
                         <button
                           type="button"
                           onClick={() => handleDealAction('accept')}
-                          disabled={dealDisabled || dealProcessing}
+                          disabled={dealDisabled || dealProcessing || (user?.role === 'customer' && !isCustomerProfileComplete(user))}
                           style={{
                             flex: 1,
                             padding: '8px 10px',
@@ -2304,8 +2320,8 @@ export default function HomePageClient() {
                             background: messages.length === 0 ? 'rgba(178, 138, 103, 0.15)' : 'rgba(16, 185, 129, 0.08)',
                             color: messages.length === 0 ? '#8F6B4A' : '#047857',
                             fontWeight: '700',
-                            cursor: dealDisabled || dealProcessing ? 'not-allowed' : 'pointer',
-                            opacity: dealDisabled || dealProcessing ? 0.55 : 1,
+                            cursor: dealDisabled || dealProcessing || (user?.role === 'customer' && !isCustomerProfileComplete(user)) ? 'not-allowed' : 'pointer',
+                            opacity: dealDisabled || dealProcessing || (user?.role === 'customer' && !isCustomerProfileComplete(user)) ? 0.55 : 1,
                             transition: 'all 0.3s ease'
                           }}
                         >
@@ -2337,6 +2353,12 @@ export default function HomePageClient() {
                           {dealData?.status === 'cancelled' ? 'Mulai Ulang Negosiasi' : 'Cancel'}
                         </button>
                       </div>
+
+                      {user?.role === 'customer' && !isCustomerProfileComplete(user) && (
+                        <div style={{ marginTop: '8px', fontSize: '12px', color: '#b91c1c' }}>
+                          Lengkapi profil Anda di <a href="/settings" style={{ color: '#1d4ed8', textDecoration: 'underline' }}>Pengaturan</a> sebelum mengajukan deal.
+                        </div>
+                      )}
 
                       {dealData?.status === 'agreed' && chatData?.dealStatus !== 'closed' && !chatData?.closedAt && (
                         <div style={{ marginTop: '8px', fontSize: '12px', color: '#1e40af' }}>

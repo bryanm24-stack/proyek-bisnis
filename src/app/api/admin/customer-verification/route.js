@@ -1,0 +1,241 @@
+// JANGAN ADA 'use client' DI SINI!
+import { NextResponse } from 'next/server';
+import { query } from '@/lib/db';
+import { readData, writeData } from '@/lib/storage';
+
+/**
+ * GET /api/admin/customer-verification
+ * - Get list of all customer KTP verifications with their status
+ * - Query params: status (optional: pending, approved, rejected, not_submitted)
+ */
+export async function GET(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const statusFilter = searchParams.get('status');
+    const role = searchParams.get('role');
+
+    // Try DB first
+    try {
+      let sqlQuery = `
+        SELECT id, name, email, phone, ktp_status, 
+               ktp_submitted_at, ktp_verified_by, ktp_verified_at, ktp_rejection_reason
+        FROM users 
+        WHERE role = 'customer'
+      `;
+      let params = [];
+
+      if (statusFilter && statusFilter !== 'all') {
+        sqlQuery += ` AND ktp_status = ?`;
+        params.push(statusFilter);
+      }
+
+      sqlQuery += ` ORDER BY ktp_submitted_at DESC, created_at DESC`;
+
+      const dbResults = await query(sqlQuery, params);
+      
+      return NextResponse.json({
+        success: true,
+        source: 'database',
+        verifications: Array.isArray(dbResults) ? dbResults : [],
+        totalCount: Array.isArray(dbResults) ? dbResults.length : 0,
+        statusCounts: {
+          pending: (dbResults || []).filter(v => v.ktp_status === 'pending').length,
+          approved: (dbResults || []).filter(v => v.ktp_status === 'approved').length,
+          rejected: (dbResults || []).filter(v => v.ktp_status === 'rejected').length,
+          notSubmitted: (dbResults || []).filter(v => v.ktp_status === 'not_submitted').length
+        }
+      }, { status: 200 });
+    } catch (dbErr) {
+      // Fallback to JSON storage
+      const users = await readData('users');
+      let verifications = users.filter(u => u.role === 'customer').map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        phone: u.phone,
+        ktp_status: u.ktp_status || 'not_submitted',
+        ktp_submitted_at: u.ktp_submitted_at,
+        ktp_verified_by: u.ktp_verified_by,
+        ktp_verified_at: u.ktp_verified_at,
+        ktp_rejection_reason: u.ktp_rejection_reason
+      }));
+
+      if (statusFilter && statusFilter !== 'all') {
+        verifications = verifications.filter(v => v.ktp_status === statusFilter);
+      }
+
+      verifications.sort((a, b) => {
+        const aDate = new Date(a.ktp_submitted_at || 0);
+        const bDate = new Date(b.ktp_submitted_at || 0);
+        return bDate - aDate;
+      });
+
+      return NextResponse.json({
+        success: true,
+        source: 'json_storage',
+        verifications,
+        totalCount: verifications.length,
+        statusCounts: {
+          pending: verifications.filter(v => v.ktp_status === 'pending').length,
+          approved: verifications.filter(v => v.ktp_status === 'approved').length,
+          rejected: verifications.filter(v => v.ktp_status === 'rejected').length,
+          notSubmitted: verifications.filter(v => v.ktp_status === 'not_submitted').length
+        }
+      }, { status: 200 });
+    }
+  } catch (error) {
+    console.error('Error fetching customer verifications:', error);
+    return NextResponse.json({
+      success: false,
+      message: 'Gagal mengambil data verifikasi: ' + error.message
+    }, { status: 500 });
+  }
+}
+
+/**
+ * POST /api/admin/customer-verification
+ * - Submit/update KTP verification (customer or admin)
+ * - Body: { userId, action: 'submit' | 'approve' | 'reject', ktpData?, rejectionReason? }
+ */
+export async function POST(request) {
+  try {
+    const body = await request.json();
+    const { userId, action, ktpData, rejectionReason, adminId } = body;
+
+    if (!userId || !action) {
+      return NextResponse.json({
+        success: false,
+        message: 'userId dan action harus diisi'
+      }, { status: 400 });
+    }
+
+    const validActions = ['submit', 'approve', 'reject'];
+    if (!validActions.includes(action)) {
+      return NextResponse.json({
+        success: false,
+        message: `Action harus salah satu dari: ${validActions.join(', ')}`
+      }, { status: 400 });
+    }
+
+    const now = new Date().toISOString();
+
+    // Try DB first
+    try {
+      // Get current user data
+      const userResult = await query(
+        'SELECT id, name, email, ktp_status FROM users WHERE id = ? LIMIT 1',
+        [userId]
+      );
+
+      if (!userResult || userResult.length === 0) {
+        return NextResponse.json({
+          success: false,
+          message: 'User tidak ditemukan'
+        }, { status: 404 });
+      }
+
+      const user = userResult[0];
+
+      let updateQuery = '';
+      let updateParams = [];
+
+      if (action === 'submit') {
+        // Customer submits KTP for verification
+        updateQuery = `
+          UPDATE users 
+          SET ktp_status = 'pending', 
+              ktp_data = ?,
+              ktp_submitted_at = ?
+          WHERE id = ?
+        `;
+        updateParams = [JSON.stringify(ktpData || {}), now, userId];
+      } else if (action === 'approve') {
+        // Admin approves KTP
+        updateQuery = `
+          UPDATE users 
+          SET ktp_status = 'approved',
+              ktp_verified_by = ?,
+              ktp_verified_at = ?,
+              ktp_rejection_reason = NULL
+          WHERE id = ?
+        `;
+        updateParams = [adminId || 'admin', now, userId];
+      } else if (action === 'reject') {
+        // Admin rejects KTP
+        updateQuery = `
+          UPDATE users 
+          SET ktp_status = 'rejected',
+              ktp_verified_by = ?,
+              ktp_verified_at = ?,
+              ktp_rejection_reason = ?
+          WHERE id = ?
+        `;
+        updateParams = [adminId || 'admin', now, rejectionReason || '', userId];
+      }
+
+      await query(updateQuery, updateParams);
+
+      // Get updated user
+      const updatedUser = await query(
+        'SELECT id, name, email, ktp_status FROM users WHERE id = ? LIMIT 1',
+        [userId]
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: `KTP ${action} berhasil!`,
+        user: updatedUser[0],
+        timestamp: now
+      }, { status: 200 });
+    } catch (dbErr) {
+      // Fallback to JSON storage
+      const users = await readData('users');
+      const userIndex = users.findIndex(u => String(u.id) === String(userId));
+
+      if (userIndex === -1) {
+        return NextResponse.json({
+          success: false,
+          message: 'User tidak ditemukan'
+        }, { status: 404 });
+      }
+
+      const user = users[userIndex];
+
+      if (action === 'submit') {
+        user.ktp_status = 'pending';
+        user.ktp_data = ktpData || {};
+        user.ktp_submitted_at = now;
+      } else if (action === 'approve') {
+        user.ktp_status = 'approved';
+        user.ktp_verified_by = adminId || 'admin';
+        user.ktp_verified_at = now;
+        user.ktp_rejection_reason = null;
+      } else if (action === 'reject') {
+        user.ktp_status = 'rejected';
+        user.ktp_verified_by = adminId || 'admin';
+        user.ktp_verified_at = now;
+        user.ktp_rejection_reason = rejectionReason || '';
+      }
+
+      await writeData('users', users);
+
+      return NextResponse.json({
+        success: true,
+        message: `KTP ${action} berhasil!`,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          ktp_status: user.ktp_status
+        },
+        timestamp: now
+      }, { status: 200 });
+    }
+  } catch (error) {
+    console.error('Error processing customer verification:', error);
+    return NextResponse.json({
+      success: false,
+      message: 'Terjadi kesalahan: ' + error.message
+    }, { status: 500 });
+  }
+}

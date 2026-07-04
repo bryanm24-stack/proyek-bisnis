@@ -66,6 +66,11 @@ export default function SettingsPage() {
       email: parsedUser.email || '',
       phone: parsedUser.phone || ''
     });
+    setBankForm({
+      bankName: parsedUser.bankName || '',
+      accountNumber: parsedUser.accountNumber || '',
+      accountHolder: parsedUser.accountHolder || ''
+    });
 
     const loadData = async () => {
       try {
@@ -174,6 +179,48 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('Error saving profile:', error);
       setGlobalMessage('Terjadi kesalahan saat menyimpan profil.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleBankSave = async () => {
+    if (!user) return;
+    setGlobalMessage('');
+    setIsSaving(true);
+
+    try {
+      const response = await fetch('/api/auth/update-profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: user.id,
+          name: profileForm.name || user.name,
+          email: profileForm.email || user.email,
+          phone: profileForm.phone || user.phone,
+          bankName: bankForm.bankName,
+          accountNumber: bankForm.accountNumber,
+          accountHolder: bankForm.accountHolder
+        })
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setGlobalMessage(result.message || 'Gagal menyimpan rekening bank.');
+        return;
+      }
+
+      const updatedUser = {
+        ...user,
+        bankName: result.user?.bankName || bankForm.bankName,
+        accountNumber: result.user?.accountNumber || bankForm.accountNumber,
+        accountHolder: result.user?.accountHolder || bankForm.accountHolder
+      };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setGlobalMessage('Rekening berhasil disimpan.');
+    } catch (error) {
+      console.error('Error saving bank details:', error);
+      setGlobalMessage('Terjadi kesalahan saat menyimpan rekening bank.');
     } finally {
       setIsSaving(false);
     }
@@ -598,10 +645,11 @@ export default function SettingsPage() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <button
-                      onClick={() => setGlobalMessage('Fungsi rekening bank akan diaktifkan setelah integrasi backend.')}
-                      style={{ padding: '14px 22px', borderRadius: '14px', border: 'none', background: '#B28A67', color: 'white', fontWeight: '700', cursor: 'pointer' }}
+                      onClick={handleBankSave}
+                      disabled={isSaving}
+                      style={{ padding: '14px 22px', borderRadius: '14px', border: 'none', background: '#B28A67', color: 'white', fontWeight: '700', cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.65 : 1 }}
                     >
-                      Simpan Rekening
+                      {isSaving ? 'Menyimpan...' : 'Simpan Rekening'}
                     </button>
                   </div>
                 </div>

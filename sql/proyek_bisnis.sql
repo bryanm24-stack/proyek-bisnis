@@ -30,6 +30,15 @@ CREATE TABLE IF NOT EXISTS users (
   role VARCHAR(255),
   email VARCHAR(255),
   phone VARCHAR(255),
+  bankName VARCHAR(255),
+  accountNumber VARCHAR(255),
+  accountHolder VARCHAR(255),
+  ktp_status ENUM('not_submitted', 'pending', 'approved', 'rejected', 'not_applicable') DEFAULT 'not_submitted',
+  ktp_data JSON,
+  ktp_submitted_at DATETIME(3),
+  ktp_verified_by VARCHAR(255),
+  ktp_verified_at DATETIME(3),
+  ktp_rejection_reason VARCHAR(500),
   created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
   FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE SET NULL
 );

@@ -107,6 +107,17 @@ export default function FavoritesPage() {
     return Number(item.hargaPcs || item.hargaSesi || item.harga || item.price || 0);
   };
 
+  const isCustomerProfileComplete = (profile) => {
+    return !!(
+      profile &&
+      profile.role === 'customer' &&
+      profile.name &&
+      profile.bankName &&
+      profile.accountNumber &&
+      profile.accountHolder
+    );
+  };
+
   // Helper function to get display price from items
   const getItemsPrice = (service) => {
     if (!service.items || service.items.length === 0) {
@@ -347,6 +358,11 @@ export default function FavoritesPage() {
 
   const handleDealAction = async (action) => {
     if (!selectedService || !user || !chatData?.id) return;
+
+    if (action === 'accept' && user.role === 'customer' && !isCustomerProfileComplete(user)) {
+      alert('Lengkapi profil Anda di halaman Pengaturan (Nama Lengkap, Nama Bank, Nomor Rekening, Nama Pemilik Rekening) sebelum mengajukan deal.');
+      return;
+    }
 
     try {
       const response = await fetch('/api/deals', {
