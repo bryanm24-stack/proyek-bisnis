@@ -9,6 +9,8 @@ async function ensureNotificationsTable() {
       user_id VARCHAR(255) NOT NULL,
       type VARCHAR(100) NOT NULL,
       message TEXT NOT NULL,
+      sender_name VARCHAR(255),
+      message_count INT DEFAULT 1,
       related_id VARCHAR(255),
       related_data JSON,
       is_read TINYINT DEFAULT 0,
@@ -31,6 +33,18 @@ async function ensureNotificationsTable() {
     if (!columnNames.has('updated_at')) {
       await query(
         `ALTER TABLE notifications ADD COLUMN updated_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) AFTER created_at`
+      );
+    }
+
+    if (!columnNames.has('sender_name')) {
+      await query(
+        `ALTER TABLE notifications ADD COLUMN sender_name VARCHAR(255) AFTER message`
+      );
+    }
+
+    if (!columnNames.has('message_count')) {
+      await query(
+        `ALTER TABLE notifications ADD COLUMN message_count INT DEFAULT 1 AFTER sender_name`
       );
     }
   } catch (err) {
@@ -56,11 +70,67 @@ export async function GET(req) {
     const notifications = await query(
       `SELECT * FROM notifications 
        WHERE user_id = ? 
-       ORDER BY created_at DESC`,
+       ORDER BY COALESCE(updated_at, created_at) DESC`,
       [userId]
     );
 
-    return NextResponse.json(notifications, { status: 200 });
+    const dedupedNotifications = [];
+    const chatNotificationMap = new Map();
+
+    for (const notification of notifications) {
+      const isChatNotification = String(notification.type).toLowerCase() === 'chat_message' && notification.related_id;
+
+      if (!isChatNotification) {
+        dedupedNotifications.push(notification);
+        continue;
+      }
+
+      const existing = chatNotificationMap.get(notification.related_id);
+      if (!existing) {
+        chatNotificationMap.set(notification.related_id, {
+          ...notification,
+          message_count: Number(notification.message_count || 1)
+        });
+        continue;
+      }
+
+      const existingIsUnread = !existing.is_read;
+      const currentIsUnread = !notification.is_read;
+
+      if (!existingIsUnread && currentIsUnread) {
+        chatNotificationMap.set(notification.related_id, {
+          ...notification,
+          message_count: Number(notification.message_count || 1)
+        });
+        continue;
+      }
+
+      if (existingIsUnread && !currentIsUnread) {
+        continue;
+      }
+
+      if (existingIsUnread && currentIsUnread) {
+        chatNotificationMap.set(notification.related_id, {
+          ...notification,
+          message_count: Number(existing.message_count || 1) + Number(notification.message_count || 1)
+        });
+        continue;
+      }
+
+      chatNotificationMap.set(notification.related_id, {
+        ...notification,
+        message_count: Number(notification.message_count || 1)
+      });
+    }
+
+    dedupedNotifications.push(...chatNotificationMap.values());
+    dedupedNotifications.sort((a, b) => {
+      const aTime = new Date(a.updated_at || a.created_at).getTime();
+      const bTime = new Date(b.updated_at || b.created_at).getTime();
+      return bTime - aTime;
+    });
+
+    return NextResponse.json(dedupedNotifications, { status: 200 });
   } catch (error) {
     console.error('Error fetching notifications:', error);
     return NextResponse.json(
@@ -75,7 +145,7 @@ export async function POST(req) {
   try {
     await ensureNotificationsTable();
     
-    const { userId, type, message, relatedId, relatedData } = await req.json();
+    const { userId, type, message, senderName, relatedId, relatedData } = await req.json();
 
     if (!userId || !type || !message) {
       return NextResponse.json(
@@ -87,14 +157,53 @@ export async function POST(req) {
     const notificationId = `notif_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const now = new Date().toISOString();
 
+    if (String(type).toLowerCase() === 'chat_message' && relatedId) {
+      const [existingNotification] = await query(
+        `SELECT * FROM notifications
+         WHERE user_id = ?
+           AND type = ?
+           AND related_id = ?
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [String(userId), String(type), String(relatedId)]
+      );
+
+      if (existingNotification) {
+        if (!Number(existingNotification.is_read)) {
+          const nextCount = Number(existingNotification.message_count || 1) + 1;
+          await query(
+            `UPDATE notifications
+             SET message = ?, sender_name = ?, message_count = ?, related_data = ?, is_read = 0, updated_at = ?
+             WHERE id = ?`,
+            [
+              String(message),
+              senderName ? String(senderName) : null,
+              nextCount,
+              relatedData ? JSON.stringify(relatedData) : existingNotification.related_data,
+              now,
+              existingNotification.id
+            ]
+          );
+
+          const [updatedNotification] = await query(
+            `SELECT * FROM notifications WHERE id = ?`,
+            [existingNotification.id]
+          );
+
+          return NextResponse.json(updatedNotification, { status: 200 });
+        }
+      }
+    }
+
     await query(
-      `INSERT INTO notifications (id, user_id, type, message, related_id, related_data, is_read, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+      `INSERT INTO notifications (id, user_id, type, message, sender_name, message_count, related_id, related_data, is_read, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?, ?, 0, ?, ?)`,
       [
         notificationId,
         String(userId),
         String(type),
         String(message),
+        senderName ? String(senderName) : null,
         relatedId ? String(relatedId) : null,
         relatedData ? JSON.stringify(relatedData) : null,
         now,
@@ -122,15 +231,41 @@ export async function PUT(req) {
   try {
     await ensureNotificationsTable();
     
-    const { notificationId } = await req.json();
+    const { notificationId, relatedId } = await req.json();
 
-    if (!notificationId) {
+    if (!notificationId && !relatedId) {
       return NextResponse.json(
-        { message: 'notificationId diperlukan' },
+        { message: 'notificationId atau relatedId diperlukan' },
         { status: 400 }
       );
     }
-    
+
+    if (relatedId) {
+      await query(
+        `UPDATE notifications
+         SET is_read = 1
+         WHERE related_id = ? AND type = 'chat_message'`,
+        [relatedId]
+      );
+
+      const [notification] = await query(
+        `SELECT * FROM notifications
+         WHERE related_id = ? AND type = 'chat_message'
+         ORDER BY COALESCE(updated_at, created_at) DESC
+         LIMIT 1`,
+        [relatedId]
+      );
+
+      if (!notification) {
+        return NextResponse.json(
+          { message: 'Notifikasi tidak ditemukan' },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json(notification, { status: 200 });
+    }
+
     await query(
       `UPDATE notifications 
        SET is_read = 1 

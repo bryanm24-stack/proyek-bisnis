@@ -1,7 +1,7 @@
 /**
  * Mapping notification types ke judul yang readable dalam Bahasa Indonesia
  */
-export const getNotificationTitle = (type) => {
+export const getNotificationTitle = (type, senderName, messageCount = 1) => {
   const titleMap = {
     // Komplain
     'complaint_created': 'Komplain Baru',
@@ -38,5 +38,15 @@ export const getNotificationTitle = (type) => {
 
   // Normalize type ke lowercase jika belum
   const normalizedType = String(type).toLowerCase();
-  return titleMap[normalizedType] || type || 'Notifikasi';
+  let title = titleMap[normalizedType] || type || 'Notifikasi';
+
+  // Untuk chat_message, tambahkan sender_name jika ada
+  if (normalizedType === 'chat_message' && senderName) {
+    const count = Number(messageCount) || 1;
+    title = count > 1
+      ? `${count} pesan baru dari ${senderName}`
+      : `Pesan baru dari ${senderName}`;
+  }
+
+  return title;
 };

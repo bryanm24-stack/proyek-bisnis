@@ -424,14 +424,14 @@ export default function SharedNavbar() {
                         onMouseLeave={(e) => e.currentTarget.style.background = '#fef9f3'}
                       >
                         <div style={{ fontSize: '13px', color: '#B28A67', fontWeight: '600', marginBottom: '4px' }}>
-                          {getNotificationTitle(notif.type)}
+                          {getNotificationTitle(notif.type, notif.sender_name, notif.message_count)}
                         </div>
                         <div style={{ fontSize: '12px', color: '#333', marginBottom: '4px', lineHeight: '1.4' }}>
                           {notif.message.substring(0, 70)}
                           {notif.message.length > 70 ? '...' : ''}
                         </div>
                         <div style={{ fontSize: '11px', color: '#999' }}>
-                          {new Date(notif.created_at).toLocaleString('id-ID')}
+                          {new Date(notif.updated_at || notif.created_at).toLocaleString('id-ID')}
                         </div>
                       </div>
                     ))}

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { ensureComplaintsTable, listComplaintsForVendor } from '@/lib/complaints';
+import {  , listComplaintsForVendor } from '@/lib/complaints';
 
 export async function GET(request) {
   try {

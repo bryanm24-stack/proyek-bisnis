@@ -88,6 +88,26 @@ export default function CustomerChatsPage() {
     setMessages(chat.messages || []);
     setNewMessage('');
     
+    // Mark chat as read
+    if (chat.id && !chat.is_read) {
+      try {
+        await fetch('/api/chat', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chatId: chat.id })
+        });
+        await fetch('/api/notifications', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ relatedId: chat.id })
+        });
+        // Update chat in list to mark as read
+        setChats(prev => prev.map(c => c.id === chat.id ? { ...c, isRead: 1, is_read: 1 } : c));
+      } catch (error) {
+        console.error('Error marking chat as read:', error);
+      }
+    }
+    
     try {
       const dealResponse = await fetch(`/api/deals?chatId=${chat.id}`);
       const dealDataResp = await dealResponse.json();
@@ -153,8 +173,8 @@ export default function CustomerChatsPage() {
         setNewMessage('');
         
         // Update chats list
-        setChats(chats.map(c => 
-          c.id === selectedChat.id ? data.data : c
+        setChats(prev => prev.map(c => 
+          c.id === selectedChat.id ? { ...c, ...data.data } : c
         ));
         setSelectedChat(data.data);
       }
@@ -274,17 +294,42 @@ export default function CustomerChatsPage() {
                       background: selectedChat?.id === chat.id ? '#B28A67' : '#fff',
                       color: selectedChat?.id === chat.id ? '#fff' : '#333',
                       border: selectedChat?.id === chat.id ? '2px solid #B28A67' : '1px solid #eee',
-                      transition: 'all 0.3s'
+                      transition: 'all 0.3s',
+                      position: 'relative'
                     }}
                   >
-                    <div style={{ fontWeight: '600', fontSize: '14px' }}>
-                      {chat.vendorName}
-                    </div>
-                    <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '4px' }}>
-                      {chat.serviceTitle}
-                    </div>
-                    <div style={{ fontSize: '12px', opacity: 0.6, marginTop: '4px' }}>
-                      {chat.messages?.length || 0} pesan
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '600', fontSize: '14px' }}>
+                          {chat.vendorName}
+                        </div>
+                        <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '4px' }}>
+                          {chat.serviceTitle}
+                        </div>
+                        <div style={{ fontSize: '12px', opacity: 0.6, marginTop: '4px' }}>
+                          {chat.messages?.length || 0} pesan
+                        </div>
+                      </div>
+                      {!chat.is_read && chat.last_sender_id !== String(user?.id) && (
+                        <div
+                          style={{
+                            background: '#10b981',
+                            color: 'white',
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            flexShrink: 0
+                          }}
+                          title="Chat belum dibaca"
+                        >
+                          ●
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

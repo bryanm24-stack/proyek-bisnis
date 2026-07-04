@@ -32,7 +32,11 @@ export async function GET(request) {
       itemName: chat.item_name,
       messages: typeof chat.messages === 'string' ? JSON.parse(chat.messages) : chat.messages || [],
       createdAt: chat.created_at,
-      dealStatus: chat.deal_status
+      dealStatus: chat.deal_status,
+      isRead: chat.is_read,
+      lastSenderId: chat.last_sender_id,
+      is_read: chat.is_read,
+      last_sender_id: chat.last_sender_id
     }));
 
     return NextResponse.json({

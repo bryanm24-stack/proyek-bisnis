@@ -17,7 +17,6 @@ export default function HomePageClient() {
   const [modalOpen, setModalOpen] = useState(false);
   const [detailTab, setDetailTab] = useState('packages');
   const [modalImageIndex, setModalImageIndex] = useState(0);
-  // ✅ NEW: Track image carousel for product cards
   const [currentImageIndex, setCurrentImageIndex] = useState({});
   const [heroImageIndex, setHeroImageIndex] = useState(0);
   const [chatModalOpen, setChatModalOpen] = useState(false);
