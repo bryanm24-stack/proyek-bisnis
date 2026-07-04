@@ -83,7 +83,7 @@ export default function SharedNavbar() {
     };
 
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
+    const interval = setInterval(fetchNotifications, 15000); // Polling setiap 15 detik
     return () => clearInterval(interval);
   }, [user]);
 
@@ -129,6 +129,26 @@ export default function SharedNavbar() {
       setNotifications((prev) => prev.filter((notif) => notif.id !== notificationId));
     } catch (error) {
       console.error('Error deleting notification:', error);
+    }
+  };
+
+  const handleMarkAsRead = async (notificationId) => {
+    if (!user || !notificationId) return;
+
+    try {
+      const response = await fetch(`/api/notifications`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notificationId })
+      });
+
+      if (response.ok) {
+        setNotifications((prev) =>
+          prev.filter((notif) => notif.id !== notificationId)
+        );
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
     }
   };
 
@@ -342,7 +362,7 @@ export default function SharedNavbar() {
               title="Notifikasi"
             >
               🔔
-              {notifications.length > 0 && (
+              {notifications.filter(n => !n.is_read).length > 0 && (
                 <span
                   style={{
                     position: 'absolute',
@@ -360,7 +380,7 @@ export default function SharedNavbar() {
                     fontWeight: 'bold',
                   }}
                 >
-                  {notifications.length}
+                  {notifications.filter(n => !n.is_read).length}
                 </span>
               )}
             </button>
@@ -375,43 +395,65 @@ export default function SharedNavbar() {
                   border: '1px solid #e5e7eb',
                   borderRadius: '8px',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  width: '300px',
-                  maxHeight: '400px',
+                  width: '320px',
+                  maxHeight: '420px',
                   overflowY: 'auto',
                   zIndex: 1000,
                 }}
               >
-                {notifications.length === 0 ? (
-                  <div style={{ padding: '16px', textAlign: 'center', color: '#999' }}>Tidak ada notifikasi</div>
+                {notifications.filter(n => !n.is_read).length === 0 ? (
+                  <div style={{ padding: '16px', textAlign: 'center', color: '#999' }}>Tidak ada notifikasi baru</div>
                 ) : (
-                  notifications.map((notif) => (
-                    <div
-                      key={notif.id}
-                      style={{
-                        padding: '12px',
-                        borderBottom: '1px solid #f0f0f0',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontSize: '14px', color: '#333' }}>{notif.message}</div>
-                        <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
-                          {new Date(notif.createdAt).toLocaleTimeString('id-ID')}
+                  <>
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa', fontWeight: '600', fontSize: '12px', color: '#666' }}>
+                      {notifications.filter(n => !n.is_read).length} notifikasi baru
+                    </div>
+                    {notifications.filter(n => !n.is_read).slice(0, 5).map((notif) => (
+                      <div
+                        key={notif.id}
+                        style={{
+                          padding: '12px 16px',
+                          borderBottom: '1px solid #f0f0f0',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s',
+                          background: '#fef9f3',
+                        }}
+                        onClick={() => handleMarkAsRead(notif.id)}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#fef9f3'}
+                      >
+                        <div style={{ fontSize: '13px', color: '#333', fontWeight: '600', marginBottom: '4px' }}>
+                          {notif.message.substring(0, 60)}
+                          {notif.message.length > 60 ? '...' : ''}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#999' }}>
+                          {new Date(notif.created_at).toLocaleTimeString('id-ID')}
                         </div>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteNotification(notif.id);
-                        }}
-                        style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: '12px' }}
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  ))
+                    ))}
+                    {notifications.filter(n => !n.is_read).length > 5 && (
+                      <div style={{ padding: '12px 16px', background: '#fafafa', color: '#999', fontSize: '12px', textAlign: 'center' }}>
+                        +{notifications.filter(n => !n.is_read).length - 5} notifikasi baru lagi
+                      </div>
+                    )}
+                    <Link
+                      href="/notifications"
+                      onClick={() => setShowNotifications(false)}
+                      style={{
+                        display: 'block',
+                        padding: '12px 16px',
+                        borderTop: '1px solid #f0f0f0',
+                        textAlign: 'center',
+                        color: '#B28A67',
+                        textDecoration: 'none',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        background: '#f9fafb',
+                      }}
+                    >
+                      Lihat Semua Notifikasi →
+                    </Link>
+                  </>
                 )}
               </div>
             )}
@@ -516,6 +558,9 @@ export default function SharedNavbar() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '0 14px 16px' }}>
           <NavLink href="/" active={isActive('/')}>
             🏠 Home
+          </NavLink>
+          <NavLink href="/notifications" active={isActive('/notifications')}>
+            🔔 Notifikasi
           </NavLink>
           <NavLink href={user.role === 'vendor' ? '/vendor/chats' : '/customer/chats'} active={isActive('/customer/chats') || isActive('/vendor/chats')}>
             💬 Chat

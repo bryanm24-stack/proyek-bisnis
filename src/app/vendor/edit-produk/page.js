@@ -43,8 +43,10 @@ function EditProdukPageContent() {
     location: '',
     images: [],
     specifications: {},
+    specificationOptions: {},
     descriptionTable: {},
     checklist: {},
+    variations: {},
     items: []
   });
 
@@ -97,8 +99,10 @@ function EditProdukPageContent() {
             location: item.location || '',
             images: item.images || [],
             specifications: item.specifications || {},
+            specificationOptions: item.specificationOptions || {},
             descriptionTable: item.descriptionTable || {},
             checklist: item.checklist || {},
+            variations: item.variations || {},
             items: item.items || []
           });
         }
@@ -168,8 +172,10 @@ function EditProdukPageContent() {
         rentalPolicy: formData.rentalPolicy,
         location: formData.location,
         specifications: formData.specifications || {},
+        specificationOptions: formData.specificationOptions || {},
         descriptionTable: formData.descriptionTable || {},
         checklist: formData.checklist || {},
+        variations: formData.variations || {},
         items: formData.items || [],
         images: formData.images.filter(img => typeof img === 'string' && (img.startsWith('data:') || img.startsWith('http'))),
         rating: 0,

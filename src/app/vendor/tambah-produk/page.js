@@ -37,8 +37,10 @@ export default function TambahProdukPage() {
     pengirimanRentGuard: false,
     images: [],
     specifications: {},
+    specificationOptions: {},
     descriptionTable: {},
     checklist: {},
+    variations: {},
     items: []
   });
 
@@ -70,8 +72,10 @@ export default function TambahProdukPage() {
       category: '',
       availability: '',
       specifications: {},
+      specificationOptions: {},
       descriptionTable: {},
-      checklist: {}
+      checklist: {},
+      variations: {}
     }));
   }, [selectedType]);
 
@@ -127,6 +131,7 @@ export default function TambahProdukPage() {
         rentalPolicy: formData.rentalPolicy,
         location: formData.location,
         specifications: formData.specifications || {},
+        specificationOptions: formData.specificationOptions || {},
         descriptionTable: formData.descriptionTable || {},
         checklist: formData.checklist || {},
         items: formData.items || [],

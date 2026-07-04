@@ -46,6 +46,8 @@ function PaymentContent() {
   const [selectedItem, setSelectedItem] = useState(null); // ✅ ADD: Track selected item & price
   const [service, setService] = useState(null); // ✅ ADD: Store service data with items
 
+  const minimumDurationDays = Math.max(1, Number(service?.minimumDays || 1));
+
   const parseImageList = (value) => {
     if (!value) return [];
     if (Array.isArray(value)) return value.filter((img) => typeof img === 'string' && img.trim() !== '');
@@ -221,6 +223,7 @@ function PaymentContent() {
               
               if (currentService) {
                 setService(currentService);
+                setDurationDays((prev) => Math.max(prev, Math.max(1, Number(currentService.minimumDays || 1))));
                 
                 // ✅ NEW: Set first item as default
                 if (currentService.items && currentService.items.length > 0) {
@@ -348,6 +351,11 @@ function PaymentContent() {
 
     // ✅ NEW: Skip availability check untuk promo
     if (!selectedPromo) {
+      if (durationDays < minimumDurationDays) {
+        alert(`❌ Durasi sewa minimal ${minimumDurationDays} hari untuk layanan ini.`);
+        return;
+      }
+
       // AVAILABILITY CHECK - Validasi ketersediaan sebelum payment (hanya untuk deal)
       if (availabilityCheck !== 'available') {
         alert(`❌ ${isJasaService ? 'Availability jasa' : 'Stok barang'} tidak tersedia untuk periode ini. Silakan ubah tanggal atau jumlah.`);
@@ -495,7 +503,8 @@ function PaymentContent() {
       // Calculate end date
       const startDateTime = new Date(startDt);
       const endDateTime = new Date(startDateTime);
-      endDateTime.setDate(endDateTime.getDate() + (Number(duration) || 1));
+      const normalizedDuration = Math.max(minimumDurationDays, Number(duration) || minimumDurationDays);
+      endDateTime.setDate(endDateTime.getDate() + normalizedDuration);
       const endDateStr = endDateTime.toISOString().split('T')[0];
 
       const response = await fetch('/api/availability/validate', {
@@ -591,7 +600,7 @@ function PaymentContent() {
     }, 500); // Debounce 500ms
 
     return () => clearTimeout(timer);
-  }, [quantity, durationDays, startDate, deal, selectedItem]);
+  }, [quantity, durationDays, startDate, deal, selectedItem, minimumDurationDays]);
 
   if (isLoading) {
     return <div style={{ padding: '40px', textAlign: 'center', minHeight: '100vh', background: '#f5f3ff' }}>⏳ Loading...</div>;
@@ -913,9 +922,12 @@ function PaymentContent() {
                     <div style={{ marginBottom: '20px' }}>
                       <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Durasi Hari</label>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <button onClick={() => setDurationDays(Math.max(1, durationDays - 1))} style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '18px', fontWeight: '700', color: '#B28A67' }}>−</button>
-                        <input type="number" value={durationDays} onChange={(e) => setDurationDays(Math.max(1, parseInt(e.target.value) || 1))} style={{ width: '80px', textAlign: 'center', border: '1px solid #ddd', borderRadius: '8px', padding: '8px', fontSize: '14px', fontWeight: '600' }} min="1" />
+                        <button onClick={() => setDurationDays(Math.max(minimumDurationDays, durationDays - 1))} style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '18px', fontWeight: '700', color: '#B28A67' }}>−</button>
+                        <input type="number" value={durationDays} onChange={(e) => setDurationDays(Math.max(minimumDurationDays, parseInt(e.target.value, 10) || minimumDurationDays))} style={{ width: '80px', textAlign: 'center', border: '1px solid #ddd', borderRadius: '8px', padding: '8px', fontSize: '14px', fontWeight: '600' }} min={minimumDurationDays} />
                         <button onClick={() => setDurationDays(durationDays + 1)} style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '18px', fontWeight: '700', color: '#B28A67' }}>+</button>
+                      </div>
+                      <div style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280' }}>
+                        Durasi minimum: {minimumDurationDays} hari
                       </div>
                     </div>
 

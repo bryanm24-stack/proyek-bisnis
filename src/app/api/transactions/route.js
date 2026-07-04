@@ -164,6 +164,9 @@ export async function POST(request) {
     const createdAt = new Date().toISOString();
     const timestamp = body.timestamp || createdAt;
     const paymentIsPayAfter = body.paymentType === 'pay_after';
+    const isPromoFlow = Boolean(body.promoId);
+    const requestedQuantity = Math.max(1, toFiniteNumber(body.quantity, 1));
+    const requestedDurationDays = isPromoFlow ? 1 : Math.max(1, toFiniteNumber(body.durationDays, 1));
 
     // Determine service ID early from deal or direct parameter
     let serviceId = body.serviceId;
@@ -255,17 +258,40 @@ export async function POST(request) {
       }
     }
 
+    if (!isPromoFlow && serviceId) {
+      try {
+        const serviceRows = await query(
+          'SELECT minimum_days FROM services WHERE id = ? LIMIT 1',
+          [serviceId]
+        );
+        const minimumDurationDays = Math.max(1, Number(serviceRows?.[0]?.minimum_days || 1));
+
+        if (requestedDurationDays < minimumDurationDays) {
+          return NextResponse.json({
+            success: false,
+            error: 'Durasi minimum tidak terpenuhi',
+            message: `Durasi sewa minimal ${minimumDurationDays} hari untuk layanan ini.`,
+            minimumDurationDays,
+            requestedDurationDays,
+            status: 'minimum_duration_not_met'
+          }, { status: 400 });
+        }
+      } catch (minimumDaysError) {
+        console.warn('Minimum duration validation warning:', minimumDaysError.message);
+      }
+    }
+
     // Validate stock availability before processing payment
-    if ((body.status === 'success' || !body.status) && body.startDate && body.durationDays && serviceId) {
+    if ((body.status === 'success' || !body.status) && body.startDate && requestedDurationDays && serviceId) {
       try {
         // Calculate end date based on start date and duration
         const startDate = new Date(body.startDate);
         const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + Number(body.durationDays || 0));
+        endDate.setDate(endDate.getDate() + requestedDurationDays);
 
         // Check availability
         const services = await query(
-          'SELECT id, quantity FROM services WHERE id = ? LIMIT 1',
+          'SELECT id, quantity, minimum_days FROM services WHERE id = ? LIMIT 1',
           [serviceId]
         );
 
@@ -337,10 +363,6 @@ export async function POST(request) {
       : [];
     const currentDealForPricing = currentDealRowsForPricing[0] || null;
 
-    const isPromoFlow = Boolean(body.promoId);
-    const requestedQuantity = Math.max(1, toFiniteNumber(body.quantity, 1));
-    const requestedDurationDays = isPromoFlow ? 1 : Math.max(1, toFiniteNumber(body.durationDays, 1));
-
     const dealUnitFinalPrice = toFiniteNumber(currentDealForPricing?.final_price, 0);
     const dealUnitOriginalPrice = toFiniteNumber(currentDealForPricing?.original_price, 0);
     const payloadBasePrice = toFiniteNumber(body.basePrice ?? body.amount, 0);
@@ -381,7 +403,7 @@ export async function POST(request) {
         effectiveUnitPrice,
         Number(requestedQuantity) || 1,
         body.quantityType || 'Unit',
-        Number(body.durationDays ?? 0) || null,
+        isPromoFlow ? null : Number(requestedDurationDays),
         body.notes || '',
         toDateOnly(body.startDate),
         computedAmount,
@@ -403,7 +425,7 @@ export async function POST(request) {
         effectiveUnitPrice,
         Number(requestedQuantity) || 1,
         body.quantityType || 'Unit',
-        Number(body.durationDays ?? 0) || null,
+        isPromoFlow ? null : Number(requestedDurationDays),
         body.notes || '',
         toDateOnly(body.startDate),
         computedAmount,
