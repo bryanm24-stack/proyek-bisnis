@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SharedNavbar from '@/app/components/SharedNavbar';
+import { getNotificationTitle } from '@/lib/notificationTitles';
 import styles from './notifications.module.css';
 
 export default function NotificationsPage() {
@@ -229,7 +230,7 @@ export default function NotificationsPage() {
                 <div className={styles['notification-content']}>
                   <div className={styles['notification-header']}>
                     <div>
-                      <div className={styles['notification-type']}>{notif.type || 'Notifikasi'}</div>
+                      <div className={styles['notification-type']}>{getNotificationTitle(notif.type)}</div>
                       <div className={styles['notification-time']}>
                         {new Date(notif.created_at).toLocaleString('id-ID')}
                       </div>
