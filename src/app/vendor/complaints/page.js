@@ -210,7 +210,7 @@ export default function VendorComplaintsPage() {
                       disabled={savingId === complaint.id}
                       style={{ background: '#15803d', color: '#fff', border: 'none', borderRadius: '12px', padding: '12px 16px', fontWeight: '800', cursor: 'pointer' }}
                     >
-                      {savingId === complaint.id ? 'Mengirim Bukti Refund...' : 'Kirim Bukti Refund'}
+                      {savingId === complaint.id ? 'Mengirim Bukti Refund...' : 'Sudah Refund (Kirim Bukti)'}
                     </button>
                   </div>
                 ) : (

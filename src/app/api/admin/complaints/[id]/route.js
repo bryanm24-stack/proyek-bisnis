@@ -43,6 +43,8 @@ export async function PATCH(request, { params }) {
         refundMethod: form.get('refundMethod') || '',
         refundReference: form.get('refundReference') || '',
         refundPaidAt: form.get('refundPaidAt') || '',
+        verifiedRecipientName: form.get('verifiedRecipientName') || '',
+        verifiedRecipientAccountNumber: form.get('verifiedRecipientAccountNumber') || '',
         refundProofUrl
       };
     } else {
@@ -66,7 +68,9 @@ export async function PATCH(request, { params }) {
       refundMethod: body.refundMethod,
       refundReference: body.refundReference,
       refundProofUrl: body.refundProofUrl,
-      refundPaidAt: body.refundPaidAt
+      refundPaidAt: body.refundPaidAt,
+      verifiedRecipientName: body.verifiedRecipientName,
+      verifiedRecipientAccountNumber: body.verifiedRecipientAccountNumber
     });
 
     return NextResponse.json({ success: true, data }, { status: 200 });

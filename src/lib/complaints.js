@@ -20,6 +20,14 @@ function parseEvidenceUrl(value) {
   return String(value);
 }
 
+function normalizePersonName(value) {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function normalizeAccountNumber(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
 export async function ensureComplaintsTable() {
   await query(
     `CREATE TABLE IF NOT EXISTS complaints (
@@ -344,9 +352,10 @@ export async function createComplaintDraft({
     `INSERT INTO complaints (
       id, user_id, vendor_id, transaction_id, type, description, evidence_url, status,
       customer_account_name, customer_account_number, customer_bank_name,
-      admin_note, vendor_note, refund_amount, forwarded_at, vendor_processed_at,
+      admin_note, vendor_note, refund_amount, refund_method, refund_reference, refund_proof_url, 
+      refund_paid_at, admin_verified_at, customer_confirmed_at, forwarded_at, vendor_processed_at,
       resolved_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       complaintId,
       String(userId),
@@ -362,6 +371,12 @@ export async function createComplaintDraft({
       adminNote || '',
       '',
       Number(refundAmount || 0),
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
       null,
       null,
       null,
@@ -484,7 +499,9 @@ export async function updateComplaintWorkflow({
   refundMethod = '',
   refundReference = '',
   refundProofUrl = '',
-  refundPaidAt = null
+  refundPaidAt = null,
+  verifiedRecipientName = '',
+  verifiedRecipientAccountNumber = ''
 }) {
   await ensureComplaintsTable();
   const current = await loadComplaintRowById(complaintId);
@@ -527,6 +544,25 @@ export async function updateComplaintWorkflow({
       }
       if (!current.refund_proof_url || !current.refund_paid_at) {
         throw new Error('Bukti refund vendor belum lengkap');
+      }
+
+      const expectedRecipientName = String(current.customer_account_name || '').trim();
+      const expectedRecipientNumber = normalizeAccountNumber(current.customer_account_number);
+      const providedRecipientName = String(verifiedRecipientName || '').trim();
+      const providedRecipientNumber = normalizeAccountNumber(verifiedRecipientAccountNumber);
+
+      if (!expectedRecipientName || !expectedRecipientNumber) {
+        throw new Error('Data rekening customer belum lengkap, admin tidak dapat melakukan verifikasi akhir');
+      }
+      if (!providedRecipientName || !providedRecipientNumber) {
+        throw new Error('Nama penerima dan nomor rekening tujuan refund wajib diisi untuk verifikasi admin');
+      }
+
+      if (normalizePersonName(providedRecipientName) !== normalizePersonName(expectedRecipientName)) {
+        throw new Error('Nama penerima refund tidak sesuai dengan nama rekening customer');
+      }
+      if (providedRecipientNumber !== expectedRecipientNumber) {
+        throw new Error('Nomor rekening tujuan refund tidak sesuai dengan data customer');
       }
 
       await query(

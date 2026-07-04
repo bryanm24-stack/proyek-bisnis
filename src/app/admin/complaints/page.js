@@ -21,6 +21,11 @@ export default function AdminComplaintsPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [note, setNote] = useState('');
   const [refundAmount, setRefundAmount] = useState('');
+  const [verifiedRecipientName, setVerifiedRecipientName] = useState('');
+  const [verifiedRecipientAccountNumber, setVerifiedRecipientAccountNumber] = useState('');
+
+  const normalizePersonName = useCallback((value) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' '), []);
+  const normalizeAccountNumber = useCallback((value) => String(value || '').replace(/\D/g, ''), []);
 
   const fetchComplaints = useCallback(async (preferredId = null) => {
     try {
@@ -34,6 +39,8 @@ export default function AdminComplaintsPage() {
         const selected = nextComplaints.find((item) => item.id === nextSelectedId) || nextComplaints[0] || null;
         setNote(selected?.adminNote || '');
         setRefundAmount(selected?.refundAmount ? String(selected.refundAmount) : '');
+        setVerifiedRecipientName('');
+        setVerifiedRecipientAccountNumber('');
       }
     } catch (error) {
       console.error('Error loading admin complaints:', error);
@@ -62,6 +69,28 @@ export default function AdminComplaintsPage() {
     [complaints, selectedId]
   );
 
+  const expectedRecipientName = selectedComplaint?.customerAccountName || '';
+  const expectedRecipientAccountNumber = selectedComplaint?.customerAccountNumber || '';
+  const expectedRecipientBankName = selectedComplaint?.customerBankName || '';
+
+  const recipientMatches = useMemo(() => {
+    if (!selectedComplaint) return false;
+    const expectedName = normalizePersonName(expectedRecipientName);
+    const expectedNumber = normalizeAccountNumber(expectedRecipientAccountNumber);
+    const inputName = normalizePersonName(verifiedRecipientName);
+    const inputNumber = normalizeAccountNumber(verifiedRecipientAccountNumber);
+    if (!expectedName || !expectedNumber || !inputName || !inputNumber) return false;
+    return expectedName === inputName && expectedNumber === inputNumber;
+  }, [
+    expectedRecipientAccountNumber,
+    expectedRecipientName,
+    normalizeAccountNumber,
+    normalizePersonName,
+    selectedComplaint,
+    verifiedRecipientAccountNumber,
+    verifiedRecipientName
+  ]);
+
   async function handleAction(action) {
     if (!selectedComplaint || !user?.id) return;
     setActionLoading(true);
@@ -74,7 +103,9 @@ export default function AdminComplaintsPage() {
           adminId: user.id,
           action,
           note,
-          refundAmount: Number(refundAmount || 0)
+          refundAmount: Number(refundAmount || 0),
+          verifiedRecipientName,
+          verifiedRecipientAccountNumber
         })
       });
       const result = await response.json();
@@ -139,6 +170,8 @@ export default function AdminComplaintsPage() {
                     setSelectedId(complaint.id);
                     setNote(complaint.adminNote || '');
                     setRefundAmount(complaint.refundAmount ? String(complaint.refundAmount) : '');
+                    setVerifiedRecipientName('');
+                    setVerifiedRecipientAccountNumber('');
                   }}
                   style={{
                     textAlign: 'left',
@@ -198,6 +231,13 @@ export default function AdminComplaintsPage() {
                   {selectedComplaint.description || 'Tidak ada deskripsi tambahan.'}
                 </div>
 
+                <div style={{ marginBottom: '14px', padding: '14px', borderRadius: '14px', background: '#ecfeff', color: '#155e75', lineHeight: 1.55, border: '1px solid #bae6fd' }}>
+                  <strong>Rekening Tujuan Refund (Customer):</strong><br />
+                  Nama Rekening: {expectedRecipientName || '-'}<br />
+                  Nomor Rekening: {expectedRecipientAccountNumber || '-'}<br />
+                  Bank: {expectedRecipientBankName || '-'}
+                </div>
+
                 {selectedComplaint.evidenceUrl && (
                   <a href={selectedComplaint.evidenceUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', marginBottom: '14px', color: '#b45309', fontWeight: '700' }}>
                     Lihat bukti terlampir
@@ -246,6 +286,33 @@ export default function AdminComplaintsPage() {
                   </div>
                 )}
 
+                {selectedComplaint.status === 'REFUND_PROCESSED' && (
+                  <div style={{ marginTop: '14px', padding: '14px', borderRadius: '14px', background: '#f8fafc', color: '#1e293b', border: '1px solid #cbd5e1' }}>
+                    <strong>Verifikasi Akhir Admin (Wajib):</strong>
+                    <div style={{ marginTop: '8px', display: 'grid', gap: '10px' }}>
+                      <input
+                        type="text"
+                        value={verifiedRecipientName}
+                        onChange={(event) => setVerifiedRecipientName(event.target.value)}
+                        placeholder="Nama penerima pada bukti transfer"
+                        style={{ borderRadius: '10px', border: '1px solid #cbd5e1', padding: '10px 12px' }}
+                      />
+                      <input
+                        type="text"
+                        value={verifiedRecipientAccountNumber}
+                        onChange={(event) => setVerifiedRecipientAccountNumber(event.target.value)}
+                        placeholder="Nomor rekening tujuan pada bukti transfer"
+                        style={{ borderRadius: '10px', border: '1px solid #cbd5e1', padding: '10px 12px' }}
+                      />
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: recipientMatches ? '#166534' : '#991b1b' }}>
+                        {recipientMatches
+                          ? 'Data penerima refund cocok dengan rekening customer.'
+                          : 'Data penerima refund belum cocok dengan rekening customer.'}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '18px' }}>
                   {selectedComplaint.status === 'PENDING_ADMIN' && (
                     <button
@@ -260,7 +327,7 @@ export default function AdminComplaintsPage() {
                   {selectedComplaint.status === 'REFUND_PROCESSED' && (
                     <button
                       onClick={() => handleAction('resolve')}
-                      disabled={actionLoading}
+                      disabled={actionLoading || !recipientMatches}
                       style={{ background: '#15803d', color: '#fff', border: 'none', borderRadius: '12px', padding: '12px 16px', fontWeight: '800', cursor: 'pointer' }}
                     >
                       Verifikasi Refund & Selesaikan Complaint
