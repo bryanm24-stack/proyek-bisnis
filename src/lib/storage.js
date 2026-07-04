@@ -314,17 +314,6 @@ async function deleteFromJsonFile(dataset, condition) {
 export async function readData(name) {
   const dataset = getDatasetName(name);
 
-  // SPECIAL: 'users' dataset ALWAYS uses JSON storage (app_data table may have stale data)
-  if (name === 'users') {
-    console.log(`[readData ${name}] Force JSON-only for users dataset`);
-    try {
-      return await readFromJsonFile(dataset);
-    } catch (error) {
-      console.error(`readData JSON fallback failed for ${name}:`, error.message);
-      return [];
-    }
-  }
-
   try {
     if (isServer) {
       if (await hasTable(dataset)) {

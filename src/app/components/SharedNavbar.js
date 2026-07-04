@@ -524,7 +524,7 @@ export default function SharedNavbar() {
             🧾 Returns
           </NavLink>
 
-          {(user.role === 'customer' || user.role === 'member') && (
+          {(user.role === 'customer' || user.role === 'member' || user.role === 'vendor') && (
             <NavLink href="/complaints" active={isExactPath('/complaints')}>
               ⚠️ Complaint
             </NavLink>

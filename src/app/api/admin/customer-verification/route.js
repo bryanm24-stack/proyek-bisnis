@@ -1,7 +1,6 @@
 // JANGAN ADA 'use client' DI SINI!
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { readData, writeData } from '@/lib/storage';
 
 /**
  * GET /api/admin/customer-verification
@@ -12,20 +11,21 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const statusFilter = searchParams.get('status');
-    const role = searchParams.get('role');
 
-    // Try JSON storage first (most up-to-date)
-    const users = await readData('users');
-    console.log('[API] readData returned:', users.length, 'users, roles:', users.map(u=>u.role));
-    let verifications = users.filter(u => u.role === 'customer').map(u => {
-      // Normalize field names: support both snake_case (new) and camelCase (old)
+    const users = await query(
+      `SELECT id, name, email, phone, role, ktp_status, ktp_data, ktp_submitted_at, ktp_verified_by, ktp_verified_at, ktp_rejection_reason
+       FROM users
+       WHERE role = 'customer'`
+    );
+
+    let verifications = users.map(u => {
       const ktpStatus = u.ktp_status || u.ktpStatus || 'not_submitted';
       const ktpData = u.ktp_data || u.ktpData || {};
       const ktpSubmittedAt = u.ktp_submitted_at || u.ktpSubmittedAt;
       const ktpVerifiedBy = u.ktp_verified_by || u.ktpVerifiedBy;
       const ktpVerifiedAt = u.ktp_verified_at || u.ktpVerifiedAt;
       const ktpRejectionReason = u.ktp_rejection_reason || u.ktpRejectionReason;
-      
+
       return {
         id: u.id,
         name: u.name,
@@ -52,7 +52,7 @@ export async function GET(request) {
 
     return NextResponse.json({
       success: true,
-      source: 'json_storage',
+      source: 'sql',
       verifications,
       totalCount: verifications.length,
       statusCounts: {
@@ -154,61 +154,23 @@ export async function POST(request) {
 
       await query(updateQuery, updateParams);
 
-      // Get updated user
-      const updatedUser = await query(
-        'SELECT id, name, email, ktp_status FROM users WHERE id = ? LIMIT 1',
+      const [updatedUser] = await query(
+        'SELECT id, name, email, ktp_status, ktp_data, ktp_submitted_at, ktp_verified_by, ktp_verified_at, ktp_rejection_reason FROM users WHERE id = ? LIMIT 1',
         [userId]
       );
 
       return NextResponse.json({
         success: true,
         message: `KTP ${action} berhasil!`,
-        user: updatedUser[0],
+        user: updatedUser,
         timestamp: now
       }, { status: 200 });
-    } catch (dbErr) {
-      // Fallback to JSON storage
-      const users = await readData('users');
-      const userIndex = users.findIndex(u => String(u.id) === String(userId));
-
-      if (userIndex === -1) {
-        return NextResponse.json({
-          success: false,
-          message: 'User tidak ditemukan'
-        }, { status: 404 });
-      }
-
-      const user = users[userIndex];
-
-      if (action === 'submit') {
-        user.ktp_status = 'pending';
-        user.ktp_data = ktpData || {};
-        user.ktp_submitted_at = now;
-      } else if (action === 'approve') {
-        user.ktp_status = 'approved';
-        user.ktp_verified_by = adminId || 'admin';
-        user.ktp_verified_at = now;
-        user.ktp_rejection_reason = null;
-      } else if (action === 'reject') {
-        user.ktp_status = 'rejected';
-        user.ktp_verified_by = adminId || 'admin';
-        user.ktp_verified_at = now;
-        user.ktp_rejection_reason = rejectionReason || '';
-      }
-
-      await writeData('users', users);
-
+    } catch (dbError) {
+      console.error('Database error processing customer verification:', dbError);
       return NextResponse.json({
-        success: true,
-        message: `KTP ${action} berhasil!`,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          ktp_status: user.ktp_status
-        },
-        timestamp: now
-      }, { status: 200 });
+        success: false,
+        message: 'Gagal memproses verifikasi KTP: ' + dbError.message
+      }, { status: 500 });
     }
   } catch (error) {
     console.error('Error processing customer verification:', error);

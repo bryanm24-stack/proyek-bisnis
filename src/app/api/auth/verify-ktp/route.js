@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { readData, writeData } from '@/lib/storage';
+import { query } from '@/lib/db';
 
 // GET: ?userId=...
 export async function GET(request) {
@@ -11,8 +11,10 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'userId wajib diisi.' }, { status: 400 });
     }
 
-    const users = await readData('users');
-    const user = Array.isArray(users) ? users.find((u) => String(u.id) === String(userId)) : null;
+    const [user] = await query(
+      'SELECT id, name, email, ktp_status, ktp_data, ktp_submitted_at, ktp_verified_by, ktp_verified_at, ktp_rejection_reason FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
 
     if (!user) {
       return NextResponse.json({ success: false, message: 'User tidak ditemukan.' }, { status: 404 });
@@ -51,17 +53,19 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'userId dan NIK wajib diisi.' }, { status: 400 });
     }
 
-    const users = await readData('users');
-    const userIndex = Array.isArray(users) ? users.findIndex((u) => String(u.id) === String(userId)) : -1;
+    const [user] = await query(
+      'SELECT id, name, email FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
 
-    if (userIndex === -1) {
+    if (!user) {
       return NextResponse.json({ success: false, message: 'User tidak ditemukan.' }, { status: 404 });
     }
 
     const now = new Date().toISOString();
     const ktpPayload = {
-      name: name || users[userIndex].name || null,
-      email: email || users[userIndex].email || null,
+      name: name || user.name || null,
+      email: email || user.email || null,
       idType: idType || 'ktp',
       nik: String(nik).trim(),
       idPhotoPreview: typeof idPhotoPreview === 'string' ? idPhotoPreview : null,
@@ -69,30 +73,15 @@ export async function POST(request) {
       notes: notes || ''
     };
 
-    // Update user record in JSON storage (snake_case fields expected by admin UI)
-    const user = users[userIndex];
-    user.ktp_status = 'pending';
-    user.ktp_data = ktpPayload;
-    user.ktp_submitted_at = now;
-    user.ktp_verified_by = null;
-    user.ktp_verified_at = null;
-    user.ktp_rejection_reason = null;
-
-    // Remove old camelCase variants to reduce ambiguity
-    delete user.ktpStatus;
-    delete user.ktpData;
-    delete user.ktpSubmittedAt;
-    delete user.ktpVerifiedBy;
-    delete user.ktpVerifiedAt;
-    delete user.ktpRejectionReason;
-
-    users[userIndex] = user;
-    await writeData('users', users);
+    await query(
+      `UPDATE users SET ktp_status = 'pending', ktp_data = ?, ktp_submitted_at = ?, ktp_verified_by = NULL, ktp_verified_at = NULL, ktp_rejection_reason = NULL WHERE id = ?`,
+      [JSON.stringify(ktpPayload), now, userId]
+    );
 
     return NextResponse.json({
       success: true,
       message: 'Permohonan verifikasi KTP disimpan.',
-      data: { status: user.ktp_status, submittedAt: user.ktp_submitted_at, ...ktpPayload }
+      data: { status: 'pending', submittedAt: now, ...ktpPayload }
     }, { status: 200 });
   } catch (error) {
     console.error('Error saving KTP verification:', error);

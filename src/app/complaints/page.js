@@ -40,6 +40,7 @@ export default function ComplaintsPage() {
   const [type, setType] = useState('kerusakan');
   const [description, setDescription] = useState('');
   const [evidenceFiles, setEvidenceFiles] = useState([]);
+  const [submitterLabel, setSubmitterLabel] = useState('Pengguna');
 
   useEffect(() => {
     try {
@@ -49,11 +50,12 @@ export default function ComplaintsPage() {
         return;
       }
       const parsed = JSON.parse(raw);
-      if (parsed.role !== 'customer' && parsed.role !== 'member') {
+      if (!['customer', 'member', 'vendor'].includes(parsed.role)) {
         router.push('/');
         return;
       }
       setUser(parsed);
+      setSubmitterLabel(parsed.role === 'vendor' ? 'Vendor' : 'Customer');
     } finally {
       setLoading(false);
     }
@@ -163,14 +165,14 @@ export default function ComplaintsPage() {
           <h1 className={styles.title}>Buat Laporan Complaint</h1>
           <p className={styles.subtitle}>
             Halaman ini dipisahkan dari retur agar complaint kerusakan dan pembatalan tidak tercampur dengan proses pengembalian biasa.
-            Semua mediasi berjalan melalui admin, bukan chat langsung dengan vendor.
+            Complaint bisa diajukan oleh customer maupun vendor (saat menjadi penyewa), dan semua mediasi berjalan melalui admin.
           </p>
         </div>
 
         <div className={styles.grid}>
           <section className={styles.panel}>
             <div className={styles.panelBody}>
-              <h2 className={styles.panelTitle}>Buat Laporan Complaint (Customer)</h2>
+              <h2 className={styles.panelTitle}>Buat Laporan Complaint ({submitterLabel})</h2>
               <p className={styles.panelDesc}>Isi referensi transaksi yang valid lalu pilih jenis complaint yang sesuai.</p>
 
               <div className={styles.alert}>
