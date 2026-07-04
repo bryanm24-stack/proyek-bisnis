@@ -145,6 +145,16 @@ export default function VendorComplaintsPage() {
                   </div>
                 )}
 
+                {/* Show customer bank info for vendor reference (read-only) */}
+                {complaint.customerAccountName && (
+                  <div style={{ padding: '12px', borderRadius: '12px', background: '#fff7ed', color: '#7c2d12', marginBottom: '12px' }}>
+                    <strong>Rekening Tujuan (Customer):</strong><br />
+                    Nama: {complaint.customerAccountName}<br />
+                    Nomor: {complaint.customerAccountNumber || '-'}<br />
+                    Bank: {complaint.customerBankName || '-'}
+                  </div>
+                )}
+
                 {complaint.description && (
                   <div style={{ padding: '14px', borderRadius: '14px', background: '#f8fafc', color: '#334155', lineHeight: 1.5, marginBottom: '12px' }}>
                     <strong>Ringkasan complaint customer:</strong><br />

@@ -35,6 +35,7 @@ export default function ComplaintsPage() {
   const [error, setError] = useState('');
   const [listError, setListError] = useState('');
   const [complaints, setComplaints] = useState([]);
+  const [confirmingId, setConfirmingId] = useState(null);
   const [referenceId, setReferenceId] = useState('');
   const [type, setType] = useState('kerusakan');
   const [description, setDescription] = useState('');
@@ -82,6 +83,32 @@ export default function ComplaintsPage() {
 
   function handleFileChange(event) {
     setEvidenceFiles(Array.from(event.target.files || []));
+  }
+
+  async function handleConfirmReceipt(complaintId) {
+    if (!user?.id) return;
+    setConfirmingId(complaintId);
+    try {
+      const response = await fetch(`/api/admin/complaints/${complaintId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actorRole: 'customer',
+          actorId: user.id,
+          action: 'customer_confirm_receipt'
+        })
+      });
+      const result = await response.json();
+      if (!response.ok || result.success === false) {
+        throw new Error(result.message || 'Gagal mengonfirmasi penerimaan');
+      }
+      await loadComplaints(user.id);
+      alert('Terima kasih, Anda telah mengonfirmasi penerimaan hasil complaint/refund.');
+    } catch (submitError) {
+      setError(submitError.message || 'Gagal mengonfirmasi penerimaan');
+    } finally {
+      setConfirmingId(null);
+    }
   }
 
   async function handleSubmit(event) {
@@ -287,6 +314,17 @@ export default function ComplaintsPage() {
                           <a className={styles.evidenceLink} href={complaint.evidenceUrl} target="_blank" rel="noreferrer">
                             Lihat bukti terlampir
                           </a>
+                        )}
+
+                        {complaint.status === 'RESOLVED' && !complaint.customerConfirmedAt && (
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmReceipt(complaint.id)}
+                            disabled={confirmingId === complaint.id}
+                            style={{ marginTop: '10px', border: 'none', borderRadius: '10px', padding: '10px 12px', background: '#15803d', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            {confirmingId === complaint.id ? 'Mengonfirmasi...' : 'Konfirmasi Penerimaan'}
+                          </button>
                         )}
                       </article>
                     );

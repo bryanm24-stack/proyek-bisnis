@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import SharedNavbar from '@/app/components/SharedNavbar';
@@ -31,7 +31,7 @@ function invoiceStatusTone(status) {
   return { bg: '#e2e8f0', fg: '#334155', label: status || 'Tidak diketahui' };
 }
 
-export default function TransactionHistoryPage() {
+function TransactionHistoryContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUser] = useState(null);
@@ -361,5 +361,13 @@ export default function TransactionHistoryPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function TransactionHistoryPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center' }}>Memuat riwayat transaksi...</div>}>
+      <TransactionHistoryContent />
+    </Suspense>
   );
 }

@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
+import { query } from '@/lib/db';
 import {
   createComplaintDraft,
   ensureComplaintsTable,
@@ -115,6 +116,18 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
+    let userBank = { bankName: '', accountNumber: '', accountHolder: '' };
+    try {
+      const urows = await query('SELECT bankName, accountNumber, accountHolder FROM users WHERE id = ? LIMIT 1', [userId]);
+      if (Array.isArray(urows) && urows[0]) {
+        userBank.bankName = urows[0].bankName || '';
+        userBank.accountNumber = urows[0].accountNumber || '';
+        userBank.accountHolder = urows[0].accountHolder || '';
+      }
+    } catch (err) {
+      console.warn('Failed to load complaint customer bank info:', err?.message || err);
+    }
+
     const complaint = await createComplaintDraft({
       userId,
       vendorId: context.vendor_id,
@@ -123,7 +136,11 @@ export async function POST(request) {
       description: payload.description || (normalizedType === 'pembatalan'
         ? 'Permintaan pembatalan transaksi yang sudah dibayar.'
         : ''),
-      evidenceUrl: evidenceUrls[0] || ''
+      evidenceUrl: evidenceUrls[0] || '',
+      refundAmount: payload.refundAmount || 0,
+      customer_account_name: userBank.accountHolder,
+      customer_account_number: userBank.accountNumber,
+      customer_bank_name: userBank.bankName
     });
 
     return NextResponse.json({

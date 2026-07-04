@@ -129,11 +129,22 @@ async function hasTransactionsShippingAddressColumn() {
 
 export async function GET(request) {
   try {
-    const rows = await query('SELECT * FROM transactions ORDER BY COALESCE(created_at, NOW()) DESC');
+    const rows = await query('SELECT t.*, c.id AS complaint_id, c.status AS complaint_status, c.customer_account_name, c.customer_account_number, c.customer_bank_name, c.refund_amount, c.refund_method, c.refund_reference, c.refund_proof_url FROM transactions t LEFT JOIN complaints c ON c.transaction_id = t.id ORDER BY COALESCE(t.created_at, NOW()) DESC');
     const transactions = rows.map((row) => ({
       ...row,
       card_details: parseJsonSafe(row.card_details, null),
-      identity_verification: parseJsonSafe(row.identity_verification, null)
+      identity_verification: parseJsonSafe(row.identity_verification, null),
+      complaint: row.complaint_id ? {
+        id: row.complaint_id,
+        status: row.complaint_status,
+        customerAccountName: row.customer_account_name,
+        customerAccountNumber: row.customer_account_number,
+        customerBankName: row.customer_bank_name,
+        refundAmount: Number(row.refund_amount || 0),
+        refundMethod: row.refund_method || '',
+        refundReference: row.refund_reference || '',
+        refundProofUrl: row.refund_proof_url || ''
+      } : null
     }));
 
     return NextResponse.json(transactions, { status: 200 });

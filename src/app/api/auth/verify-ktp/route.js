@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readData, writeData } from '@/lib/storage';
 
+// GET: ?userId=...
 export async function GET(request) {
   try {
     const url = new URL(request.url);
@@ -11,9 +12,7 @@ export async function GET(request) {
     }
 
     const users = await readData('users');
-    const user = Array.isArray(users)
-      ? users.find((item) => String(item.id) === String(userId))
-      : null;
+    const user = Array.isArray(users) ? users.find((u) => String(u.id) === String(userId)) : null;
 
     if (!user) {
       return NextResponse.json({ success: false, message: 'User tidak ditemukan.' }, { status: 404 });
@@ -42,29 +41,27 @@ export async function GET(request) {
   }
 }
 
+// POST: body JSON { userId, name, email, idType, nik, idPhotoPreview, selfiePhotoPreview, notes }
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { userId, name, email, idType, nik, idPhotoPreview, selfiePhotoPreview, notes } = body;
+    const { userId, name, email, idType, nik, idPhotoPreview, selfiePhotoPreview, notes } = body || {};
 
     if (!userId || !nik) {
       return NextResponse.json({ success: false, message: 'userId dan NIK wajib diisi.' }, { status: 400 });
     }
 
     const users = await readData('users');
-    const userIndex = Array.isArray(users)
-      ? users.findIndex((item) => String(item.id) === String(userId))
-      : -1;
+    const userIndex = Array.isArray(users) ? users.findIndex((u) => String(u.id) === String(userId)) : -1;
 
     if (userIndex === -1) {
       return NextResponse.json({ success: false, message: 'User tidak ditemukan.' }, { status: 404 });
     }
 
-    const user = users[userIndex];
     const now = new Date().toISOString();
     const ktpPayload = {
-      name: name || user.name || null,
-      email: email || user.email || null,
+      name: name || users[userIndex].name || null,
+      email: email || users[userIndex].email || null,
       idType: idType || 'ktp',
       nik: String(nik).trim(),
       idPhotoPreview: typeof idPhotoPreview === 'string' ? idPhotoPreview : null,
@@ -72,15 +69,16 @@ export async function POST(request) {
       notes: notes || ''
     };
 
-    // Store using snake_case convention (new standard)
+    // Update user record in JSON storage (snake_case fields expected by admin UI)
+    const user = users[userIndex];
     user.ktp_status = 'pending';
     user.ktp_data = ktpPayload;
     user.ktp_submitted_at = now;
     user.ktp_verified_by = null;
     user.ktp_verified_at = null;
     user.ktp_rejection_reason = null;
-    
-    // Clean up old camelCase fields if they exist
+
+    // Remove old camelCase variants to reduce ambiguity
     delete user.ktpStatus;
     delete user.ktpData;
     delete user.ktpSubmittedAt;
@@ -94,11 +92,7 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       message: 'Permohonan verifikasi KTP disimpan.',
-      data: {
-        status: user.ktp_status,
-        submittedAt: user.ktp_submitted_at,
-        ...ktpPayload
-      }
+      data: { status: user.ktp_status, submittedAt: user.ktp_submitted_at, ...ktpPayload }
     }, { status: 200 });
   } catch (error) {
     console.error('Error saving KTP verification:', error);

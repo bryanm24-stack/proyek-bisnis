@@ -89,6 +89,41 @@ function VendorInspectionContent() {
     }
   };
 
+  // New: allow vendor to mark refund as paid and provide customer bank/account info view
+  const handleMarkRefunded = async () => {
+    if (!order) return;
+    const amount = prompt('Masukkan jumlah yang Anda transfer ke customer (tanpa pemisah):');
+    if (!amount) return;
+    const ref = prompt('Masukkan referensi transaksi/ID (opsional):') || '';
+
+    setSubmittingRefundDecision(true);
+    try {
+      const form = new FormData();
+      form.append('actorRole', 'vendor');
+      form.append('vendorId', localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).id : '');
+      form.append('action', 'submit_refund_payment');
+      form.append('refundMethod', 'transfer');
+      form.append('refundReference', ref);
+      form.append('refundPaidAt', new Date().toISOString());
+      form.append('refundAmount', amount);
+
+      const response = await fetch(`/api/admin/complaints/${order.complaintId}`, {
+        method: 'PATCH',
+        body: form
+      });
+      const result = await response.json();
+      if (!response.ok || result.success === false) {
+        throw new Error(result.message || 'Gagal mengirim bukti refund');
+      }
+      alert('Bukti refund terkirim. Menunggu verifikasi admin.');
+      router.push('/vendor/orders');
+    } catch (error) {
+      alert(error.message || 'Gagal mengirim bukti refund');
+    } finally {
+      setSubmittingRefundDecision(false);
+    }
+  };
+
   const handleComplaintResolution = async (action) => {
     if (!order) return;
 

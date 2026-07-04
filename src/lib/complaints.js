@@ -39,6 +39,7 @@ export async function ensureComplaintsTable() {
       refund_proof_url TEXT,
       refund_paid_at DATETIME(3),
       admin_verified_at DATETIME(3),
+      customer_confirmed_at DATETIME(3),
       forwarded_at DATETIME(3),
       vendor_processed_at DATETIME(3),
       resolved_at DATETIME(3),
@@ -78,6 +79,19 @@ export async function ensureComplaintsTable() {
   }
   if (!columnNames.has('admin_verified_at')) {
     await query('ALTER TABLE complaints ADD COLUMN admin_verified_at DATETIME(3) AFTER refund_paid_at');
+  }
+  if (!columnNames.has('customer_confirmed_at')) {
+    await query('ALTER TABLE complaints ADD COLUMN customer_confirmed_at DATETIME(3) AFTER admin_verified_at');
+  }
+  // Add customer bank details columns to store destination account for refunds
+  if (!columnNames.has('customer_account_name')) {
+    await query("ALTER TABLE complaints ADD COLUMN customer_account_name VARCHAR(255) AFTER evidence_url");
+  }
+  if (!columnNames.has('customer_account_number')) {
+    await query("ALTER TABLE complaints ADD COLUMN customer_account_number VARCHAR(255) AFTER customer_account_name");
+  }
+  if (!columnNames.has('customer_bank_name')) {
+    await query("ALTER TABLE complaints ADD COLUMN customer_bank_name VARCHAR(255) AFTER customer_account_number");
   }
 }
 
@@ -230,8 +244,12 @@ export function mapComplaintRow(row) {
     refundMethod: row.refund_method || '',
     refundReference: row.refund_reference || '',
     refundProofUrl: parseEvidenceUrl(row.refund_proof_url),
+    customerAccountName: row.customer_account_name || '',
+    customerAccountNumber: row.customer_account_number || '',
+    customerBankName: row.customer_bank_name || '',
     refundPaidAt: row.refund_paid_at || null,
     adminVerifiedAt: row.admin_verified_at || null,
+    customerConfirmedAt: row.customer_confirmed_at || null,
     forwardedAt: row.forwarded_at || null,
     vendorProcessedAt: row.vendor_processed_at || null,
     resolvedAt: row.resolved_at || null,
@@ -294,6 +312,9 @@ export async function createComplaintDraft({
   description = '',
   evidenceUrl = '',
   refundAmount = 0,
+  customer_account_name = '',
+  customer_account_number = '',
+  customer_bank_name = '',
   adminNote = '',
   status = COMPLAINT_STATUSES.PENDING_ADMIN
 }) {
@@ -322,6 +343,7 @@ export async function createComplaintDraft({
   await query(
     `INSERT INTO complaints (
       id, user_id, vendor_id, transaction_id, type, description, evidence_url, status,
+      customer_account_name, customer_account_number, customer_bank_name,
       admin_note, vendor_note, refund_amount, forwarded_at, vendor_processed_at,
       resolved_at, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -334,6 +356,9 @@ export async function createComplaintDraft({
       String(description || '').trim(),
       parseEvidenceUrl(evidenceUrl),
       status,
+      String(customer_account_name || ''),
+      String(customer_account_number || ''),
+      String(customer_bank_name || ''),
       adminNote || '',
       '',
       Number(refundAmount || 0),
@@ -521,6 +546,34 @@ export async function updateComplaintWorkflow({
     } else {
       throw new Error('Aksi admin tidak dikenali');
     }
+  } else if (normalizedRole === 'customer') {
+    if (normalizedAction !== 'customer_confirm_receipt') {
+      throw new Error('Aksi customer tidak dikenali');
+    }
+    if (String(current.user_id) !== String(actorId)) {
+      throw new Error('Anda tidak memiliki akses ke complaint ini');
+    }
+    if (current.status !== COMPLAINT_STATUSES.RESOLVED) {
+      throw new Error('Konfirmasi penerimaan hanya tersedia setelah admin menutup complaint');
+    }
+    if (!current.admin_verified_at) {
+      throw new Error('Complaint belum diverifikasi admin');
+    }
+
+    await query(
+      `UPDATE complaints
+       SET customer_confirmed_at = ?, updated_at = ?
+       WHERE id = ?`,
+      [now, now, String(complaintId)]
+    );
+
+    await createNotification(
+      current.user_id,
+      'complaint_customer_confirmed',
+      'Anda telah mengonfirmasi penerimaan hasil complaint/refund.',
+      complaintId,
+      { complaintId, transactionId: current.transaction_id }
+    );
   } else if (normalizedRole === 'vendor') {
     if (String(current.vendor_id) !== String(actorId)) {
       throw new Error('Anda tidak memiliki akses ke complaint ini');
