@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import SharedNavbar from '@/app/components/SharedNavbar';
 import styles from './page.module.css';
 
 export default function CustomerVerificationPage() {
   const [user, setUser] = useState(null);
   const [verifications, setVerifications] = useState([]);
+  const [selectedVerification, setSelectedVerification] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
@@ -151,11 +153,29 @@ export default function CustomerVerificationPage() {
     return labels[status] || status;
   };
 
+  const parseKtpData = (ktpData) => {
+    if (!ktpData) return {};
+    if (typeof ktpData === 'string') {
+      try {
+        return JSON.parse(ktpData);
+      } catch {
+        return {};
+      }
+    }
+    return ktpData;
+  };
+
+  const toggleVerificationDetails = (verificationId) => {
+    setSelectedVerification(prev => (prev === verificationId ? null : verificationId));
+  };
+
   if (!user) return <div className={styles.container}>Loading...</div>;
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
+    <div className={styles['admin-page']}>
+      <SharedNavbar />
+      <div className={styles.container}>
+        <div className={styles.header}>
         <h1>📋 Verifikasi Customer KTP</h1>
         <p className={styles.subtitle}>Kelola dan verifikasi dokumen identitas customer</p>
       </div>
@@ -202,7 +222,7 @@ export default function CustomerVerificationPage() {
 
       {/* Filter Tabs */}
       <div className={styles['filter-tabs']}>
-        {['all', 'pending', 'approved', 'rejected'].map(status => (
+        {['all', 'pending', 'approved', 'rejected', 'not_submitted'].map(status => (
           <button
             key={status}
             className={`${styles['filter-btn']} ${statusFilter === status ? styles['active'] : ''}`}
@@ -234,57 +254,102 @@ export default function CustomerVerificationPage() {
               </tr>
             </thead>
             <tbody>
-              {verifications.map(verification => (
-                <tr key={verification.id} className={styles['table-row']}>
-                  <td className={styles['cell-name']}>
-                    <strong>{verification.name}</strong>
-                  </td>
-                  <td className={styles['cell-email']}>{verification.email}</td>
-                  <td className={styles['cell-phone']}>{verification.phone || '-'}</td>
-                  <td className={styles['cell-status']}>
-                    <span className={`${styles['badge']} ${styles[getStatusBadgeColor(verification.ktp_status)]}`}>
-                      {getStatusLabel(verification.ktp_status)}
-                    </span>
-                  </td>
-                  <td className={styles['cell-date']}>
-                    {verification.ktp_submitted_at
-                      ? new Date(verification.ktp_submitted_at).toLocaleDateString('id-ID')
-                      : '-'}
-                  </td>
-                  <td className={styles['cell-actions']}>
-                    {verification.ktp_status === 'pending' ? (
-                      <div className={styles['action-buttons']}>
-                        <button
-                          className={`${styles['btn-approve']} ${actionLoading === verification.id ? styles['disabled'] : ''}`}
-                          onClick={() => handleApprove(verification.id)}
-                          disabled={actionLoading === verification.id}
-                        >
-                          {actionLoading === verification.id ? '...' : '✓ Terima'}
-                        </button>
-                        <button
-                          className={`${styles['btn-reject']} ${actionLoading === verification.id ? styles['disabled'] : ''}`}
-                          onClick={() => handleReject(verification.id)}
-                          disabled={actionLoading === verification.id}
-                        >
-                          {actionLoading === verification.id ? '...' : '✕ Tolak'}
-                        </button>
-                      </div>
-                    ) : (
-                      <span className={styles['badge-info']}>
-                        {verification.ktp_status === 'approved' ? '✓ Sudah Diverifikasi' : '✕ Ditolak'}
-                      </span>
+              {verifications.map((verification) => {
+                const ktpData = parseKtpData(verification.ktp_data);
+                const verificationHistory = verification.ktp_verified_at
+                  ? (verification.ktp_status === 'approved' ? 'Disetujui' : 'Ditolak')
+                      + ' oleh ' + (verification.ktp_verified_by || 'admin')
+                      + ' pada ' + new Date(verification.ktp_verified_at).toLocaleString('id-ID')
+                  : 'Belum ditinjau';
+
+                return (
+                  <>
+                    <tr className={styles['table-row']}>
+                      <td className={styles['cell-name']}>
+                        <strong>{verification.name}</strong>
+                      </td>
+                      <td className={styles['cell-email']}>{verification.email}</td>
+                      <td className={styles['cell-phone']}>{verification.phone || '-'}</td>
+                      <td className={styles['cell-status']}>
+                        <span className={`${styles['badge']} ${styles[getStatusBadgeColor(verification.ktp_status)]}`}>
+                          {getStatusLabel(verification.ktp_status)}
+                        </span>
+                      </td>
+                      <td className={styles['cell-date']}>
+                        {verification.ktp_submitted_at ? new Date(verification.ktp_submitted_at).toLocaleDateString('id-ID') : '-'}
+                      </td>
+                      <td className={styles['cell-actions']}>
+                        {verification.ktp_status === 'pending' ? (
+                          <div className={styles['action-buttons']}>
+                            <button
+                              className={`${styles['btn-approve']} ${actionLoading === verification.id ? styles['disabled'] : ''}`}
+                              onClick={() => handleApprove(verification.id)}
+                              disabled={actionLoading === verification.id}
+                            >
+                              {actionLoading === verification.id ? '...' : '✓ Terima'}
+                            </button>
+                            <button
+                              className={`${styles['btn-reject']} ${actionLoading === verification.id ? styles['disabled'] : ''}`}
+                              onClick={() => handleReject(verification.id)}
+                              disabled={actionLoading === verification.id}
+                            >
+                              {actionLoading === verification.id ? '...' : '✕ Tolak'}
+                            </button>
+                            <button
+                              className={styles['btn-details']}
+                              onClick={() => toggleVerificationDetails(verification.id)}
+                            >
+                              {selectedVerification === verification.id ? 'Tutup Detail' : 'Lihat Detail'}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className={styles['badge-info']}>
+                            {verification.ktp_status === 'approved'
+                              ? '✓ Sudah Diverifikasi'
+                              : verification.ktp_status === 'rejected'
+                              ? '✕ Ditolak'
+                              : '⚪ Belum Diajukan'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+
+                    {selectedVerification === verification.id && (
+                      <tr className={styles['detail-row']}>
+                        <td colSpan="6" className={styles['detail-panel']}>
+                          <div className={styles['detail-content']}>
+                            <div><strong>Jenis Identitas:</strong> {ktpData.idType || 'KTP'}</div>
+                            <div><strong>Nomor Identitas:</strong> {ktpData.nik || '-'}</div>
+                            <div><strong>Catatan:</strong> {ktpData.notes || '-'}</div>
+                            <div><strong>Tanggal Pengajuan:</strong> {verification.ktp_submitted_at ? new Date(verification.ktp_submitted_at).toLocaleString('id-ID') : '-'}</div>
+                            <div><strong>Riwayat Verifikasi:</strong> {verificationHistory}</div>
+                            <div className={styles['detail-images']}>
+                              {ktpData.idPhotoPreview && (
+                                <div className={styles['detail-image-card']}>
+                                  <div className={styles['detail-image-title']}>Foto Identitas</div>
+                                  <img src={ktpData.idPhotoPreview} alt="Foto Identitas" />
+                                </div>
+                              )}
+                              {ktpData.selfiePhotoPreview && (
+                                <div className={styles['detail-image-card']}>
+                                  <div className={styles['detail-image-title']}>Foto Selfie</div>
+                                  <img src={ktpData.selfiePhotoPreview} alt="Foto Selfie" />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                  </td>
-                </tr>
-              ))}
+                  </>
+                );
+              })}
             </tbody>
           </table>
         )}
       </div>
 
-      <style jsx>{`
-        ${styles}
-      `}</style>
     </div>
+  </div>
   );
 }

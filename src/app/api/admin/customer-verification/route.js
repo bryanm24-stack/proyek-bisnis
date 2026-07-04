@@ -14,75 +14,54 @@ export async function GET(request) {
     const statusFilter = searchParams.get('status');
     const role = searchParams.get('role');
 
-    // Try DB first
-    try {
-      let sqlQuery = `
-        SELECT id, name, email, phone, ktp_status, 
-               ktp_submitted_at, ktp_verified_by, ktp_verified_at, ktp_rejection_reason
-        FROM users 
-        WHERE role = 'customer'
-      `;
-      let params = [];
-
-      if (statusFilter && statusFilter !== 'all') {
-        sqlQuery += ` AND ktp_status = ?`;
-        params.push(statusFilter);
-      }
-
-      sqlQuery += ` ORDER BY ktp_submitted_at DESC, created_at DESC`;
-
-      const dbResults = await query(sqlQuery, params);
+    // Try JSON storage first (most up-to-date)
+    const users = await readData('users');
+    console.log('[API] readData returned:', users.length, 'users, roles:', users.map(u=>u.role));
+    let verifications = users.filter(u => u.role === 'customer').map(u => {
+      // Normalize field names: support both snake_case (new) and camelCase (old)
+      const ktpStatus = u.ktp_status || u.ktpStatus || 'not_submitted';
+      const ktpData = u.ktp_data || u.ktpData || {};
+      const ktpSubmittedAt = u.ktp_submitted_at || u.ktpSubmittedAt;
+      const ktpVerifiedBy = u.ktp_verified_by || u.ktpVerifiedBy;
+      const ktpVerifiedAt = u.ktp_verified_at || u.ktpVerifiedAt;
+      const ktpRejectionReason = u.ktp_rejection_reason || u.ktpRejectionReason;
       
-      return NextResponse.json({
-        success: true,
-        source: 'database',
-        verifications: Array.isArray(dbResults) ? dbResults : [],
-        totalCount: Array.isArray(dbResults) ? dbResults.length : 0,
-        statusCounts: {
-          pending: (dbResults || []).filter(v => v.ktp_status === 'pending').length,
-          approved: (dbResults || []).filter(v => v.ktp_status === 'approved').length,
-          rejected: (dbResults || []).filter(v => v.ktp_status === 'rejected').length,
-          notSubmitted: (dbResults || []).filter(v => v.ktp_status === 'not_submitted').length
-        }
-      }, { status: 200 });
-    } catch (dbErr) {
-      // Fallback to JSON storage
-      const users = await readData('users');
-      let verifications = users.filter(u => u.role === 'customer').map(u => ({
+      return {
         id: u.id,
         name: u.name,
         email: u.email,
         phone: u.phone,
-        ktp_status: u.ktp_status || 'not_submitted',
-        ktp_submitted_at: u.ktp_submitted_at,
-        ktp_verified_by: u.ktp_verified_by,
-        ktp_verified_at: u.ktp_verified_at,
-        ktp_rejection_reason: u.ktp_rejection_reason
-      }));
+        ktp_status: ktpStatus,
+        ktp_data: ktpData,
+        ktp_submitted_at: ktpSubmittedAt,
+        ktp_verified_by: ktpVerifiedBy,
+        ktp_verified_at: ktpVerifiedAt,
+        ktp_rejection_reason: ktpRejectionReason
+      };
+    });
 
-      if (statusFilter && statusFilter !== 'all') {
-        verifications = verifications.filter(v => v.ktp_status === statusFilter);
-      }
-
-      verifications.sort((a, b) => {
-        const aDate = new Date(a.ktp_submitted_at || 0);
-        const bDate = new Date(b.ktp_submitted_at || 0);
-        return bDate - aDate;
-      });
-
-      return NextResponse.json({
-        success: true,
-        source: 'json_storage',
-        verifications,
-        totalCount: verifications.length,
-        statusCounts: {
-          pending: verifications.filter(v => v.ktp_status === 'pending').length,
-          approved: verifications.filter(v => v.ktp_status === 'approved').length,
-          rejected: verifications.filter(v => v.ktp_status === 'rejected').length,
-          notSubmitted: verifications.filter(v => v.ktp_status === 'not_submitted').length
-        }
-      }, { status: 200 });
+    if (statusFilter && statusFilter !== 'all') {
+      verifications = verifications.filter(v => v.ktp_status === statusFilter);
     }
+
+    verifications.sort((a, b) => {
+      const aDate = new Date(a.ktp_submitted_at || 0);
+      const bDate = new Date(b.ktp_submitted_at || 0);
+      return bDate - aDate;
+    });
+
+    return NextResponse.json({
+      success: true,
+      source: 'json_storage',
+      verifications,
+      totalCount: verifications.length,
+      statusCounts: {
+        pending: verifications.filter(v => v.ktp_status === 'pending').length,
+        approved: verifications.filter(v => v.ktp_status === 'approved').length,
+        rejected: verifications.filter(v => v.ktp_status === 'rejected').length,
+        notSubmitted: verifications.filter(v => v.ktp_status === 'not_submitted').length
+      }
+    }, { status: 200 });
   } catch (error) {
     console.error('Error fetching customer verifications:', error);
     return NextResponse.json({

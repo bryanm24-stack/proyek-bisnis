@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { readData, writeData } from '@/lib/storage';
 
-const DATASET = 'ktp_verifications';
-
 export async function GET(request) {
   try {
     const url = new URL(request.url);
@@ -12,12 +10,32 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'userId wajib diisi.' }, { status: 400 });
     }
 
-    const records = await readData(DATASET);
-    const verification = Array.isArray(records)
-      ? records.find((item) => String(item.userId) === String(userId))
+    const users = await readData('users');
+    const user = Array.isArray(users)
+      ? users.find((item) => String(item.id) === String(userId))
       : null;
 
-    return NextResponse.json({ success: true, data: verification || null }, { status: 200 });
+    if (!user) {
+      return NextResponse.json({ success: false, message: 'User tidak ditemukan.' }, { status: 404 });
+    }
+
+    const ktpData = user.ktp_data || {};
+    const verification = {
+      status: user.ktp_status || 'not_submitted',
+      submittedAt: user.ktp_submitted_at || null,
+      verifiedAt: user.ktp_verified_at || null,
+      verifiedBy: user.ktp_verified_by || null,
+      rejectionReason: user.ktp_rejection_reason || null,
+      name: ktpData.name || user.name || null,
+      email: ktpData.email || user.email || null,
+      idType: ktpData.idType || 'ktp',
+      nik: ktpData.nik || null,
+      idPhotoPreview: ktpData.idPhotoPreview || null,
+      selfiePhotoPreview: ktpData.selfiePhotoPreview || null,
+      notes: ktpData.notes || ''
+    };
+
+    return NextResponse.json({ success: true, data: verification }, { status: 200 });
   } catch (error) {
     console.error('Error reading KTP verification:', error);
     return NextResponse.json({ success: false, message: 'Terjadi kesalahan saat memuat status verifikasi.' }, { status: 500 });
@@ -27,41 +45,61 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { userId, name, email, idType, nik, idPhotoPreview, selfiePhotoPreview, status, notes } = body;
+    const { userId, name, email, idType, nik, idPhotoPreview, selfiePhotoPreview, notes } = body;
 
     if (!userId || !nik) {
       return NextResponse.json({ success: false, message: 'userId dan NIK wajib diisi.' }, { status: 400 });
     }
 
-    const records = await readData(DATASET);
-    const existingRecord = Array.isArray(records)
-      ? records.find((item) => String(item.userId) === String(userId))
-      : null;
+    const users = await readData('users');
+    const userIndex = Array.isArray(users)
+      ? users.findIndex((item) => String(item.id) === String(userId))
+      : -1;
 
-    const newRecord = {
-      id: existingRecord?.id || `KTP-${Date.now()}`,
-      userId: String(userId),
-      name: name || null,
-      email: email || null,
+    if (userIndex === -1) {
+      return NextResponse.json({ success: false, message: 'User tidak ditemukan.' }, { status: 404 });
+    }
+
+    const user = users[userIndex];
+    const now = new Date().toISOString();
+    const ktpPayload = {
+      name: name || user.name || null,
+      email: email || user.email || null,
       idType: idType || 'ktp',
       nik: String(nik).trim(),
       idPhotoPreview: typeof idPhotoPreview === 'string' ? idPhotoPreview : null,
       selfiePhotoPreview: typeof selfiePhotoPreview === 'string' ? selfiePhotoPreview : null,
-      status: status || 'pending',
-      notes: notes || '',
-      submittedAt: new Date().toISOString(),
-      reviewedAt: existingRecord?.reviewedAt || null,
-      reviewedBy: existingRecord?.reviewedBy || null,
-      adminNotes: existingRecord?.adminNotes || ''
+      notes: notes || ''
     };
 
-    const updated = existingRecord
-      ? records.map((item) => (String(item.userId) === String(userId) ? newRecord : item))
-      : [...(Array.isArray(records) ? records : []), newRecord];
+    // Store using snake_case convention (new standard)
+    user.ktp_status = 'pending';
+    user.ktp_data = ktpPayload;
+    user.ktp_submitted_at = now;
+    user.ktp_verified_by = null;
+    user.ktp_verified_at = null;
+    user.ktp_rejection_reason = null;
+    
+    // Clean up old camelCase fields if they exist
+    delete user.ktpStatus;
+    delete user.ktpData;
+    delete user.ktpSubmittedAt;
+    delete user.ktpVerifiedBy;
+    delete user.ktpVerifiedAt;
+    delete user.ktpRejectionReason;
 
-    await writeData(DATASET, updated);
+    users[userIndex] = user;
+    await writeData('users', users);
 
-    return NextResponse.json({ success: true, message: 'Permohonan verifikasi KTP disimpan.', data: newRecord }, { status: 200 });
+    return NextResponse.json({
+      success: true,
+      message: 'Permohonan verifikasi KTP disimpan.',
+      data: {
+        status: user.ktp_status,
+        submittedAt: user.ktp_submitted_at,
+        ...ktpPayload
+      }
+    }, { status: 200 });
   } catch (error) {
     console.error('Error saving KTP verification:', error);
     return NextResponse.json({ success: false, message: 'Terjadi kesalahan saat menyimpan verifikasi.' }, { status: 500 });

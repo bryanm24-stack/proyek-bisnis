@@ -191,10 +191,39 @@ function IdentityCheckContent() {
     setIsSubmitting(true);
 
     try {
-      // Save verification data to localStorage for payment page
+      const userData = localStorage.getItem('user');
+      const parsedUser = userData ? JSON.parse(userData) : null;
+      if (!parsedUser) {
+        alert('User tidak ditemukan. Silakan login ulang.');
+        router.push('/login');
+        return;
+      }
+
+      const payload = {
+        userId: parsedUser.id,
+        name: formData.fullName,
+        email: formData.email,
+        idType: formData.idType,
+        nik: formData.idNumber,
+        idPhotoPreview: formData.idPhotoPreview,
+        selfiePhotoPreview: formData.selfiePhotoPreview,
+        notes: formData.notes,
+        status: 'pending'
+      };
+
+      const response = await fetch('/api/auth/verify-ktp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        alert(result.message || 'Gagal mengirim data verifikasi KTP.');
+        return;
+      }
+
       localStorage.setItem('verificationData', JSON.stringify(formData));
-      
-      // Redirect to payment page
       router.push(`/transaction/payment?dealId=${dealId}`);
     } catch (error) {
       console.error('Error:', error);
