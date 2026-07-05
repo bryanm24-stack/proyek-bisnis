@@ -1018,6 +1018,7 @@ export default function HomePageClient() {
       <div className="hero-section">
         <div className="hero-inner">
           <div className="hero-content">
+            <div className="hero-badge">📍 Khusus Melayani Area Surabaya & Sekitarnya</div>
             <h1>Sewa Apa Saja,<br/>dari Vendor Terbaik</h1>
             <p>Ribuan vendor penyewaan terpercaya siap melayani kebutuhan sewa kamu</p>
             <div className="hero-buttons">
@@ -2468,6 +2469,22 @@ export default function HomePageClient() {
           margin: 24px 0 30px;
           max-width: 540px;
           line-height: 1.7;
+        }
+
+        .hero-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.8rem 1.1rem;
+          border-radius: 999px;
+          background: rgba(255,255,255,0.15);
+          border: 1px solid rgba(255,255,255,0.28);
+          color: #fff;
+          font-size: 0.95rem;
+          font-weight: 600;
+          margin-bottom: 1.4rem;
+          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+          backdrop-filter: blur(8px);
         }
 
         .hero-buttons {
