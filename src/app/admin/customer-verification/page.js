@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import Link from 'next/link';
 import SharedNavbar from '@/app/components/SharedNavbar';
 import styles from './page.module.css';
@@ -254,7 +254,7 @@ export default function CustomerVerificationPage() {
               </tr>
             </thead>
             <tbody>
-              {verifications.map((verification) => {
+              {verifications.map((verification, index) => {
                 const ktpData = parseKtpData(verification.ktp_data);
                 const verificationHistory = verification.ktp_verified_at
                   ? (verification.ktp_status === 'approved' ? 'Disetujui' : 'Ditolak')
@@ -263,7 +263,7 @@ export default function CustomerVerificationPage() {
                   : 'Belum ditinjau';
 
                 return (
-                  <>
+                  <Fragment key={`verification-${verification.id || index}`}>
                     <tr className={styles['table-row']}>
                       <td className={styles['cell-name']}>
                         <strong>{verification.name}</strong>
@@ -341,7 +341,7 @@ export default function CustomerVerificationPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>

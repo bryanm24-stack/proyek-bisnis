@@ -221,6 +221,64 @@ const resolveJasaSpecGroup = (path) => {
 const getCategoryPath = (mainCategory, subCategory, superSubCategory) =>
   `${mainCategory || ''} ${subCategory || ''} ${superSubCategory || ''}`.toLowerCase();
 
+const formatVariationLabel = (key) =>
+  String(key || 'Variasi')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const normalizeVariationOption = (option, index, variationId) => {
+  if (option && typeof option === 'object') {
+    const optionId = String(option.id || option.value || `${variationId}-opt-${index + 1}`);
+    const optionLabel = String(option.label || option.name || option.value || `Opsi ${index + 1}`);
+    return { id: optionId, label: optionLabel };
+  }
+
+  const optionLabel = String(option || `Opsi ${index + 1}`);
+  return {
+    id: `${variationId}-opt-${index + 1}`,
+    label: optionLabel
+  };
+};
+
+const normalizeVariations = (rawVariations, rawSpecificationOptions) => {
+  const baseVariations = rawVariations && typeof rawVariations === 'object' ? rawVariations : {};
+  const specOptions = rawSpecificationOptions && typeof rawSpecificationOptions === 'object' ? rawSpecificationOptions : {};
+  const hasBaseVariations = Object.keys(baseVariations).length > 0;
+  const source = hasBaseVariations ? baseVariations : specOptions;
+
+  return Object.entries(source).reduce((acc, [key, value]) => {
+    const variationId = String(key);
+    if (value == null) return acc;
+
+    if (Array.isArray(value)) {
+      acc[variationId] = {
+        id: variationId,
+        name: formatVariationLabel(variationId),
+        options: value.map((option, index) => normalizeVariationOption(option, index, variationId))
+      };
+      return acc;
+    }
+
+    if (typeof value === 'object') {
+      const rawOptions = Array.isArray(value.options)
+        ? value.options
+        : Array.isArray(value.values)
+          ? value.values
+          : [];
+
+      acc[variationId] = {
+        id: String(value.id || variationId),
+        name: String(value.name || value.label || formatVariationLabel(variationId)),
+        options: rawOptions.map((option, index) => normalizeVariationOption(option, index, variationId))
+      };
+      return acc;
+    }
+
+    return acc;
+  }, {});
+};
+
 export default function VendorProductForm({
   formData,
   setFormData,
@@ -718,7 +776,7 @@ export default function VendorProductForm({
   };
 
   // ========== VARIASI HANDLERS ==========
-  const variations = formData.variations || {};
+  const variations = normalizeVariations(formData.variations, specificationOptions);
   const variationCount = Object.keys(variations).length;
 
   const handleAddVariation = () => {
@@ -1028,7 +1086,8 @@ export default function VendorProductForm({
 
   useEffect(() => {
     setFormData(prev => {
-      const variationEntries = Object.entries(prev.variations || {});
+      const normalizedVariations = normalizeVariations(prev.variations, prev.specificationOptions || {});
+      const variationEntries = Object.entries(normalizedVariations);
       const currentOptionKeys = new Set(activeSpecOptionFields.map((field) => field.key));
       const optionIdsByField = new Map(
         activeSpecOptionFields.map((field) => [
@@ -1362,8 +1421,12 @@ export default function VendorProductForm({
                     </tr>
                   </thead>
                   <tbody>
-                    {(formData.items || []).map((item, idx) => [
-                      <tr key={item.id} style={{ 
+                    {(formData.items || []).map((item, idx) => {
+                      const rowBaseKey = item?.id ? `item-${item.id}` : `item-idx-${idx}`;
+
+                      return (
+                      <React.Fragment key={rowBaseKey}>
+                      <tr style={{ 
                         borderBottom: '1px solid #e5e7eb',
                         background: idx % 2 === 0 ? '#ffffff' : '#f9fafb',
                         transition: 'background 0.15s'
@@ -1593,15 +1656,18 @@ export default function VendorProductForm({
                             ✕
                           </button>
                         </td>
-                      </tr>,
-                      Object.keys(variations).length > 0 && (
-                        <tr key={`var-${item.id}`} style={{ background: '#f0f9ff', borderBottom: '1px solid #e5e7eb' }}>
+                      </tr>
+                      {Object.keys(variations).length > 0 && (
+                        <tr key={`${rowBaseKey}-var`} style={{ background: '#f0f9ff', borderBottom: '1px solid #e5e7eb' }}>
                           <td colSpan="5" style={{ padding: '12px 14px' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                              {Object.entries(variations).map(([variasiId, variasi]) => (
+                              {Object.entries(variations).map(([variasiId, variasi]) => {
+                                const variationName = (variasi?.name || 'Variasi').toString();
+
+                                return (
                                 <div key={variasiId} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                   <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151' }}>
-                                    {variasi.name}
+                                    {variationName}
                                   </label>
                                   <select
                                     value={item.variationValues?.[variasiId] || ''}
@@ -1616,7 +1682,7 @@ export default function VendorProductForm({
                                       cursor: 'pointer'
                                     }}
                                   >
-                                    <option value="">-- Pilih {variasi.name.toLowerCase()} --</option>
+                                    <option value="">-- Pilih {variationName.toLowerCase()} --</option>
                                     {(variasi.options || []).map((option) => (
                                       <option key={option.id} value={option.id}>
                                         {option.label}
@@ -1624,13 +1690,14 @@ export default function VendorProductForm({
                                     ))}
                                   </select>
                                 </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </td>
                         </tr>
-                      ),
-                      activeSpecOptionFields.length > 0 && (
-                        <tr key={`specopt-${item.id}`} style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                      )}
+                      {activeSpecOptionFields.length > 0 && (
+                        <tr key={`${rowBaseKey}-specopt`} style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
                           <td colSpan="5" style={{ padding: '12px 14px' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                               {activeSpecOptionFields.map((field) => {
@@ -1667,8 +1734,10 @@ export default function VendorProductForm({
                             </div>
                           </td>
                         </tr>
-                      )
-                    ])}
+                      )}
+                      </React.Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
