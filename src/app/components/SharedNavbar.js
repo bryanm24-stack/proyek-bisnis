@@ -234,20 +234,6 @@ export default function SharedNavbar() {
         >
           <div style={{ padding: '18px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
             <div style={{ fontWeight: '700', color: '#333', fontSize: '15px' }}>Akun</div>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              style={{
-                background: 'none',
-                border: 'none',
-                fontSize: '18px',
-                cursor: 'pointer',
-                color: '#666',
-                display: sidebarOpen ? 'inline-flex' : 'none',
-              }}
-              aria-label="Tutup sidebar tamu"
-            >
-              ×
-            </button>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 14px 16px' }}>
@@ -555,20 +541,6 @@ export default function SharedNavbar() {
       >
         <div style={{ padding: '18px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
           <div style={{ fontWeight: '700', color: '#333', fontSize: '16px' }}>Navigasi</div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '18px',
-              cursor: 'pointer',
-              color: '#666',
-              display: sidebarOpen ? 'inline-flex' : 'none',
-            }}
-            aria-label="Tutup sidebar"
-          >
-            ×
-          </button>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '0 14px 20px', maxHeight: '60vh', overflowY: 'auto' }}>

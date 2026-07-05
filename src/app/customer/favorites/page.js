@@ -542,7 +542,7 @@ export default function FavoritesPage() {
   return (
     <>
       <SharedNavbar />
-      <div style={{ minHeight: 'calc(100vh - 300px)', padding: '20px', width: '100%', maxWidth: '1400px', margin: 0 }}>
+      <div style={{ minHeight: 'calc(100vh - 300px)', padding: '24px', maxWidth: '1100px', margin: '0 auto', width: '100%' }}>
         <div style={{ marginBottom: '30px' }}>
           <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '10px' }}>
             ❤️ Favorit Saya
