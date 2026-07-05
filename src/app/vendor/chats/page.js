@@ -379,7 +379,7 @@ export default function VendorChatsPage() {
           flexDirection: 'column'
         }}>
           <div style={{ padding: '20px', paddingBottom: '0' }}>
-            <h2 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>💬 Chat</h2>
+            <h2 style={{ margin: '0 0 16px 0', fontSize: '18px' }}> Chat</h2>
             
             {/* Tab Navigation */}
             {vendorChats.length > 0 || customerChats.length > 0 ? (
@@ -427,7 +427,7 @@ export default function VendorChatsPage() {
                     marginBottom: '-2px'
                   }}
                 >
-                  👤 Pembelian {customerChats.length > 0 && `(${customerChats.length})`}
+                   Pembelian {customerChats.length > 0 && `(${customerChats.length})`}
                 </button>
               </div>
             ) : null}
@@ -655,7 +655,7 @@ export default function VendorChatsPage() {
                     fontSize: '12px'
                   }}
                 >
-                  👤 Profil
+                   Profil
                 </button>
               </div>
 
@@ -680,7 +680,7 @@ export default function VendorChatsPage() {
                           disabled={!canVendorAccept}
                           style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: !canVendorAccept ? '#94d3a2' : '#10b981', color: 'white', fontWeight: '700', cursor: !canVendorAccept ? 'not-allowed' : 'pointer', opacity: !canVendorAccept ? 0.6 : 1 }}
                         >
-                          {dealProcessing ? 'Memproses...' : '✅ Terima Deal'}
+                          {dealProcessing ? 'Memproses...' : ' Terima Deal'}
                         </button>
                         <button
                           onClick={() => handleDealAction('cancel')}
@@ -694,7 +694,7 @@ export default function VendorChatsPage() {
                             onClick={() => setDiscountMode('yes')}
                             style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: '#f59e0b', color: 'white', fontWeight: '700', cursor: 'pointer' }}
                           >
-                            💰 Kasih Promo
+                             Kasih Promo
                           </button>
                         )}
                       </div>
@@ -983,7 +983,7 @@ export default function VendorChatsPage() {
                     fontSize: '14px'
                   }}
                 >
-                  {dealProcessing ? 'Memproses...' : '✅ Terima Deal'}
+                  {dealProcessing ? 'Memproses...' : ' Terima Deal'}
                 </button>
                 <button
                   onClick={() => {
@@ -1034,7 +1034,7 @@ export default function VendorChatsPage() {
                         onMouseEnter={(e) => e.target.style.background = '#d97706'}
                         onMouseLeave={(e) => e.target.style.background = '#f59e0b'}
                       >
-                        💰 Aplikasikan Diskon
+                         Aplikasikan Diskon
                       </button>
                     )}
                   </>
@@ -1098,7 +1098,7 @@ export default function VendorChatsPage() {
                       fontSize: '14px'
                     }}
                   >
-                    💳 Lanjut ke Pembayaran
+                     Lanjut ke Pembayaran
                   </button>
                 )}
 

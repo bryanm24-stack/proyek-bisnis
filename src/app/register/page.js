@@ -125,7 +125,7 @@ const handleSubmit = async (e) => {
             <div className="form-group">
               <label>Nama Lengkap</label>
               <div className="input-wrapper">
-                <span className="input-icon">👤</span>
+                <span className="input-icon"></span>
                 <input 
                   type="text" 
                   name="name" 

@@ -15,6 +15,9 @@ function mapInvoiceRow(row) {
   const discountAmount = Math.max((basePrice * quantity * durationDays) - Math.max(txTotal - serviceFee, 0), 0);
   const discountedSubtotal = Math.max(txTotal - serviceFee, 0);
   const totalAmount = txTotal > 0 ? txTotal : (discountedSubtotal + serviceFee);
+  const effectiveStatus = row.status === 'paid'
+    ? 'paid'
+    : (row.payment_type !== 'pay_after' && row.transaction_status === 'success' ? 'paid' : row.status);
 
   return {
     id: row.id,
@@ -27,7 +30,7 @@ function mapInvoiceRow(row) {
     paymentDeadline: row.payment_deadline,
     paymentMethod: row.payment_method,
     paymentType: row.payment_type,
-    status: row.status,
+    status: effectiveStatus,
     createdAt: row.created_at,
     paidAt: row.paid_at,
     paymentTransactionId: row.payment_transaction_id,
@@ -51,7 +54,7 @@ function mapInvoiceRow(row) {
           price: row.promo_price !== null && row.promo_price !== undefined ? toNumber(row.promo_price) : null
         }
       : null,
-    collaborationStatus: row.status === 'paid' ? 'completed' : 'ongoing'
+    collaborationStatus: effectiveStatus === 'paid' ? 'completed' : 'ongoing'
   };
 }
 
@@ -96,6 +99,7 @@ export async function GET(request) {
          t.duration_days,
          t.service_fee,
          t.total_amount AS tx_total_amount,
+        t.status AS transaction_status,
          t.promo_id,
          p.title AS promo_title,
          p.promo_price

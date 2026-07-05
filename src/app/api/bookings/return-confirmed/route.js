@@ -6,7 +6,7 @@ import { readData, writeData } from '@/lib/storage';
  * POST /api/bookings/return-confirmed
  * Called by vendor after return is approved
  * Updates booking status: pending_return → completed
- * ✅ CRITICAL: This is where STOCK GETS INCREMENTED BACK!
+ *  CRITICAL: This is where STOCK GETS INCREMENTED BACK!
  */
 export async function POST(request) {
   try {
@@ -57,7 +57,7 @@ export async function POST(request) {
     booking.status = 'completed';
     booking.returnConfirmedAt = new Date().toISOString();
 
-    // ✅ CRITICAL: INCREMENT ACTUAL STOCK BACK!
+    //  CRITICAL: INCREMENT ACTUAL STOCK BACK!
     const serviceType = service.type || 'barang';
     let totalQuantity = 0;
     
@@ -99,7 +99,7 @@ export async function POST(request) {
     // Save updated services
     await writeData('service', services);
 
-    console.log(`✅ Return confirmed for booking ${bookingId}. Stock incremented by ${booking.quantity}.`);
+    console.log(` Return confirmed for booking ${bookingId}. Stock incremented by ${booking.quantity}.`);
 
     return NextResponse.json({
       success: true,

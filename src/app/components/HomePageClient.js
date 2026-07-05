@@ -208,7 +208,7 @@ export default function HomePageClient() {
     window.location.reload();
   };
 
-  // ✅ NEW: Handle image navigation in carousel
+  //  NEW: Handle image navigation in carousel
   const handleNextImage = (e, serviceId, totalImages) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1217,7 +1217,7 @@ export default function HomePageClient() {
                     {isFavorited(service.id) ? '❤️' : '🤍'}
                   </button>
                   
-                  {/* ✅ CAROUSEL */}
+                  {/*  CAROUSEL */}
                   <div className="vendor-cover" style={{ position: 'relative', overflow: 'hidden' }}>
                     <img 
                       src={service.images && service.images.length > 0 
@@ -1467,7 +1467,7 @@ export default function HomePageClient() {
                       setSelectedItemDetail(null);
                     }}
                   >
-                    📦 Paket Tersedia
+                     Paket Tersedia
                   </button>
                   <button
                     className={`tab ${detailTab === 'description' ? 'active' : ''}`}
@@ -1719,7 +1719,7 @@ export default function HomePageClient() {
                               >
                                 {isUnavailable
                                   ? (isJasaItem ? '⛔ Availability Penuh' : '⛔ Stok Habis')
-                                  : '💬 Chat untuk Paket Ini'}
+                                  : ' Chat untuk Paket Ini'}
                               </button>
                                   </>
                                 );
@@ -1847,9 +1847,9 @@ export default function HomePageClient() {
                                       Rp {Number(activeServicePromo.promoPrice || 0).toLocaleString('id-ID')}
                                     </p>
                                     <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '12px', color: '#475569' }}>
-                                      <span>⏳ {getPromoCountdownLabel(activeServicePromo)}</span>
+                                      <span> {getPromoCountdownLabel(activeServicePromo)}</span>
                                       <span>
-                                        👤 {activeServicePromoRemainingApplicants === null
+                                         {activeServicePromoRemainingApplicants === null
                                           ? 'Kuota tidak dibatasi'
                                           : `${activeServicePromoRemainingApplicants} kuota tersisa`}
                                       </span>
@@ -1968,7 +1968,7 @@ export default function HomePageClient() {
 
                       {selectedVendorProfile?.memberSince && (
                         <div className="info-section">
-                          <h4>📅 Bergabung Sejak</h4>
+                          <h4> Bergabung Sejak</h4>
                           <p>{new Date(selectedVendorProfile.memberSince).toLocaleDateString('id-ID')}</p>
                         </div>
                       )}
@@ -1991,7 +1991,7 @@ export default function HomePageClient() {
 
                       {descriptionTableEntries.length > 0 && (
                         <div className="info-section">
-                          <h4>📋 Detail Produk/Jasa</h4>
+                          <h4> Detail Produk/Jasa</h4>
                           <div style={{ display: 'grid', gap: '10px' }}>
                             {descriptionTableEntries.map(([key, value]) => (
                               <div key={key}>
@@ -2039,7 +2039,7 @@ export default function HomePageClient() {
                       {(selectedService.type === 'barang' || selectedService.category === 'barang') && (
                         <>
                           <div className="info-section">
-                            <h4>📦 Keterangan Barang</h4>
+                            <h4> Keterangan Barang</h4>
                             <p>{selectedService.jenisBarang || selectedService.shortDescription || '-'}</p>
                           </div>
 
@@ -2066,7 +2066,7 @@ export default function HomePageClient() {
 
                           {selectedService.syaratKetentuan && (
                             <div className="info-section">
-                              <h4>📋 Syarat & Ketentuan</h4>
+                              <h4> Syarat & Ketentuan</h4>
                               <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
                             </div>
                           )}
@@ -2091,7 +2091,7 @@ export default function HomePageClient() {
 
                           {selectedService.syaratKetentuan && (
                             <div className="info-section">
-                              <h4>📋 Syarat & Ketentuan</h4>
+                              <h4> Syarat & Ketentuan</h4>
                               <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
                             </div>
                           )}
@@ -2218,7 +2218,7 @@ export default function HomePageClient() {
                     title={user && user.id === selectedService.vendorId ? "Anda tidak bisa chat dengan service sendiri" : "Chat dengan vendor"}
                     style={user && user.id === selectedService.vendorId ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                   >
-                    💬 Chat Vendor
+                     Chat Vendor
                   </button>
                   <button className="btn-secondary-modal" onClick={closeModal}>Tutup</button>
                 </div>

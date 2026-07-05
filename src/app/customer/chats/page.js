@@ -202,7 +202,7 @@ export default function CustomerChatsPage() {
           background: '#f9fafb'
         }}>
           <div style={{ padding: '20px' }}>
-            <h2 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>💬 Chat Vendor</h2>
+            <h2 style={{ margin: '0 0 16px 0', fontSize: '18px' }}> Chat Vendor</h2>
             
             {/* Search Bar */}
             <div style={{ marginBottom: '16px' }}>
@@ -383,7 +383,7 @@ export default function CustomerChatsPage() {
                         fontSize: '12px'
                       }}
                     >
-                      👤 Profil
+                       Profil
                     </button>
               </div>
 

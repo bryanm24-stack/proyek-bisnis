@@ -502,7 +502,7 @@ export default function SharedNavbar() {
               fontWeight: '600',
             }}
           >
-            <span>👤</span>
+            <span></span>
             Profil Saya
           </Link>
 

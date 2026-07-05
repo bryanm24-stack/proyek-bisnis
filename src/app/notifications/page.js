@@ -200,7 +200,7 @@ export default function NotificationsPage() {
                 </button>
               )}
               <button className={styles['btn-delete-all']} onClick={handleDeleteAll}>
-                🗑️ Hapus Semua
+                Hapus Semua
               </button>
             </div>
           )}

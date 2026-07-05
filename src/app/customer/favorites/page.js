@@ -960,9 +960,9 @@ export default function FavoritesPage() {
                       marginBottom: '-2px'
                     }}
                   >
-                    {tab === 'packages' && '📦 Paket Tersedia'}
+                    {tab === 'packages' && ' Paket Tersedia'}
                     {tab === 'description' && '📝 Deskripsi Produk'}
-                    {tab === 'information' && '📋 Informasi Penjual'}
+                    {tab === 'information' && ' Informasi Penjual'}
                     {tab === 'reviews' && '⭐ Rating & Review'}
                   </button>
                 ))}
@@ -1058,7 +1058,7 @@ export default function FavoritesPage() {
                             onMouseEnter={(e) => e.target.style.backgroundColor = '#8F6B4A'}
                             onMouseLeave={(e) => e.target.style.backgroundColor = '#B28A67'}
                           >
-                            💬 Chat untuk Paket Ini
+                             Chat untuk Paket Ini
                           </button>
                         </div>
                       )}
@@ -1110,7 +1110,7 @@ export default function FavoritesPage() {
 
                   {selectedService.minimumDays && (
                     <div className="info-section">
-                      <h4>📅 Minimum Sewa</h4>
+                      <h4> Minimum Sewa</h4>
                       <p>{selectedService.minimumDays} hari</p>
                     </div>
                   )}
@@ -1257,7 +1257,7 @@ export default function FavoritesPage() {
                   title={user && user.id === selectedService.vendorId ? "Anda tidak bisa chat dengan service sendiri" : "Chat dengan vendor"}
                   style={user && user.id === selectedService.vendorId ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                 >
-                  💬 Chat Vendor
+                   Chat Vendor
                 </button>
                 <button className="btn-secondary-modal" onClick={closeModal}>Tutup</button>
               </div>

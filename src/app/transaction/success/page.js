@@ -45,9 +45,9 @@ function SuccessContent() {
 
   const getPaymentMethodLabel = (method) => {
     const labels = {
-      qris: '💳 QRIS',
-      card: '🏦 Kartu Debit/Credit',
-      cod: '🚚 Cash on Delivery'
+      qris: ' QRIS',
+      card: ' Kartu Debit/Credit',
+      cod: ' Cash on Delivery'
     };
     return labels[method] || method;
   };
@@ -71,7 +71,7 @@ function SuccessContent() {
           
           {/* Success Icon */}
           <div style={{ fontSize: '80px', marginBottom: '24px', animation: 'bounce 2s infinite' }}>
-            ✅
+            
           </div>
 
           <h1 style={{ fontSize: '32px', fontWeight: '700', color: '#22c55e', marginBottom: '12px' }}>Pembayaran Berhasil!</h1>
@@ -85,7 +85,7 @@ function SuccessContent() {
 
           {/* Payment Details */}
           <div style={{ background: '#f9fafb', padding: '24px', borderRadius: '8px', marginBottom: '24px', border: '1px solid #e5e7eb', textAlign: 'left' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#1f2937', marginBottom: '16px', textAlign: 'center' }}>📋 Rincian Pembayaran</h2>
+            <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#1f2937', marginBottom: '16px', textAlign: 'center' }}> Rincian Pembayaran</h2>
 
             {transaction?.quantity && (
               <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid #ddd' }}>
@@ -159,7 +159,7 @@ function SuccessContent() {
                 transition: 'all 0.2s'
               }}
             >
-              📄 Lihat Invoice
+               Lihat Invoice
             </button>
             <button
               onClick={() => router.push(chatPath)}
@@ -175,7 +175,7 @@ function SuccessContent() {
                 transition: 'all 0.2s'
               }}
             >
-              💬 Lihat Chat
+               Lihat Chat
             </button>
             <button
               onClick={() => router.push('/')}
@@ -191,7 +191,7 @@ function SuccessContent() {
                 transition: 'all 0.2s'
               }}
             >
-              🏠 Kembali ke Home
+               Kembali ke Home
             </button>
           </div>
         </div>

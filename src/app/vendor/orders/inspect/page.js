@@ -193,12 +193,12 @@ function VendorInspectionContent() {
   }
 
   const statusLabels = {
-    checking: '⏳ Sedang Diperiksa Customer',
-    approved: '✅ Customer Setuju',
+    checking: ' Sedang Diperiksa Customer',
+    approved: ' Customer Setuju',
     complaint: '⚠️ Customer Komplain',
-    refund_requested: '⏳ Refund Diminta Customer',
+    refund_requested: ' Refund Diminta Customer',
     refund_rejected: '❌ Refund Ditolak Vendor',
-    refunded: '💰 Refund Selesai',
+    refunded: ' Refund Selesai',
     partially_refunded: '💸 Partial Refund Selesai',
     penalty_applied: '⚠️ Denda Diterapkan',
     complaint_rejected: '❌ Komplain Ditolak'
@@ -288,7 +288,7 @@ function VendorInspectionContent() {
                 )}
 
                 <div style={{ fontSize: '12px', color: '#9a3412', marginTop: '10px' }}>
-                  📅 Tanggal komplain: {new Date(order.complaintDate).toLocaleDateString('id-ID', { 
+                   Tanggal komplain: {new Date(order.complaintDate).toLocaleDateString('id-ID', { 
                     weekday: 'long', 
                     year: 'numeric', 
                     month: 'long', 
@@ -377,7 +377,7 @@ function VendorInspectionContent() {
                   disabled={isSubmitting}
                   style={{ padding: '12px', background: '#16a34a', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', opacity: isSubmitting ? 0.6 : 1 }}
                 >
-                  ✅ Setujui Refund
+                   Setujui Refund
                 </button>
                 <button
                   onClick={() => handleComplaintResolution('reject-refund')}
@@ -392,7 +392,7 @@ function VendorInspectionContent() {
 
           {order.inspectionStatus === 'approved' && (
             <div style={{ background: '#dcfce7', border: '1px solid #86efac', borderRadius: '8px', padding: '15px', marginBottom: '20px' }}>
-              <h3 style={{ margin: '0 0 10px 0', color: '#15803d', fontSize: '16px' }}>✅ Customer Puas</h3>
+              <h3 style={{ margin: '0 0 10px 0', color: '#15803d', fontSize: '16px' }}> Customer Puas</h3>
               <p style={{ margin: '0', fontSize: '14px', color: '#166534' }}>
                 Customer telah menyetujui kondisi barang. Transaksi ini berhasil diselesaikan.
               </p>
@@ -401,12 +401,12 @@ function VendorInspectionContent() {
 
           {order.inspectionStatus === 'refunded' && (
             <div style={{ background: '#dcfce7', border: '1px solid #86efac', borderRadius: '8px', padding: '15px', marginBottom: '20px' }}>
-              <h3 style={{ margin: '0 0 10px 0', color: '#15803d', fontSize: '16px' }}>💰 Refund Selesai</h3>
+              <h3 style={{ margin: '0 0 10px 0', color: '#15803d', fontSize: '16px' }}> Refund Selesai</h3>
               <p style={{ margin: '8px 0', fontSize: '14px', color: '#166534' }}>
                 Refund sebesar Rp {(order.refundAmount || 0).toLocaleString('id-ID')} telah diproses untuk customer.
               </p>
               <div style={{ marginTop: '10px', fontSize: '12px', color: '#4d7c0f' }}>
-                📅 Tanggal refund: {new Date(order.refundedAt).toLocaleDateString('id-ID')}
+                 Tanggal refund: {new Date(order.refundedAt).toLocaleDateString('id-ID')}
               </div>
             </div>
           )}
@@ -444,7 +444,7 @@ function VendorInspectionContent() {
           {order.inspectionStatus === 'checking' && (
             <div style={{ background: '#e0e7ff', border: '1px solid #a5b4fc', borderRadius: '8px', padding: '15px' }}>
               <p style={{ margin: '0', fontSize: '14px', color: '#3730a3' }}>
-                ⏳ Menunggu customer untuk memeriksa barang. Silakan tunggu hingga customer memberikan keputusan.
+                 Menunggu customer untuk memeriksa barang. Silakan tunggu hingga customer memberikan keputusan.
               </p>
             </div>
           )}

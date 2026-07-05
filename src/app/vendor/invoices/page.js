@@ -109,7 +109,7 @@ export default function VendorInvoicesPage() {
         throw new Error(result.message || 'Gagal menyimpan rating');
       }
 
-      alert('✅ Rating berhasil disimpan.');
+      alert(' Rating berhasil disimpan.');
       setInvoices((prev) => prev.map((item) => (
         item.id === invoice.id ? { ...item, hasCustomerRating: true } : item
       )));
@@ -129,7 +129,7 @@ export default function VendorInvoicesPage() {
       <div>
         <SharedNavbar />
         <div style={{ textAlign: 'center', padding: '50px', color: '#666' }}>
-          ⏳ Memuat invoice...
+           Memuat invoice...
         </div>
       </div>
     );
@@ -147,7 +147,7 @@ export default function VendorInvoicesPage() {
         {/* Header */}
         <div style={{ marginBottom: '32px' }}>
           <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>
-            📋 Invoice Transaksi
+             Invoice Transaksi
           </h1>
           <p style={{ color: '#666', fontSize: '16px' }}>
             Riwayat invoice akun kamu saat menyewa barang/jasa.
@@ -157,9 +157,9 @@ export default function VendorInvoicesPage() {
         {/* Filter Buttons */}
         <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
           {[
-            { value: 'pending', label: '⏳ Menunggu Pembayaran' },
-            { value: 'paid', label: '✅ Sudah Dibayar' },
-            { value: 'all', label: '📊 Semua Invoice' }
+            { value: 'pending', label: ' Menunggu Pembayaran' },
+            { value: 'paid', label: ' Sudah Dibayar' },
+            { value: 'all', label: ' Semua Invoice' }
           ].map(btn => (
             <button
               key={btn.value}
@@ -249,7 +249,7 @@ export default function VendorInvoicesPage() {
                       background: invoice.status === 'paid' ? '#dcfce7' : '#fef3c7',
                       color: invoice.status === 'paid' ? '#166534' : '#92400e'
                     }}>
-                      {invoice.status === 'paid' ? '✅ Dibayar' : '⏳ Pending'}
+                      {invoice.status === 'paid' ? ' Dibayar' : ' Pending'}
                     </div>
                   </div>
                 </div>
@@ -258,25 +258,25 @@ export default function VendorInvoicesPage() {
                 <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
                     <div>
-                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>📦 Item Sewa</p>
+                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}> Item Sewa</p>
                       <p style={{ margin: '0', fontSize: '15px', fontWeight: '600' }}>
                         {invoice.serviceTitle || 'N/A'}
                       </p>
                     </div>
                     <div>
-                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>📅 Durasi Sewa</p>
+                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}> Durasi Sewa</p>
                       <p style={{ margin: '0', fontSize: '15px', fontWeight: '600' }}>
                         {invoice.durationDays || 1} hari
                       </p>
                     </div>
                     <div>
-                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>💰 Harga/Hari</p>
+                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}> Harga/Hari</p>
                       <p style={{ margin: '0', fontSize: '15px', fontWeight: '600' }}>
                         {formatCurrency(invoice.basePrice || 0)}
                       </p>
                     </div>
                     <div>
-                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>📆 Batas Pembayaran</p>
+                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}> Batas Pembayaran</p>
                       <p style={{ margin: '0', fontSize: '15px', fontWeight: '600' }}>
                         {invoice.paymentDeadline ? new Date(invoice.paymentDeadline).toLocaleDateString('id-ID') : 'N/A'}
                       </p>
@@ -292,7 +292,7 @@ export default function VendorInvoicesPage() {
                       marginTop: '16px',
                       borderLeft: '4px solid #B28A67'
                     }}>
-                      <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>📋 Detail Invoice</h4>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}> Detail Invoice</h4>
                       <div style={{ display: 'grid', gap: '8px', fontSize: '13px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
                           <span style={{ color: '#666' }}>Invoice ID Lengkap:</span>
@@ -313,7 +313,7 @@ export default function VendorInvoicesPage() {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#666' }}>Status Pembayaran:</span>
-                          <strong>{invoice.status === 'paid' ? '✅ Sudah Dibayar' : '⏳ Belum Dibayar'}</strong>
+                          <strong>{invoice.status === 'paid' ? ' Sudah Dibayar' : ' Belum Dibayar'}</strong>
                         </div>
                         {invoice.paymentMethod && (
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>

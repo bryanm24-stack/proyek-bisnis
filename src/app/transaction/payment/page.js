@@ -677,7 +677,7 @@ function PaymentContent() {
                           </div>
                           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px', fontSize: '12px', color: '#e2e8f0' }}>
                             <span>⏳ {formatPromoCountdown(selectedPromo.endAt) || 'Tanpa batas waktu'}</span>
-                            <span>👤 {Number.isFinite(Number(selectedPromo.remainingApplicants)) ? `${selectedPromo.remainingApplicants} kuota tersisa` : 'Kuota tidak dibatasi'}</span>
+                            <span> {Number.isFinite(Number(selectedPromo.remainingApplicants)) ? `${selectedPromo.remainingApplicants} kuota tersisa` : 'Kuota tidak dibatasi'}</span>
                           </div>
                         </div>
                       </>

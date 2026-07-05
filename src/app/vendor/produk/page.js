@@ -93,7 +93,7 @@ export default function VendorProdukPage() {
       if (data.success) {
         const allPromos = Array.isArray(data.data) ? data.data : [];
         setVendorPromos(allPromos);
-        console.log(`✅ Loaded ${allPromos.length} promos for vendor ${vendorId}:`, allPromos.map(p => ({id: p.id, title: p.title, active: p.active})));
+        console.log(` Loaded ${allPromos.length} promos for vendor ${vendorId}:`, allPromos.map(p => ({id: p.id, title: p.title, active: p.active})));
       } else {
         setVendorPromos([]);
       }
@@ -122,7 +122,7 @@ export default function VendorProdukPage() {
       }
 
       setVendorPromos((prev) => prev.filter((promo) => String(promo.id) !== String(promoId)));
-      alert('✅ Promo berhasil dihapus');
+      alert(' Promo berhasil dihapus');
     } catch (error) {
       console.error('Error deleting promo:', error);
       alert(error.message || '❌ Gagal menghapus promo');
@@ -159,7 +159,7 @@ export default function VendorProdukPage() {
       const data = await response.json();
       if (data.success) {
         setVendorItems(vendorItems.filter(item => item.id !== itemId));
-        alert('✅ Item berhasil dihapus!');
+        alert(' Item berhasil dihapus!');
       } else {
         alert('❌ Gagal menghapus item');
       }
@@ -282,7 +282,7 @@ const parseLocalDateTime = (value) => {
         return;
       }
 
-      setPromoMessage('✅ Promo berhasil dibuat dan siap tampil di home customer.');
+      setPromoMessage(' Promo berhasil dibuat dan siap tampil di home customer.');
       fetchVendorPromos(user.id);
       setTimeout(() => closePromoModal(), 1500);
     } catch (error) {
@@ -302,7 +302,7 @@ const parseLocalDateTime = (value) => {
     return (
       <div>
         <SharedNavbar />
-        <div style={{ padding: '40px', textAlign: 'center' }}>⏳ Loading...</div>
+        <div style={{ padding: '40px', textAlign: 'center' }}> Loading...</div>
       </div>
     );
   }
@@ -318,7 +318,7 @@ const parseLocalDateTime = (value) => {
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 24px' }}>
         <div style={{ marginBottom: '32px' }}>
           <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>
-            📦 Barang/Jasa Saya
+             Barang/Jasa Saya
           </h1>
           <p style={{ color: '#666', fontSize: '16px' }}>
             Kelola semua item sewa kamu di sini
@@ -600,7 +600,7 @@ const parseLocalDateTime = (value) => {
                         </div>
                       )}
                     </>
-                  ) : '📦'}
+                  ) : ''}
                 </div>
 
                 <div style={{ padding: '16px' }}>
@@ -644,7 +644,7 @@ const parseLocalDateTime = (value) => {
                       onMouseEnter={(e) => e.target.style.background = '#8F6B4A'}
                       onMouseLeave={(e) => e.target.style.background = '#B28A67'}
                     >
-                      ✏️ Edit
+                      Edit
                     </button>
                     <button
                       onClick={() => openPromoModal()}
@@ -663,7 +663,7 @@ const parseLocalDateTime = (value) => {
                       onMouseEnter={(e) => e.target.style.background = '#cffafe'}
                       onMouseLeave={(e) => e.target.style.background = '#ecfeff'}
                     >
-                      ✨ Add Promo
+                      Add Promo
                     </button>
                     <button
                       onClick={() => handleDelete(item.id)}
@@ -688,7 +688,7 @@ const parseLocalDateTime = (value) => {
                         e.target.style.borderColor = '#e5e7eb';
                       }}
                     >
-                      🗑️ Hapus
+                      Hapus
                     </button>
                   </div>
                 </div>
@@ -711,7 +711,7 @@ const parseLocalDateTime = (value) => {
           >
             <div style={{ padding: '24px 28px', background: 'linear-gradient(135deg, #C8A587, #B28A67)', color: 'white', flexShrink: 0 }}>
               <div style={{ fontSize: '14px', opacity: 0.9 }}>Buat promosi menarik tanpa kode promo</div>
-              <h3 style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: '800' }}>✨ Add Promo</h3>
+              <h3 style={{ margin: '8px 0 0', fontSize: '24px', fontWeight: '800' }}>Add Promo</h3>
             </div>
 
             <form onSubmit={handleCreatePromo} style={{ padding: '28px', display: 'grid', gap: '18px', overflow: 'auto', flex: 1 }}>
@@ -756,8 +756,8 @@ const parseLocalDateTime = (value) => {
                         {promoForm.title}
                       </div>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px', fontSize: '12px', color: '#e2e8f0' }}>
-                          <span>⏳ {promoForm.endAt ? new Date(promoForm.endAt).toLocaleString('id-ID') : 'Tanpa batas waktu'}</span>
-                          <span>👤 {promoForm.maxApplicants ? `${promoForm.maxApplicants} kuota` : 'Kuota tidak dibatasi'}</span>
+                          <span> {promoForm.endAt ? new Date(promoForm.endAt).toLocaleString('id-ID') : 'Tanpa batas waktu'}</span>
+                          <span> {promoForm.maxApplicants ? `${promoForm.maxApplicants} kuota` : 'Kuota tidak dibatasi'}</span>
                           <span>1x/user</span>
                         </div>
                     </div>
@@ -902,7 +902,7 @@ const parseLocalDateTime = (value) => {
               </label>
 
               {promoMessage && (
-                <div style={{ padding: '12px 14px', borderRadius: '10px', background: promoMessage.startsWith('✅') ? '#ecfdf5' : '#fef2f2', color: promoMessage.startsWith('✅') ? '#166534' : '#991b1b', fontSize: '14px', whiteSpace: 'pre-wrap' }}>
+                <div style={{ padding: '12px 14px', borderRadius: '10px', background: promoMessage.startsWith('') ? '#ecfdf5' : '#fef2f2', color: promoMessage.startsWith('') ? '#166534' : '#991b1b', fontSize: '14px', whiteSpace: 'pre-wrap' }}>
                   {promoMessage}
                 </div>
               )}
@@ -910,7 +910,7 @@ const parseLocalDateTime = (value) => {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '4px' }}>
                 <button type="button" onClick={closePromoModal} style={{ padding: '12px 18px', borderRadius: '10px', border: '1px solid #d1d5db', background: 'white', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s' }}>Batal</button>
                 <button type="submit" disabled={promoSubmitting} style={{ padding: '12px 18px', borderRadius: '10px', border: 'none', background: promoSubmitting ? '#C8A587' : '#B28A67', color: 'white', fontWeight: '800', cursor: promoSubmitting ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}>
-                  {promoSubmitting ? '⏳ Menyimpan...' : '✨ Simpan Promo'}
+                  {promoSubmitting ? ' Menyimpan...' : '✨ Simpan Promo'}
                 </button>
               </div>
             </form>
