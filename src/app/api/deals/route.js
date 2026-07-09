@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { createComplaintDraft, isPaidTransactionContext, resolveComplaintReference } from '@/lib/complaints';
 
 const normalizeId = (id) => String(id ?? '').trim();
 
@@ -62,12 +63,6 @@ function mapDealRow(row, chat = null, originalPriceOverride = null) {
     invoiceStatus: row.invoice_status,
     paymentConfirmedAt: row.payment_confirmed_at,
     completedAt: row.completed_at,
-    actualReturnDate: row.actual_return_date,
-    returnStatus: row.return_status,
-    vendorConfirmed: toBool(row.vendor_confirmed),
-    customerConfirmed: toBool(row.customer_confirmed),
-    settlementDate: row.settlement_date,
-    refundStatus: row.refund_status,
     itemId: chat?.itemId ?? null,
     itemName: chat?.itemName ?? null,
     itemPrice: originalPrice
@@ -187,8 +182,7 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const referer = request.headers.get('referer') || '';
-    const actorIsVendorUI = referer.includes('/vendor/chats');
-    const { action, chatId, customerId, vendorId, serviceId, resetDeadline } = body;
+    const { action, chatId, customerId, vendorId, serviceId, resetDeadline, actorId } = body;
 
     if (!action) {
       return NextResponse.json({ success: false, message: 'Action diperlukan' }, { status: 400 });
@@ -203,6 +197,7 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Chat room tidak ditemukan' }, { status: 404 });
     }
     const chat = mapChatRow(chatRow);
+    const actorIsVendorUI = normalizeId(actorId || '') === normalizeId(chat.vendorId || '') || referer.includes('/vendor/chats');
 
     if (customerId && normalizeId(chat.customerId) !== normalizeId(customerId)) {
       return NextResponse.json({ success: false, message: 'Data customer tidak valid' }, { status: 403 });
@@ -240,6 +235,30 @@ export async function POST(request) {
       }
 
       if (existingDealRow) {
+        const transactionContext = await resolveComplaintReference(existingDealRow.id);
+        if (transactionContext && isPaidTransactionContext(transactionContext)) {
+          const complaint = await createComplaintDraft({
+            userId: chat.customerId,
+            vendorId: chat.vendorId,
+            transactionId: transactionContext.transaction_id,
+            type: 'pembatalan',
+            description: 'Permintaan pembatalan transaksi yang sudah dibayar, menunggu mediasi admin.'
+          });
+
+          return NextResponse.json({
+            success: true,
+            message: 'Transaksi sudah dibayar. Permintaan pembatalan diteruskan ke admin melalui complaint.',
+            data: {
+              deal: mapDealRow(existingDealRow, chat),
+              chat,
+              complaint,
+              cancellationEscalated: true
+            }
+          }, { status: 202 });
+        }
+      }
+
+      if (existingDealRow) {
         await query('UPDATE deals SET status = ? WHERE id = ?', ['cancelled', existingDealRow.id]);
       }
       await query('UPDATE chats SET deal_status = ? WHERE id = ?', ['cancelled', chatId]);
@@ -271,8 +290,8 @@ export async function POST(request) {
           `INSERT INTO deals (
             id, chat_id, customer_id, vendor_id, service_id,
             customer_accepted, vendor_accepted, status, created_at,
-            agreed_at, discount, original_price, final_price, return_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            agreed_at, discount, original_price, final_price
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             dealId,
             chatId,
@@ -286,8 +305,7 @@ export async function POST(request) {
             agreedAt,
             JSON.stringify({ type: null, value: 0, amount: 0 }),
             resolvedPrice,
-            resolvedPrice,
-            'pending'
+            resolvedPrice
           ]
         );
 

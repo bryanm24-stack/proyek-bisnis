@@ -1,6 +1,29 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+async function ensureVendorRegistrationsTable() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS vendor_registrations (
+      id VARCHAR(255) PRIMARY KEY,
+      user_id VARCHAR(255) NOT NULL,
+      user_name VARCHAR(255),
+      user_email VARCHAR(255),
+      vendor_name VARCHAR(255) NOT NULL,
+      phone_number VARCHAR(255),
+      identity_file LONGTEXT,
+      identity_file_name VARCHAR(255),
+      status VARCHAR(50) DEFAULT 'pending',
+      rejection_reason TEXT,
+      created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+      submitted_at DATETIME(3),
+      approved_at DATETIME(3),
+      INDEX idx_status (status),
+      INDEX idx_user_id (user_id),
+      INDEX idx_created_at (created_at)
+    )
+  `);
+}
+
 function normalizeRegistration(reg) {
   if (!reg) return null;
   return {
@@ -23,6 +46,8 @@ function normalizeRegistration(reg) {
 // GET - Get all vendor registrations (admin only)
 export async function GET(request) {
   try {
+    await ensureVendorRegistrationsTable();
+
     const registrations = await query(
       'SELECT * FROM vendor_registrations ORDER BY created_at DESC'
     );
@@ -43,6 +68,8 @@ export async function GET(request) {
 // POST - Approve or reject vendor registration
 export async function POST(request) {
   try {
+    await ensureVendorRegistrationsTable();
+
     const body = await request.json();
     const { registrationId, action, rejectionReason } = body;
 

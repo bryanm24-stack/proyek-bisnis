@@ -43,8 +43,10 @@ function EditProdukPageContent() {
     location: '',
     images: [],
     specifications: {},
+    specificationOptions: {},
     descriptionTable: {},
     checklist: {},
+    variations: {},
     items: []
   });
 
@@ -97,8 +99,10 @@ function EditProdukPageContent() {
             location: item.location || '',
             images: item.images || [],
             specifications: item.specifications || {},
+            specificationOptions: item.specificationOptions || {},
             descriptionTable: item.descriptionTable || {},
             checklist: item.checklist || {},
+            variations: item.variations || {},
             items: item.items || []
           });
         }
@@ -168,8 +172,10 @@ function EditProdukPageContent() {
         rentalPolicy: formData.rentalPolicy,
         location: formData.location,
         specifications: formData.specifications || {},
+        specificationOptions: formData.specificationOptions || {},
         descriptionTable: formData.descriptionTable || {},
         checklist: formData.checklist || {},
+        variations: formData.variations || {},
         items: formData.items || [],
         images: formData.images.filter(img => typeof img === 'string' && (img.startsWith('data:') || img.startsWith('http'))),
         rating: 0,
@@ -185,7 +191,7 @@ function EditProdukPageContent() {
       const data = await response.json();
 
       if (data.success) {
-        setSuccessMsg('✅ Item berhasil diperbarui!');
+        setSuccessMsg(' Item berhasil diperbarui!');
         setTimeout(() => {
           router.push('/vendor/produk');
         }, 1500);
@@ -203,7 +209,7 @@ function EditProdukPageContent() {
     return (
       <div>
         <SharedNavbar />
-        <div style={{ padding: '40px', textAlign: 'center' }}>⏳ Loading...</div>
+        <div style={{ padding: '40px', textAlign: 'center' }}> Loading...</div>
       </div>
     );
   }
@@ -235,7 +241,7 @@ function EditProdukPageContent() {
             ← Kembali
           </button>
           <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>
-            ✏️ Edit Item Sewa
+            Edit Item Sewa
           </h1>
         </div>
 
@@ -285,7 +291,7 @@ function EditProdukPageContent() {
 
 export default function EditProdukPage() {
   return (
-    <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center' }}>⏳ Loading...</div>}>
+    <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center' }}> Loading...</div>}>
       <EditProdukPageContent />
     </Suspense>
   );

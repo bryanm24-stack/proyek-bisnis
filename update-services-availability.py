@@ -15,5 +15,5 @@ for service in services:
 with open('services.json', 'w', encoding='utf-8') as f:
     json.dump(services, f, indent=2, ensure_ascii=False)
 
-print(f"✅ Updated {len(services)} services with bookings field")
+print(f" Updated {len(services)} services with bookings field")
 print(f"Sample: {services[0].get('id')} - bookings: {len(services[0]['bookings'])}")

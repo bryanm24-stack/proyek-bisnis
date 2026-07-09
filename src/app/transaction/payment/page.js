@@ -36,12 +36,30 @@ function PaymentContent() {
   const [selectedPromo, setSelectedPromo] = useState(null); // ✅ NEW: Promo yang dipilih dari home
   const [promoError, setPromoError] = useState('');
   const [promoNow, setPromoNow] = useState(Date.now());
+  const [showPrePaymentModal, setShowPrePaymentModal] = useState(false);
   const [paymentType, setPaymentType] = useState('full'); // 'full' or 'pay_after'
+  const [verificationStatus, setVerificationStatus] = useState(null); // KTP verification status loaded from API
   const [availabilityCheck, setAvailabilityCheck] = useState(null); // null, 'checking', 'available', 'unavailable'
   const [availabilityMessage, setAvailabilityMessage] = useState('');
   const [maxAvailableQuantity, setMaxAvailableQuantity] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null); // ✅ ADD: Track selected item & price
   const [service, setService] = useState(null); // ✅ ADD: Store service data with items
+
+  const minimumDurationDays = Math.max(1, Number(service?.minimumDays || 1));
+
+  const parseImageList = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.filter((img) => typeof img === 'string' && img.trim() !== '');
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed.filter((img) => typeof img === 'string' && img.trim() !== '');
+      } catch {
+        if (value.trim() !== '') return [value.trim()];
+      }
+    }
+    return [];
+  };
 
   const generateRandomQR = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -72,6 +90,19 @@ function PaymentContent() {
     return `${days > 0 ? `${days}d ` : ''}${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`.trim();
   };
 
+  const openPrePaymentModal = () => {
+    setShowPrePaymentModal(true);
+  };
+
+  const closePrePaymentModal = () => {
+    setShowPrePaymentModal(false);
+  };
+
+  const confirmPrePayment = () => {
+    setShowPrePaymentModal(false);
+    setStep('payment');
+  };
+
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (!userData) {
@@ -99,6 +130,24 @@ function PaymentContent() {
     }
 
     setUser(parsedUser);
+
+    const fetchVerificationStatus = async () => {
+      try {
+        const response = await fetch(`/api/auth/verify-ktp?userId=${encodeURIComponent(parsedUser.id)}`, { cache: 'no-store' });
+        if (!response.ok) {
+          setVerificationStatus(null);
+          return;
+        }
+
+        const result = await response.json();
+        setVerificationStatus(result?.data?.status || null);
+      } catch (error) {
+        console.error('Error loading verification status:', error);
+        setVerificationStatus(null);
+      }
+    };
+
+    fetchVerificationStatus();
 
     // ✅ NEW: Handle promo flow
     if (promoId) {
@@ -163,15 +212,17 @@ function PaymentContent() {
         // ✅ NEW: Fetch service data to get item prices
         if (currentDeal && currentDeal.serviceId) {
           try {
-            const servicesResponse = await fetch('/api/services');
+            const servicesResponse = await fetch('/api/vendor/services');
             if (servicesResponse.ok) {
               const servicesData = await servicesResponse.json();
-              const currentService = Array.isArray(servicesData) 
-                ? servicesData.find(s => String(s.id) === String(currentDeal.serviceId))
+              const serviceList = Array.isArray(servicesData?.data) ? servicesData.data : [];
+              const currentService = Array.isArray(serviceList) 
+                ? serviceList.find(s => String(s.id) === String(currentDeal.serviceId))
                 : null;
               
               if (currentService) {
                 setService(currentService);
+                setDurationDays((prev) => Math.max(prev, Math.max(1, Number(currentService.minimumDays || 1))));
                 
                 // ✅ NEW: Set first item as default
                 if (currentService.items && currentService.items.length > 0) {
@@ -202,7 +253,9 @@ function PaymentContent() {
                     id: firstItem.id,
                     name: firstItem.namaBarang || firstItem.namaJasa,
                     price: itemPrice,
-                    stok: firstItem.stok // include per-item stok for payment UI
+                    stok: firstItem.stok, // include per-item stok for payment UI
+                    image: firstItem.image || firstItem.thumbnail || null,
+                    images: firstItem.images || []
                   });
                 }
               }
@@ -284,7 +337,7 @@ function PaymentContent() {
         return;
       }
 
-      if (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() <= promoNow) {
+      if (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() < promoNow) {
         alert('Promo sudah berakhir.');
         return;
       }
@@ -297,6 +350,11 @@ function PaymentContent() {
 
     // ✅ NEW: Skip availability check untuk promo
     if (!selectedPromo) {
+      if (durationDays < minimumDurationDays) {
+        alert(`❌ Durasi sewa minimal ${minimumDurationDays} hari untuk layanan ini.`);
+        return;
+      }
+
       // AVAILABILITY CHECK - Validasi ketersediaan sebelum payment (hanya untuk deal)
       if (availabilityCheck !== 'available') {
         alert(`❌ ${isJasaService ? 'Availability jasa' : 'Stok barang'} tidak tersedia untuk periode ini. Silakan ubah tanggal atau jumlah.`);
@@ -325,6 +383,8 @@ function PaymentContent() {
         reviewedBy: null,
         adminNotes: ''
       } : null;
+      // NOTE: Checkout should be restricted on the backend based on verification status.
+      // This client-side data is only used for display and request payload composition.
 
       const transactionData = {
         id: `TRX-${Date.now()}`,
@@ -436,7 +496,8 @@ function PaymentContent() {
       // Calculate end date
       const startDateTime = new Date(startDt);
       const endDateTime = new Date(startDateTime);
-      endDateTime.setDate(endDateTime.getDate() + (Number(duration) || 1));
+      const normalizedDuration = Math.max(minimumDurationDays, Number(duration) || minimumDurationDays);
+      endDateTime.setDate(endDateTime.getDate() + normalizedDuration);
       const endDateStr = endDateTime.toISOString().split('T')[0];
 
       const response = await fetch('/api/availability/validate', {
@@ -512,6 +573,18 @@ function PaymentContent() {
   const expectedReturnDateLabel = expectedReturnDate
     ? expectedReturnDate.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
     : '-';
+  const selectedItemImages = parseImageList(selectedItem?.images);
+  const serviceImages = parseImageList(service?.images);
+  const productImageSrc = selectedPromo?.image
+    || selectedItem?.image
+    || selectedItemImages[0]
+    || service?.image
+    || service?.thumbnail
+    || service?.coverImage
+    || serviceImages[0]
+    || deal?.image
+    || null;
+  const fallbackProductImage = 'https://via.placeholder.com/1200x700?text=Produk';
 
   // CHECK AVAILABILITY - Saat quantity, duration, atau startDate berubah
   useEffect(() => {
@@ -520,7 +593,7 @@ function PaymentContent() {
     }, 500); // Debounce 500ms
 
     return () => clearTimeout(timer);
-  }, [quantity, durationDays, startDate, deal, selectedItem]);
+  }, [quantity, durationDays, startDate, deal, selectedItem, minimumDurationDays]);
 
   if (isLoading) {
     return <div style={{ padding: '40px', textAlign: 'center', minHeight: '100vh', background: '#f5f3ff' }}>⏳ Loading...</div>;
@@ -553,15 +626,14 @@ function PaymentContent() {
             <div>
               {/* Product Image */}
               <div style={{ background: 'white', borderRadius: '12px', overflow: 'hidden', marginBottom: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-                {selectedPromo && selectedPromo.image ? (
+                {productImageSrc ? (
                   <div style={{ position: 'relative', width: '100%', height: '350px', background: '#e5e7eb' }}>
                     <img
-                      src={selectedPromo.image}
-                      alt="Promo"
+                      src={productImageSrc}
+                      alt={selectedPromo ? 'Promo' : (selectedItem?.name || deal?.itemName || service?.title || 'Produk')}
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       onError={(e) => {
-                        e.target.style.display = 'none';
-                        e.target.parentElement.querySelector('[id="imageFallback"]').style.display = 'flex';
+                        e.currentTarget.src = fallbackProductImage;
                       }}
                     />
                     {/* Overlay Gradient untuk Promo */}
@@ -605,7 +677,7 @@ function PaymentContent() {
                           </div>
                           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px', fontSize: '12px', color: '#e2e8f0' }}>
                             <span>⏳ {formatPromoCountdown(selectedPromo.endAt) || 'Tanpa batas waktu'}</span>
-                            <span>👤 {Number.isFinite(Number(selectedPromo.remainingApplicants)) ? `${selectedPromo.remainingApplicants} kuota tersisa` : 'Kuota tidak dibatasi'}</span>
+                            <span> {Number.isFinite(Number(selectedPromo.remainingApplicants)) ? `${selectedPromo.remainingApplicants} kuota tersisa` : 'Kuota tidak dibatasi'}</span>
                           </div>
                         </div>
                       </>
@@ -625,7 +697,6 @@ function PaymentContent() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                       <span style={{ fontSize: '20px' }}>⭐</span>
                       <span style={{ fontSize: '16px', fontWeight: '700', color: '#1f2937' }}>{deal?.rating?.toFixed(1) || '4.7'}</span>
-                      <span style={{ fontSize: '14px', color: '#6b7280' }}>→ {deal?.rentCount || '1.3K'} disewa</span>
                     </div>
 
                     <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1f2937', marginBottom: '12px', lineHeight: '1.3' }}>
@@ -734,7 +805,7 @@ function PaymentContent() {
                     </div>
 
                     {/* Continue Button */}
-                    <button onClick={() => setStep('payment')} disabled={selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() <= promoNow)} style={{ width: '100%', padding: '14px 16px', background: (selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() <= promoNow)) ? '#C8A587' : '#B28A67', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '16px', cursor: (selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() <= promoNow)) ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }} onMouseEnter={(e) => { if (!(selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() <= promoNow))) e.target.style.background = '#8F6B4A'; }} onMouseLeave={(e) => { if (!(selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() <= promoNow))) e.target.style.background = '#B28A67'; }}>
+                    <button onClick={() => setStep('payment')} disabled={selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() < promoNow)} style={{ width: '100%', padding: '14px 16px', background: (selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() < promoNow)) ? '#C8A587' : '#B28A67', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '16px', cursor: (selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() < promoNow)) ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }} onMouseEnter={(e) => { if (!(selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() < promoNow))) e.target.style.background = '#8F6B4A'; }} onMouseLeave={(e) => { if (!(selectedPromo.userHasClaimed || (selectedPromo.endAt && new Date(selectedPromo.endAt).getTime() < promoNow))) e.target.style.background = '#B28A67'; }}>
                       Lanjut ke Pembayaran →
                     </button>
                   </div>
@@ -844,9 +915,12 @@ function PaymentContent() {
                     <div style={{ marginBottom: '20px' }}>
                       <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Durasi Hari</label>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <button onClick={() => setDurationDays(Math.max(1, durationDays - 1))} style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '18px', fontWeight: '700', color: '#B28A67' }}>−</button>
-                        <input type="number" value={durationDays} onChange={(e) => setDurationDays(Math.max(1, parseInt(e.target.value) || 1))} style={{ width: '80px', textAlign: 'center', border: '1px solid #ddd', borderRadius: '8px', padding: '8px', fontSize: '14px', fontWeight: '600' }} min="1" />
+                        <button onClick={() => setDurationDays(Math.max(minimumDurationDays, durationDays - 1))} style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '18px', fontWeight: '700', color: '#B28A67' }}>−</button>
+                        <input type="number" value={durationDays} onChange={(e) => setDurationDays(Math.max(minimumDurationDays, parseInt(e.target.value, 10) || minimumDurationDays))} style={{ width: '80px', textAlign: 'center', border: '1px solid #ddd', borderRadius: '8px', padding: '8px', fontSize: '14px', fontWeight: '600' }} min={minimumDurationDays} />
                         <button onClick={() => setDurationDays(durationDays + 1)} style={{ width: '40px', height: '40px', border: '1px solid #ddd', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '18px', fontWeight: '700', color: '#B28A67' }}>+</button>
+                      </div>
+                      <div style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280' }}>
+                        Durasi minimum: {minimumDurationDays} hari
                       </div>
                     </div>
 
@@ -856,28 +930,6 @@ function PaymentContent() {
                       <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Tambahkan catatan khusus untuk vendor..." style={{ width: '100%', border: '1px solid #ddd', borderRadius: '8px', padding: '12px', fontSize: '14px', fontFamily: 'inherit', minHeight: '80px', boxSizing: 'border-box' }} />
                     </div>
 
-                    {/* Continue Button - ✅ REAL-TIME VALIDATION: Disabled if stock/availability unavailable */}
-                    <button 
-                      onClick={() => setStep('payment')} 
-                      disabled={availabilityCheck === 'unavailable' || availabilityCheck === 'checking'}
-                      style={{ 
-                        width: '100%', 
-                        padding: '14px 16px', 
-                        background: (availabilityCheck === 'unavailable' || availabilityCheck === 'checking') ? '#C8A587' : '#B28A67', 
-                        color: 'white', 
-                        border: 'none', 
-                        borderRadius: '8px', 
-                        fontWeight: '600', 
-                        fontSize: '16px', 
-                        cursor: (availabilityCheck === 'unavailable' || availabilityCheck === 'checking') ? 'not-allowed' : 'pointer', 
-                        transition: 'all 0.2s',
-                        opacity: (availabilityCheck === 'unavailable' || availabilityCheck === 'checking') ? 0.6 : 1
-                      }} 
-                      onMouseEnter={(e) => { if (availabilityCheck !== 'unavailable' && availabilityCheck !== 'checking') e.target.style.background = '#8F6B4A'; }} 
-                      onMouseLeave={(e) => { if (availabilityCheck !== 'unavailable' && availabilityCheck !== 'checking') e.target.style.background = '#B28A67'; }}
-                    >
-                      {availabilityCheck === 'checking' ? '⏳ Memeriksa ketersediaan...' : (availabilityCheck === 'unavailable' ? '❌ Stok tidak tersedia' : 'Lanjut ke Pembayaran →')}
-                    </button>
                   </>
                 ) : null}
 
@@ -896,6 +948,7 @@ function PaymentContent() {
                     </div>
                   </div>
                 </div>
+
               </div>
             </div>
 
@@ -957,14 +1010,45 @@ function PaymentContent() {
                   </p>
                 </div>
 
-                <button onClick={() => setStep('payment')} style={{ width: '100%', padding: '14px', background: '#B28A67', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '16px', cursor: 'pointer', transition: 'all 0.2s' }}>
+                <button onClick={openPrePaymentModal} style={{ width: '100%', padding: '14px', background: '#B28A67', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '16px', cursor: 'pointer', transition: 'all 0.2s' }}>
                   Lanjut ke Pembayaran
                 </button>
               </div>
             </div>
           </div>
-        ) : (
-          // STEP 2: Payment Method (existing code)
+        ) : null}
+
+          {showPrePaymentModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+              <div style={{ width: '100%', maxWidth: '640px', background: 'white', borderRadius: '20px', padding: '28px', boxShadow: '0 24px 80px rgba(0,0,0,0.18)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: '22px', color: '#1f2937' }}>Informasi Penting Sebelum Pembayaran</h2>
+                    <p style={{ margin: '8px 0 0 0', fontSize: '14px', color: '#4b5563' }}>Pastikan Anda memahami ketentuan sebelum melanjutkan ke metode pembayaran.</p>
+                  </div>
+                  <button onClick={closePrePaymentModal} style={{ background: 'transparent', border: 'none', color: '#6b7280', fontSize: '24px', cursor: 'pointer', lineHeight: '1' }}>×</button>
+                </div>
+
+                <div style={{ marginBottom: '20px', color: '#374151', fontSize: '14px', lineHeight: '1.75' }}>
+                  <div style={{ marginBottom: '14px' }}><strong>1. Ketersediaan stok</strong><br />Pastikan stok produk sudah dicek dan tersedia sesuai tanggal sewa. Jika stok tidak tersedia, transaksi tidak dapat diproses.</div>
+                  <div style={{ marginBottom: '14px' }}><strong>2. Kualitas produk</strong><br />Periksa kualitas dan kelengkapan parts sebelum melakukan pembayaran. Komplain dapat diajukan jika barang tidak sesuai.</div>
+                  <div style={{ marginBottom: '14px' }}><strong>3. Dana penyewa aman</strong><br />Jika terjadi kendala atau barang tidak sesuai, Anda dapat ajukan komplain dan refund sebelum barang dikirim.</div>
+                  <div><strong>4. Pengiriman</strong><br />Pastikan jadwal pengiriman sudah sesuai. Dana akan dibayarkan ke merchant setelah sewa selesai dan tidak ada komplain.</div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                  <button onClick={closePrePaymentModal} style={{ padding: '12px 18px', borderRadius: '10px', border: '1px solid #d1d5db', background: 'white', color: '#374151', fontWeight: '600', cursor: 'pointer' }}>
+                    Batal
+                  </button>
+                  <button onClick={confirmPrePayment} style={{ padding: '12px 18px', borderRadius: '10px', border: 'none', background: '#B28A67', color: 'white', fontWeight: '700', cursor: 'pointer' }}>
+                    Lanjut ke Pembayaran
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+        {step === 'payment' ? (
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '32px' }}>
             {/* Payment Form */}
             <div style={{ background: 'white', borderRadius: '12px', padding: '32px', boxShadow: '0 4px 6px rgba(0, 0, 0, 0.07)' }}>
@@ -1151,7 +1235,7 @@ function PaymentContent() {
               </div>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

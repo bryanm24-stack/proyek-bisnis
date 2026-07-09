@@ -43,7 +43,7 @@ if (v2vChats.length > 0) {
     });
     
     if (errors.length === 0) {
-      console.log(`  ✅ Message attribution: OK`);
+      console.log(`   Message attribution: OK`);
     } else {
       errors.forEach(e => console.log(`  ❌ ${e}`));
     }
@@ -63,7 +63,7 @@ if (testVendor) {
   
   console.log(`As Vendor Provider: ${asVendor.length} chats`);
   console.log(`As Customer: ${asCustomer.length} chats`);
-  console.log(`Total visibility: ${asVendor.length + asCustomer.length} chats ✅`);
+  console.log(`Total visibility: ${asVendor.length + asCustomer.length} chats `);
 }
 
-console.log('\n✅ Analysis completed!\n');
+console.log('\n Analysis completed!\n');

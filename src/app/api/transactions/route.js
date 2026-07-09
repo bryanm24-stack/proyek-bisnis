@@ -98,6 +98,11 @@ const toDateOnly = (value) => {
   return `${y}-${m}-${d}`;
 };
 
+const toFiniteNumber = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 async function hasTransactionsServiceIdColumn() {
   const rows = await query(
     `SELECT 1
@@ -110,13 +115,36 @@ async function hasTransactionsServiceIdColumn() {
   return rows.length > 0;
 }
 
+async function hasTransactionsShippingAddressColumn() {
+  const rows = await query(
+    `SELECT 1
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'transactions'
+       AND COLUMN_NAME = 'shipping_address'
+     LIMIT 1`
+  );
+  return rows.length > 0;
+}
+
 export async function GET(request) {
   try {
-    const rows = await query('SELECT * FROM transactions ORDER BY COALESCE(created_at, NOW()) DESC');
+    const rows = await query('SELECT t.*, c.id AS complaint_id, c.status AS complaint_status, c.customer_account_name, c.customer_account_number, c.customer_bank_name, c.refund_amount, c.refund_method, c.refund_reference, c.refund_proof_url FROM transactions t LEFT JOIN complaints c ON c.transaction_id = t.id ORDER BY COALESCE(t.created_at, NOW()) DESC');
     const transactions = rows.map((row) => ({
       ...row,
       card_details: parseJsonSafe(row.card_details, null),
-      identity_verification: parseJsonSafe(row.identity_verification, null)
+      identity_verification: parseJsonSafe(row.identity_verification, null),
+      complaint: row.complaint_id ? {
+        id: row.complaint_id,
+        status: row.complaint_status,
+        customerAccountName: row.customer_account_name,
+        customerAccountNumber: row.customer_account_number,
+        customerBankName: row.customer_bank_name,
+        refundAmount: Number(row.refund_amount || 0),
+        refundMethod: row.refund_method || '',
+        refundReference: row.refund_reference || '',
+        refundProofUrl: row.refund_proof_url || ''
+      } : null
     }));
 
     return NextResponse.json(transactions, { status: 200 });
@@ -130,10 +158,15 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const hasServiceIdColumn = await hasTransactionsServiceIdColumn();
+    const hasShippingAddressColumn = await hasTransactionsShippingAddressColumn();
 
     const txId = body.id || `TRX-${Date.now()}`;
     const createdAt = new Date().toISOString();
     const timestamp = body.timestamp || createdAt;
+    const paymentIsPayAfter = body.paymentType === 'pay_after';
+    const isPromoFlow = Boolean(body.promoId);
+    const requestedQuantity = Math.max(1, toFiniteNumber(body.quantity, 1));
+    const requestedDurationDays = isPromoFlow ? 1 : Math.max(1, toFiniteNumber(body.durationDays, 1));
 
     // Determine service ID early from deal or direct parameter
     let serviceId = body.serviceId;
@@ -161,11 +194,8 @@ export async function POST(request) {
           customer_accepted, vendor_accepted, status,
           created_at, agreed_at, discount,
           original_price, final_price, discount_updated_at,
-          invoice_status, payment_confirmed_at, completed_at,
-          actual_return_date, return_status,
-          vendor_confirmed, customer_confirmed,
-          settlement_date, refund_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
+          invoice_status, payment_confirmed_at, completed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
         [
           promoDealId,
           null,
@@ -183,12 +213,6 @@ export async function POST(request) {
           timestamp,
           promoInvoiceStatus,
           promoInvoiceStatus === 'paid' ? timestamp : null,
-          null,
-          null,
-          null,
-          0,
-          0,
-          null,
           null
         ]
       );
@@ -234,17 +258,40 @@ export async function POST(request) {
       }
     }
 
+    if (!isPromoFlow && serviceId) {
+      try {
+        const serviceRows = await query(
+          'SELECT minimum_days FROM services WHERE id = ? LIMIT 1',
+          [serviceId]
+        );
+        const minimumDurationDays = Math.max(1, Number(serviceRows?.[0]?.minimum_days || 1));
+
+        if (requestedDurationDays < minimumDurationDays) {
+          return NextResponse.json({
+            success: false,
+            error: 'Durasi minimum tidak terpenuhi',
+            message: `Durasi sewa minimal ${minimumDurationDays} hari untuk layanan ini.`,
+            minimumDurationDays,
+            requestedDurationDays,
+            status: 'minimum_duration_not_met'
+          }, { status: 400 });
+        }
+      } catch (minimumDaysError) {
+        console.warn('Minimum duration validation warning:', minimumDaysError.message);
+      }
+    }
+
     // Validate stock availability before processing payment
-    if ((body.status === 'success' || !body.status) && body.startDate && body.durationDays && serviceId) {
+    if ((body.status === 'success' || !body.status) && body.startDate && requestedDurationDays && serviceId) {
       try {
         // Calculate end date based on start date and duration
         const startDate = new Date(body.startDate);
         const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + Number(body.durationDays || 0));
+        endDate.setDate(endDate.getDate() + requestedDurationDays);
 
         // Check availability
         const services = await query(
-          'SELECT id, quantity FROM services WHERE id = ? LIMIT 1',
+          'SELECT id, quantity, minimum_days FROM services WHERE id = ? LIMIT 1',
           [serviceId]
         );
 
@@ -311,7 +358,40 @@ export async function POST(request) {
       }
     }
 
-    const insertValues = hasServiceIdColumn
+    const currentDealRowsForPricing = resolvedDealId
+      ? await query('SELECT id, customer_id, vendor_id, service_id, original_price, final_price FROM deals WHERE id = ? LIMIT 1', [resolvedDealId])
+      : [];
+    const currentDealForPricing = currentDealRowsForPricing[0] || null;
+
+    const dealUnitFinalPrice = toFiniteNumber(currentDealForPricing?.final_price, 0);
+    const dealUnitOriginalPrice = toFiniteNumber(currentDealForPricing?.original_price, 0);
+    const payloadBasePrice = toFiniteNumber(body.basePrice ?? body.amount, 0);
+
+    const effectiveUnitPrice = isPromoFlow
+      ? toFiniteNumber(body.totalAmount ?? body.amount, payloadBasePrice)
+      : (dealUnitFinalPrice > 0 ? dealUnitFinalPrice : (dealUnitOriginalPrice > 0 ? dealUnitOriginalPrice : payloadBasePrice));
+
+    const computedSubtotal = isPromoFlow
+      ? Math.max(toFiniteNumber(body.totalAmount ?? body.amount, effectiveUnitPrice), 0)
+      : Math.max(effectiveUnitPrice * requestedQuantity * requestedDurationDays, 0);
+
+    const computedServiceFee = isPromoFlow ? 0 : Math.max(0, Math.round(computedSubtotal * 0.05));
+    const computedTotalAmount = isPromoFlow ? computedSubtotal : (computedSubtotal + computedServiceFee);
+    const computedDownPayment = isPromoFlow ? null : Math.round(computedTotalAmount * 0.2);
+    const computedRemainingPayment = isPromoFlow ? null : Math.max(computedTotalAmount - computedDownPayment, 0);
+    const computedAmount = isPromoFlow
+      ? computedTotalAmount
+      : (paymentIsPayAfter ? Number(computedDownPayment || 0) : computedTotalAmount);
+
+    const payloadTotalAmount = toFiniteNumber(body.totalAmount, computedTotalAmount);
+    if (!isPromoFlow && Math.abs(payloadTotalAmount - computedTotalAmount) > 1) {
+      console.warn(
+        `[transactions] Total mismatch detected for deal ${resolvedDealId || '-'}: payload=${payloadTotalAmount}, computed=${computedTotalAmount}. Using computed total.`
+      );
+    }
+
+    const shippingAddressValue = body.shippingAddress || null;
+    const baseInsertValues = hasServiceIdColumn
       ? [
         txId,
         body.invoiceId || null,
@@ -320,21 +400,20 @@ export async function POST(request) {
         body.userId || null,
         body.promoId || null,
         body.paymentMethod || null,
-        Number(body.basePrice ?? body.amount ?? 0) || 0,
-        Number(body.quantity ?? 1) || 1,
+        effectiveUnitPrice,
+        Number(requestedQuantity) || 1,
         body.quantityType || 'Unit',
-        Number(body.durationDays ?? 0) || null,
+        isPromoFlow ? null : Number(requestedDurationDays),
         body.notes || '',
         toDateOnly(body.startDate),
-        Number(body.amount ?? 0) || 0,
-        Number(body.serviceFee ?? 0) || 0,
-        Number(body.totalAmount ?? body.amount ?? 0) || 0,
+        computedAmount,
+        computedServiceFee,
+        computedTotalAmount,
         body.status || 'pending',
         timestamp,
         body.cardDetails ? JSON.stringify(body.cardDetails) : null,
         body.qrCode || null,
-        body.identityVerification ? JSON.stringify(body.identityVerification) : null,
-        createdAt
+        body.identityVerification ? JSON.stringify(body.identityVerification) : null
       ]
       : [
         txId,
@@ -343,39 +422,58 @@ export async function POST(request) {
         body.userId || null,
         body.promoId || null,
         body.paymentMethod || null,
-        Number(body.basePrice ?? body.amount ?? 0) || 0,
-        Number(body.quantity ?? 1) || 1,
+        effectiveUnitPrice,
+        Number(requestedQuantity) || 1,
         body.quantityType || 'Unit',
-        Number(body.durationDays ?? 0) || null,
+        isPromoFlow ? null : Number(requestedDurationDays),
         body.notes || '',
         toDateOnly(body.startDate),
-        Number(body.amount ?? 0) || 0,
-        Number(body.serviceFee ?? 0) || 0,
-        Number(body.totalAmount ?? body.amount ?? 0) || 0,
+        computedAmount,
+        computedServiceFee,
+        computedTotalAmount,
         body.status || 'pending',
         timestamp,
         body.cardDetails ? JSON.stringify(body.cardDetails) : null,
         body.qrCode || null,
-        body.identityVerification ? JSON.stringify(body.identityVerification) : null,
-        createdAt
+        body.identityVerification ? JSON.stringify(body.identityVerification) : null
       ];
 
-    await query(
-      hasServiceIdColumn
+    if (hasShippingAddressColumn) {
+      baseInsertValues.push(shippingAddressValue);
+    }
+
+    baseInsertValues.push(createdAt);
+    const insertValues = baseInsertValues;
+
+    const insertSql = hasServiceIdColumn
+      ? hasShippingAddressColumn
         ? `INSERT INTO transactions (
             id, invoice_id, deal_id, service_id, user_id, promo_id, payment_method, base_price,
             quantity, quantity_type, duration_days, notes, start_date,
             amount, service_fee, total_amount, status, timestamp,
+            card_details, qr_code, identity_verification, shipping_address, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        : `INSERT INTO transactions (
+            id, invoice_id, deal_id, service_id, user_id, promo_id, payment_method, base_price,
+            quantity, quantity_type, duration_days, notes, start_date,
+            amount, service_fee, total_amount, status, timestamp,
             card_details, qr_code, identity_verification, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      : hasShippingAddressColumn
+        ? `INSERT INTO transactions (
+            id, invoice_id, deal_id, user_id, promo_id, payment_method, base_price,
+            quantity, quantity_type, duration_days, notes, start_date,
+            amount, service_fee, total_amount, status, timestamp,
+            card_details, qr_code, identity_verification, shipping_address, created_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         : `INSERT INTO transactions (
             id, invoice_id, deal_id, user_id, promo_id, payment_method, base_price,
             quantity, quantity_type, duration_days, notes, start_date,
             amount, service_fee, total_amount, status, timestamp,
             card_details, qr_code, identity_verification, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
-      insertValues
-    );
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+    await query(insertSql, insertValues);
 
     if (body.promoId && (body.status || 'pending') === 'success') {
       try {
@@ -389,7 +487,6 @@ export async function POST(request) {
     const currentDeal = dealRows[0] || null;
 
     if ((resolvedDealId || body.promoId) && body.paymentType !== 'invoice_payment') {
-      const isPayAfter = body.paymentType === 'pay_after';
       const paymentCompletedAt = timestamp;
       const paymentDeadlineDate = new Date();
       paymentDeadlineDate.setDate(paymentDeadlineDate.getDate() + 2);
@@ -418,13 +515,13 @@ export async function POST(request) {
             currentDeal?.vendor_id || currentPromo?.vendor_id || body.vendorId || null,
             currentDeal?.service_id || null,
             txId,
-            isPayAfter ? Number(body.remainingPayment ?? 0) : Number(body.totalAmount ?? body.amount ?? 0),
-            isPayAfter ? paymentDeadlineDate.toISOString() : timestamp,
+                paymentIsPayAfter ? Number(computedRemainingPayment ?? 0) : computedTotalAmount,
+                paymentIsPayAfter ? paymentDeadlineDate.toISOString() : timestamp,
             body.paymentMethod || null,
             body.paymentType || 'full',
-            isPayAfter ? 'pending' : 'paid',
-            isPayAfter ? null : paymentCompletedAt,
-            isPayAfter ? null : txId,
+                paymentIsPayAfter ? 'pending' : 'paid',
+                paymentIsPayAfter ? null : paymentCompletedAt,
+                paymentIsPayAfter ? null : txId,
             body.notes || '',
             invoiceId
           ]
@@ -444,14 +541,14 @@ export async function POST(request) {
             currentDeal?.vendor_id || currentPromo?.vendor_id || body.vendorId || null,
             currentDeal?.service_id || null,
             txId,
-            isPayAfter ? Number(body.remainingPayment ?? 0) : Number(body.totalAmount ?? body.amount ?? 0),
-            isPayAfter ? paymentDeadlineDate.toISOString() : timestamp,
+            paymentIsPayAfter ? Number(computedRemainingPayment ?? 0) : computedTotalAmount,
+            paymentIsPayAfter ? paymentDeadlineDate.toISOString() : timestamp,
             body.paymentMethod || null,
             body.paymentType || 'full',
-            isPayAfter ? 'pending' : 'paid',
+            paymentIsPayAfter ? 'pending' : 'paid',
             createdAt,
-            isPayAfter ? null : paymentCompletedAt,
-            isPayAfter ? null : txId,
+            paymentIsPayAfter ? null : paymentCompletedAt,
+            paymentIsPayAfter ? null : txId,
             body.notes || ''
           ]
         );
@@ -469,20 +566,21 @@ export async function POST(request) {
       if (resolvedDealId) {
         await query(
           `UPDATE deals
-           SET invoice_status = ?, status = ?, payment_confirmed_at = ?, completed_at = ?
+           SET invoice_status = ?, status = ?, payment_confirmed_at = ?, completed_at = ?, final_price = ?
            WHERE id = ?`,
           [
-            isPayAfter ? 'pending' : 'paid',
-            isPayAfter ? 'agreed' : 'active',
-            isPayAfter ? null : paymentCompletedAt,
-            isPayAfter ? null : paymentCompletedAt,
+            paymentIsPayAfter ? 'pending' : 'paid',
+            paymentIsPayAfter ? 'agreed' : 'active',
+            paymentIsPayAfter ? null : paymentCompletedAt,
+            paymentIsPayAfter ? null : paymentCompletedAt,
+            computedTotalAmount,
             resolvedDealId
           ]
         );
 
         const dealRowsAfter = await query('SELECT chat_id FROM deals WHERE id = ? LIMIT 1', [resolvedDealId]);
         if (dealRowsAfter.length > 0 && dealRowsAfter[0].chat_id) {
-          await query('UPDATE chats SET deal_status = ? WHERE id = ?', [isPayAfter ? 'agreed' : 'active', dealRowsAfter[0].chat_id]);
+          await query('UPDATE chats SET deal_status = ? WHERE id = ?', [paymentIsPayAfter ? 'agreed' : 'active', dealRowsAfter[0].chat_id]);
         }
       }
     }

@@ -167,7 +167,6 @@ const DESCRIPTION_TABLE_BY_TYPE = {
     buildField('descCondition', 'Kondisi Barang', 'Baru, mulus, bekas terawat, dll', true),
     buildField('descCompleteness', 'Kelengkapan Dalam Paket', 'Unit utama, kabel, adaptor, tas, dll', true),
     buildField('descUsageRules', 'Aturan Pemakaian', 'Hal yang boleh/tidak boleh dilakukan', true),
-    buildField('descDelivery', 'Skema Pengiriman/Pickup', 'Pickup, antar, jam operasional', true),
     buildField('descDamagePolicy', 'Catatan Kerusakan & Tanggung Jawab', 'Biaya ganti rugi, denda, dll')
   ],
   jasa: [
@@ -338,10 +337,10 @@ export default function VendorProductForm({
   }, []);
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
   };
 

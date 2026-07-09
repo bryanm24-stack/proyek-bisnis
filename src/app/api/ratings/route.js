@@ -21,7 +21,9 @@ async function ensureRatingsSchema() {
     { column: 'deal_id', sql: 'ALTER TABLE ratings ADD COLUMN deal_id VARCHAR(255) NULL' },
     { column: 'vendor_reply', sql: 'ALTER TABLE ratings ADD COLUMN vendor_reply TEXT NULL' },
     { column: 'vendor_reply_at', sql: 'ALTER TABLE ratings ADD COLUMN vendor_reply_at DATETIME(3) NULL' },
-    { column: 'vendor_reply_by', sql: 'ALTER TABLE ratings ADD COLUMN vendor_reply_by VARCHAR(255) NULL' }
+    { column: 'vendor_reply_by', sql: 'ALTER TABLE ratings ADD COLUMN vendor_reply_by VARCHAR(255) NULL' },
+    { column: 'weight_multiplier', sql: 'ALTER TABLE ratings ADD COLUMN weight_multiplier DECIMAL(5,2) DEFAULT 1.00' },
+    { column: 'weighted_score', sql: 'ALTER TABLE ratings ADD COLUMN weighted_score DECIMAL(5,2) DEFAULT 0.00' }
   ];
 
   for (const update of schemaUpdates) {
@@ -36,6 +38,61 @@ async function ensureRatingsSchema() {
   }
 }
 
+function calculateWeightedMetrics({ rating, finalPrice, createdAt, now = new Date() }) {
+  const baseWeight = 1.0;
+  const parsedRating = Number(rating || 0);
+  const parsedFinalPrice = Number(finalPrice || 0);
+
+  const createdDate = createdAt ? new Date(createdAt) : now;
+  const ageMs = Math.max(0, now.getTime() - createdDate.getTime());
+  const ageDays = ageMs / (1000 * 60 * 60 * 24);
+
+  // Time decay penalty: -0.01 per day, max absolute -0.50
+  const timeDecayPenalty = Math.min(0.5, ageDays * 0.01);
+
+  let financialWeighting = 0;
+  if (parsedFinalPrice > 500000) {
+    financialWeighting = 0.5;
+  } else if (parsedFinalPrice > 100000) {
+    financialWeighting = 0.25;
+  }
+
+  const weightMultiplier = baseWeight - timeDecayPenalty + financialWeighting;
+  const weightedScore = parsedRating * weightMultiplier;
+
+  return {
+    weightMultiplier,
+    weightedScore
+  };
+}
+
+function calculateWeightedAggregate(rows, now = new Date()) {
+  let totalWeightedScore = 0;
+  let totalWeightMultiplier = 0;
+
+  for (const row of rows) {
+    const metrics = calculateWeightedMetrics({
+      rating: row.rating,
+      finalPrice: row.final_price,
+      createdAt: row.deal_created_at || row.created_at,
+      now
+    });
+
+    totalWeightedScore += metrics.weightedScore;
+    totalWeightMultiplier += metrics.weightMultiplier;
+  }
+
+  const finalRating = totalWeightMultiplier > 0
+    ? Number((totalWeightedScore / totalWeightMultiplier).toFixed(1))
+    : 0;
+
+  return {
+    totalWeightedScore,
+    totalWeightMultiplier,
+    finalRating
+  };
+}
+
 function mapRatingRow(row) {
   return {
     id: row.id,
@@ -46,6 +103,8 @@ function mapRatingRow(row) {
     itemId: row.item_id || null,
     itemName: row.item_name || null,
     rating: Number(row.rating || 0),
+    weightMultiplier: Number(row.weight_multiplier || 1),
+    weightedScore: Number(row.weighted_score || 0),
     review: row.review || '',
     customerName: row.customer_name || 'Customer',
     vendorReply: row.vendor_reply || null,
@@ -101,6 +160,7 @@ export async function POST(request) {
 
     // Cek duplikasi rating berdasarkan deal (prioritas) atau service legacy
     const hasDealIdColumn = await ratingsHasColumn('deal_id');
+    const now = new Date();
     let duplicateRows = [];
     if (dealId && hasDealIdColumn) {
       duplicateRows = await query(
@@ -141,10 +201,33 @@ export async function POST(request) {
       createdAt: new Date().toISOString()
     };
 
+    let newRatingDealPrice = 0;
+    let newRatingDealCreatedAt = newRating.createdAt;
+    if (dealId) {
+      const dealRows = await query(
+        'SELECT final_price, created_at FROM deals WHERE id = ? LIMIT 1',
+        [String(dealId)]
+      );
+      if (dealRows.length > 0) {
+        newRatingDealPrice = Number(dealRows[0].final_price || 0);
+        newRatingDealCreatedAt = dealRows[0].created_at || newRating.createdAt;
+      }
+    }
+
+    const newRatingWeighted = calculateWeightedMetrics({
+      rating: newRating.rating,
+      finalPrice: newRatingDealPrice,
+      createdAt: newRatingDealCreatedAt,
+      now
+    });
+
     if (hasDealIdColumn) {
       await query(
-        `INSERT INTO ratings (id, service_id, customer_id, vendor_id, deal_id, rating, review, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ratings (
+           id, service_id, customer_id, vendor_id, deal_id, rating, review, created_at,
+           weight_multiplier, weighted_score
+         )
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           newRating.id,
           resolvedServiceId,
@@ -153,13 +236,18 @@ export async function POST(request) {
           dealId ? String(dealId) : null,
           Number(newRating.rating),
           newRating.review,
-          newRating.createdAt
+          newRating.createdAt,
+          Number(newRatingWeighted.weightMultiplier.toFixed(2)),
+          Number(newRatingWeighted.weightedScore.toFixed(2))
         ]
       );
     } else {
       await query(
-        `INSERT INTO ratings (id, service_id, customer_id, vendor_id, rating, review, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ratings (
+           id, service_id, customer_id, vendor_id, rating, review, created_at,
+           weight_multiplier, weighted_score
+         )
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           newRating.id,
           resolvedServiceId,
@@ -167,21 +255,51 @@ export async function POST(request) {
           String(vendorId),
           Number(newRating.rating),
           newRating.review,
-          newRating.createdAt
+          newRating.createdAt,
+          Number(newRatingWeighted.weightMultiplier.toFixed(2)),
+          Number(newRatingWeighted.weightedScore.toFixed(2))
         ]
       );
     }
 
-    const aggregate = await query(
-      'SELECT COUNT(*) AS total, AVG(rating) AS avg_rating FROM ratings WHERE service_id = ?',
+    const historicalRatings = await query(
+      `SELECT
+         r.id,
+         r.rating,
+         r.created_at,
+         d.final_price,
+         d.created_at AS deal_created_at
+       FROM ratings r
+       LEFT JOIN deals d ON d.id = r.deal_id
+       WHERE r.service_id = ?`,
       [resolvedServiceId]
     );
-    const total = Number(aggregate[0]?.total || 0);
-    const avgRating = Number(aggregate[0]?.avg_rating || 0);
+
+    for (const row of historicalRatings) {
+      const metrics = calculateWeightedMetrics({
+        rating: row.rating,
+        finalPrice: row.final_price,
+        createdAt: row.deal_created_at || row.created_at,
+        now
+      });
+
+      await query(
+        'UPDATE ratings SET weight_multiplier = ?, weighted_score = ? WHERE id = ?',
+        [
+          Number(metrics.weightMultiplier.toFixed(2)),
+          Number(metrics.weightedScore.toFixed(2)),
+          String(row.id)
+        ]
+      );
+    }
+
+    const aggregate = calculateWeightedAggregate(historicalRatings, now);
+    const total = historicalRatings.length;
+    const finalWeightedRating = aggregate.finalRating;
 
     await query(
       'UPDATE services SET rent_count = ?, rating = ? WHERE id = ?',
-      [total, Number(avgRating.toFixed(1)), resolvedServiceId]
+      [total, finalWeightedRating, resolvedServiceId]
     );
 
     if (dealId) {
@@ -194,7 +312,7 @@ export async function POST(request) {
 
       const dealRows = await query('SELECT chat_id FROM deals WHERE id = ? LIMIT 1', [String(dealId)]);
       if (dealRows.length > 0 && dealRows[0].chat_id) {
-        await query('UPDATE chats SET deal_status = ? WHERE id = ?', [null, String(dealRows[0].chat_id)]);
+        await query('UPDATE chats SET deal_status = ?, updated_at = ? WHERE id = ?', ['closed', newRating.createdAt, String(dealRows[0].chat_id)]);
       }
     }
 
@@ -205,7 +323,7 @@ export async function POST(request) {
         rating: newRating,
         updatedService: {
           id: resolvedServiceId,
-          rating: Number(avgRating.toFixed(1)),
+          rating: finalWeightedRating,
           rentCount: total
         }
       }
@@ -316,6 +434,8 @@ export async function GET(request) {
       rows = await query(
         `SELECT
            r.*,
+           COALESCE(r.weight_multiplier, 1.00) AS weight_multiplier,
+           COALESCE(r.weighted_score, 0.00) AS weighted_score,
            u.name AS customer_name,
            c.item_id,
            c.item_name
@@ -329,7 +449,11 @@ export async function GET(request) {
       );
     } else {
       rows = await query(
-        `SELECT r.*, u.name AS customer_name
+        `SELECT
+           r.*,
+           COALESCE(r.weight_multiplier, 1.00) AS weight_multiplier,
+           COALESCE(r.weighted_score, 0.00) AS weighted_score,
+           u.name AS customer_name
          FROM ratings r
          LEFT JOIN users u ON u.id = r.customer_id
          WHERE r.service_id = ?

@@ -22,6 +22,11 @@ function mapDeal(row) {
     customerAccepted: row.customer_accepted,
     vendorAccepted: row.vendor_accepted,
     status: row.status,
+    inspectionStatus: row.inspection_status || row.inspectionStatus || null,
+    refundAmount: Number(row.refund_amount || row.refundAmount || 0),
+    refundReason: row.refund_reason || row.refundReason || null,
+    refundRequestedAt: row.refund_requested_at || row.refundRequestedAt || null,
+    refundedAt: row.refunded_at || row.refundedAt || null,
     createdAt: row.created_at,
     agreedAt: row.agreed_at,
     discount,
@@ -31,13 +36,7 @@ function mapDeal(row) {
     discountUpdatedAt: row.discount_updated_at,
     invoiceStatus: row.invoice_status,
     paymentConfirmedAt: row.payment_confirmed_at,
-    completedAt: row.completed_at,
-    actualReturnDate: row.actual_return_date,
-    returnStatus: row.return_status,
-    vendorConfirmed: row.vendor_confirmed,
-    customerConfirmed: row.customer_confirmed,
-    settlementDate: row.settlement_date,
-    refundStatus: row.refund_status
+    completedAt: row.completed_at
   };
 }
 

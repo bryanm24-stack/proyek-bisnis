@@ -3,9 +3,8 @@
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { getNotificationTitle } from '@/lib/notificationTitles';
 
-
-import { readData, writeData } from '@/lib/storage';
 let cachedUserRaw = null;
 let cachedUserSnapshot = null;
 
@@ -48,13 +47,15 @@ function NavLink({ href, active, children }) {
     <Link
       href={href}
       style={{
-          fontSize: '14px',
-          color: active ? '#B28A67' : '#666',
+          fontSize: '16px',
+          color: active ? '#B28A67' : '#444',
           textDecoration: 'none',
           fontWeight: active ? '600' : '500',
-          padding: '6px 12px',
-          borderRadius: '6px',
-          background: active ? '#f0e6ff' : 'transparent',
+          padding: '14px 16px',
+          borderRadius: '12px',
+          background: active ? '#f8f4ef' : 'transparent',
+          transition: 'background 0.2s ease, color 0.2s ease',
+          display: 'block',
         }}
     >
       {children}
@@ -66,13 +67,7 @@ export default function SharedNavbar() {
   const user = useSyncExternalStore(subscribeAuth, readUserFromStorage, () => null);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState('info');
-  const [profileForm, setProfileForm] = useState({ name: '', email: '' });
-  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
-  const [settingsMessage, setSettingsMessage] = useState('');
-  const [settingsLoading, setSettingsLoading] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -91,7 +86,7 @@ export default function SharedNavbar() {
     };
 
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
+    const interval = setInterval(fetchNotifications, 15000); // Polling setiap 15 detik
     return () => clearInterval(interval);
   }, [user]);
 
@@ -109,95 +104,27 @@ export default function SharedNavbar() {
     if (typeof document === 'undefined') return;
 
     const body = document.body;
+    body.style.paddingTop = '80px';
+
     if (!isMobile && sidebarOpen) {
-      body.style.marginLeft = '220px';
+      body.style.marginLeft = '280px';
     } else {
       body.style.marginLeft = '0px';
     }
 
     return () => {
+      body.style.paddingTop = '0px';
       body.style.marginLeft = '0px';
     };
-  }, [sidebarOpen, isMobile]);
+  }, [isMobile, sidebarOpen]);
 
   const isActive = (href) => pathname === href || pathname.startsWith(href + '/');
+  const isExactPath = (href) => pathname === href;
 
   const handleLogout = () => {
     localStorage.removeItem('user');
     window.dispatchEvent(new Event('auth-change'));
     router.push('/login');
-  };
-
-  const updateLocalUser = (newUserData) => {
-    const storedUser = readUserFromStorage();
-    if (!storedUser) return;
-    const updated = { ...storedUser, ...newUserData };
-    localStorage.setItem('user', JSON.stringify(updated));
-    window.dispatchEvent(new Event('auth-change'));
-  };
-
-  const handleSaveProfile = async () => {
-    if (!user) return;
-    setSettingsLoading(true);
-    setSettingsMessage('');
-
-    try {
-      const response = await fetch('/api/auth/update-profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: user.id, name: profileForm.name, email: profileForm.email }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        setSettingsMessage(data.message || 'Gagal menyimpan informasi.');
-      } else {
-        updateLocalUser({ name: data.user.name, email: data.user.email });
-        setSettingsMessage('Informasi pengguna berhasil diperbarui.');
-      }
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      setSettingsMessage('Terjadi kesalahan saat menyimpan.');
-    } finally {
-      setSettingsLoading(false);
-    }
-  };
-
-  const handleSavePassword = async () => {
-    if (!user) return;
-    setSettingsLoading(true);
-    setSettingsMessage('');
-
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setSettingsMessage('Password baru dan konfirmasi tidak sama.');
-      setSettingsLoading(false);
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/auth/change-password', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: user.id,
-          currentPassword: passwordForm.currentPassword,
-          newPassword: passwordForm.newPassword,
-        }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        setSettingsMessage(data.message || 'Gagal mengganti password.');
-      } else {
-        setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-        setSettingsMessage('Password berhasil diubah.');
-      }
-    } catch (error) {
-      console.error('Error changing password:', error);
-      setSettingsMessage('Terjadi kesalahan saat mengganti password.');
-    } finally {
-      setSettingsLoading(false);
-    }
   };
 
   const handleDeleteNotification = async (notificationId) => {
@@ -211,27 +138,178 @@ export default function SharedNavbar() {
     }
   };
 
-  useEffect(() => {
-    if (!user) return;
-    setProfileForm({ name: user.name, email: user.email });
-  }, [user]);
+  const handleMarkAsRead = async (notificationId) => {
+    if (!user || !notificationId) return;
 
-  if (!user) return null;
+    try {
+      const response = await fetch(`/api/notifications`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notificationId })
+      });
+
+      if (response.ok) {
+        setNotifications((prev) =>
+          prev.filter((notif) => notif.id !== notificationId)
+        );
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  if (!user) {
+    return (
+      <>
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '80px',
+            zIndex: 110,
+            background: 'white',
+            borderBottom: '1px solid #e5e7eb',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            padding: '12px 16px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={() => setSidebarOpen((prev) => !prev)}
+              style={{
+                background: 'none',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                padding: '8px 10px',
+                cursor: 'pointer',
+                color: '#333',
+                fontSize: '18px',
+              }}
+              aria-label={sidebarOpen ? 'Tutup sidebar tamu' : 'Buka sidebar tamu'}
+            >
+              ☰
+            </button>
+
+            <Link
+              href="/"
+              style={{
+                fontSize: '20px',
+                fontWeight: '700',
+                color: '#B28A67',
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <span style={{ fontSize: '24px', lineHeight: '1' }}>🛡️</span>
+              RentGuard
+            </Link>
+          </div>
+
+          <div style={{ color: '#6b7280', fontSize: '13px', fontWeight: '500' }}>
+            Jelajahi layanan sewa terpercaya
+          </div>
+        </div>
+
+        <aside
+          style={{
+            position: 'fixed',
+            top: '64px',
+            left: 0,
+            bottom: 0,
+            width: sidebarOpen ? '220px' : '0px',
+            overflow: 'hidden',
+            transition: 'width 0.2s ease',
+            borderRight: sidebarOpen ? '1px solid #e5e7eb' : 'none',
+            background: '#fafafa',
+            zIndex: 105,
+          }}
+        >
+          <div style={{ padding: '18px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+            <div style={{ fontWeight: '700', color: '#333', fontSize: '15px' }}>Akun</div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 14px 16px' }}>
+            <Link
+              href="/login"
+              style={{
+                background: '#1f2937',
+                color: 'white',
+                border: '1px solid #1f2937',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                textDecoration: 'none',
+                fontSize: '14px',
+                fontWeight: '600',
+                textAlign: 'center',
+              }}
+            >
+              Masuk
+            </Link>
+
+            <Link
+              href="/register"
+              style={{
+                background: '#B28A67',
+                color: 'white',
+                border: '1px solid #B28A67',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                textDecoration: 'none',
+                fontSize: '14px',
+                fontWeight: '600',
+                textAlign: 'center',
+              }}
+            >
+              Register
+            </Link>
+
+            <Link
+              href="/vendor/register"
+              style={{
+                background: 'white',
+                color: '#B28A67',
+                border: '1px solid #B28A67',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                textDecoration: 'none',
+                fontSize: '14px',
+                fontWeight: '600',
+                textAlign: 'center',
+              }}
+            >
+              Menjadi Vendor
+            </Link>
+          </div>
+        </aside>
+      </>
+    );
+  }
 
   return (
     <>
       <div
         style={{
-          position: 'sticky',
+          position: 'fixed',
           top: 0,
-          zIndex: 110,
+          left: 0,
+          right: 0,
+          height: '80px',
+          zIndex: 50,
           background: 'white',
           borderBottom: '1px solid #e5e7eb',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '14px 20px',
+          padding: '0 22px',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -282,7 +360,7 @@ export default function SharedNavbar() {
               title="Notifikasi"
             >
               🔔
-              {notifications.length > 0 && (
+              {notifications.filter(n => !n.is_read).length > 0 && (
                 <span
                   style={{
                     position: 'absolute',
@@ -300,7 +378,7 @@ export default function SharedNavbar() {
                     fontWeight: 'bold',
                   }}
                 >
-                  {notifications.length}
+                  {notifications.filter(n => !n.is_read).length}
                 </span>
               )}
             </button>
@@ -315,43 +393,68 @@ export default function SharedNavbar() {
                   border: '1px solid #e5e7eb',
                   borderRadius: '8px',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  width: '300px',
-                  maxHeight: '400px',
+                  width: '320px',
+                  maxHeight: '420px',
                   overflowY: 'auto',
                   zIndex: 1000,
                 }}
               >
-                {notifications.length === 0 ? (
-                  <div style={{ padding: '16px', textAlign: 'center', color: '#999' }}>Tidak ada notifikasi</div>
+                {notifications.filter(n => !n.is_read).length === 0 ? (
+                  <div style={{ padding: '16px', textAlign: 'center', color: '#999' }}>Tidak ada notifikasi baru</div>
                 ) : (
-                  notifications.map((notif) => (
-                    <div
-                      key={notif.id}
-                      style={{
-                        padding: '12px',
-                        borderBottom: '1px solid #f0f0f0',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontSize: '14px', color: '#333' }}>{notif.message}</div>
-                        <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
-                          {new Date(notif.createdAt).toLocaleTimeString('id-ID')}
+                  <>
+                    <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa', fontWeight: '600', fontSize: '12px', color: '#666' }}>
+                      {notifications.filter(n => !n.is_read).length} notifikasi baru
+                    </div>
+                    {notifications.filter(n => !n.is_read).slice(0, 5).map((notif) => (
+                      <div
+                        key={notif.id}
+                        style={{
+                          padding: '12px 16px',
+                          borderBottom: '1px solid #f0f0f0',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s',
+                          background: '#fef9f3',
+                        }}
+                        onClick={() => handleMarkAsRead(notif.id)}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#fef9f3'}
+                      >
+                        <div style={{ fontSize: '13px', color: '#B28A67', fontWeight: '600', marginBottom: '4px' }}>
+                          {getNotificationTitle(notif.type, notif.sender_name, notif.message_count)}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#333', marginBottom: '4px', lineHeight: '1.4' }}>
+                          {notif.message.substring(0, 70)}
+                          {notif.message.length > 70 ? '...' : ''}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#999' }}>
+                          {new Date(notif.updated_at || notif.created_at).toLocaleString('id-ID')}
                         </div>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteNotification(notif.id);
-                        }}
-                        style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: '12px' }}
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  ))
+                    ))}
+                    {notifications.filter(n => !n.is_read).length > 5 && (
+                      <div style={{ padding: '12px 16px', background: '#fafafa', color: '#999', fontSize: '12px', textAlign: 'center' }}>
+                        +{notifications.filter(n => !n.is_read).length - 5} notifikasi baru lagi
+                      </div>
+                    )}
+                    <Link
+                      href="/notifications"
+                      onClick={() => setShowNotifications(false)}
+                      style={{
+                        display: 'block',
+                        padding: '12px 16px',
+                        borderTop: '1px solid #f0f0f0',
+                        textAlign: 'center',
+                        color: '#B28A67',
+                        textDecoration: 'none',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        background: '#f9fafb',
+                      }}
+                    >
+                      Lihat Semua Notifikasi →
+                    </Link>
+                  </>
                 )}
               </div>
             )}
@@ -383,22 +486,25 @@ export default function SharedNavbar() {
             </div>
           </div>
 
-          <button
-            onClick={() => setShowSettings((prev) => !prev)}
+          <Link
+            href="/settings"
             style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
               background: '#F3F4F6',
               color: '#333',
               border: '1px solid #e5e7eb',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              cursor: 'pointer',
+              padding: '8px 12px',
+              borderRadius: '10px',
+              textDecoration: 'none',
               fontSize: '13px',
               fontWeight: '600',
             }}
-            title="Pengaturan"
           >
-            ⚙️ Settings
-          </button>
+            <span></span>
+            Profil Saya
+          </Link>
 
           <button
             onClick={handleLogout}
@@ -421,53 +527,55 @@ export default function SharedNavbar() {
       <aside
         style={{
           position: 'fixed',
-          top: '64px',
+          top: '80px',
           left: 0,
           bottom: 0,
-          width: sidebarOpen ? '220px' : '0px',
+          width: sidebarOpen ? '280px' : '0px',
+          height: sidebarOpen ? 'calc(100vh - 80px)' : '0px',
           overflow: 'hidden',
-          transition: 'width 0.2s ease',
+          transition: 'width 0.25s ease, height 0.25s ease',
           borderRight: sidebarOpen ? '1px solid #e5e7eb' : 'none',
           background: '#fafafa',
-          zIndex: 105,
+          zIndex: 45,
         }}
       >
         <div style={{ padding: '18px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-          <div style={{ fontWeight: '700', color: '#333', fontSize: '15px' }}>Navigasi</div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '18px',
-              cursor: 'pointer',
-              color: '#666',
-              display: sidebarOpen ? 'inline-flex' : 'none',
-            }}
-            aria-label="Tutup sidebar"
-          >
-            ×
-          </button>
+          <div style={{ fontWeight: '700', color: '#333', fontSize: '16px' }}>Navigasi</div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '0 14px 16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '0 14px 20px', maxHeight: '60vh', overflowY: 'auto' }}>
           <NavLink href="/" active={isActive('/')}>
-            🏠 Home
+            Home
+          </NavLink>
+          <NavLink href="/notifications" active={isActive('/notifications')}>
+            Notifikasi
           </NavLink>
           <NavLink href={user.role === 'vendor' ? '/vendor/chats' : '/customer/chats'} active={isActive('/customer/chats') || isActive('/vendor/chats')}>
-            💬 Chat
+            Chat
           </NavLink>
           <NavLink href="/returns" active={isActive('/returns')}>
-            🧾 Returns
+            Returns
           </NavLink>
 
-          {user.role === 'customer' && (
+          {(user.role === 'customer' || user.role === 'member' || user.role === 'vendor') && (
+            <NavLink href="/complaints" active={isExactPath('/complaints')}>
+              Complaint
+            </NavLink>
+          )}
+
+          {(user.role === 'customer' || user.role === 'member' || user.role === 'vendor') && (
+            <NavLink href="/riwayat-transaksi" active={isActive('/riwayat-transaksi')}>
+              Riwayat Transaksi
+            </NavLink>
+          )}
+
+          {(user.role === 'customer' || user.role === 'member') && (
             <>
               <NavLink href="/customer/invoices" active={isActive('/customer/invoices')}>
-                📋 Invoice
+                Invoice
               </NavLink>
               <NavLink href="/customer/favorites" active={isActive('/customer/favorites')}>
-                ❤️ Favorit
+                Favorit
               </NavLink>
             </>
           )}
@@ -475,16 +583,19 @@ export default function SharedNavbar() {
           {user.role === 'vendor' && (
             <>
               <NavLink href="/vendor/invoices" active={isActive('/vendor/invoices')}>
-                📋 Invoice
+                Invoice
+              </NavLink>
+              <NavLink href="/vendor/complaints" active={isActive('/vendor/complaints')}>
+                Instruksi Complaint
               </NavLink>
               <NavLink href="/vendor/favorites" active={isActive('/vendor/favorites')}>
-                ❤️ Favorit
+                Favorit
               </NavLink>
               <NavLink href="/vendor/produk" active={isActive('/vendor/produk')}>
-                📦 Barang/Jasa Saya
+                Barang/Jasa Saya
               </NavLink>
               <NavLink href="/vendor/tambah-produk" active={isActive('/vendor/tambah-produk')}>
-                ➕ Tambahkan Barang/Jasa
+                Tambahkan Barang/Jasa
               </NavLink>
             </>
           )}
@@ -492,180 +603,22 @@ export default function SharedNavbar() {
           {user.role === 'admin' && (
             <>
               <NavLink href="/admin/vendor-approval" active={isActive('/admin/vendor-approval')}>
-                ✓ Verifikasi Vendor
+                Verifikasi Vendor
+              </NavLink>
+              <NavLink href="/admin/customer-verification" active={isActive('/admin/customer-verification')}>
+                Verifikasi Customer
               </NavLink>
               <NavLink href="/admin/transaction-verification" active={isActive('/admin/transaction-verification')}>
-                🪪 Verifikasi Transaksi
+                Verifikasi Transaksi
+              </NavLink>
+              <NavLink href="/admin/complaints" active={isActive('/admin/complaints')}>
+                Manajemen Keluhan
               </NavLink>
             </>
           )}
         </div>
       </aside>
-
-      {showSettings && (
-        <div
-          onClick={() => setShowSettings(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.35)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 120,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: 'min(560px, calc(100% - 40px))',
-              background: 'white',
-              borderRadius: '16px',
-              boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
-              padding: '24px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
-              <div>
-                <div style={{ fontSize: '18px', fontWeight: '700', color: '#111' }}>Pengaturan Pengguna</div>
-                <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>Ubah informasi dan kelola password akun Anda.</div>
-              </div>
-              <button
-                onClick={() => setShowSettings(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '24px',
-                  cursor: 'pointer',
-                  color: '#999',
-                }}
-                aria-label="Tutup pengaturan"
-              >
-                ×
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '22px', flexWrap: 'wrap' }}>
-              {['info', 'password'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setSettingsTab(tab)}
-                  style={{
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '999px',
-                    padding: '10px 16px',
-                    background: settingsTab === tab ? '#B28A67' : 'white',
-                    color: settingsTab === tab ? 'white' : '#333',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                  }}
-                >
-                  {tab === 'info' ? 'Informasi Pengguna' : 'Ubah Password'}
-                </button>
-              ))}
-            </div>
-
-            {settingsMessage && (
-              <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', color: '#334155' }}>
-                {settingsMessage}
-              </div>
-            )}
-
-            {settingsTab === 'info' ? (
-              <div style={{ display: 'grid', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#444', marginBottom: '6px' }}>Nama Lengkap</label>
-                  <input
-                    value={profileForm.name}
-                    onChange={(e) => setProfileForm((prev) => ({ ...prev, name: e.target.value }))}
-                    style={{ width: '100%', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '10px' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#444', marginBottom: '6px' }}>Email</label>
-                  <input
-                    value={profileForm.email}
-                    readOnly
-                    style={{ width: '100%', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '10px', background: '#f8fafc', color: '#6b7280' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#444', marginBottom: '6px' }}>Role</label>
-                  <div style={{ padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '10px', background: '#f8fafc', color: '#374151' }}>
-                    {user.role === 'customer' ? 'Customer' : user.role === 'vendor' ? 'Vendor' : 'Admin'}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button
-                    onClick={handleSaveProfile}
-                    disabled={settingsLoading}
-                    style={{
-                      background: '#B28A67',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '10px',
-                      padding: '12px 18px',
-                      cursor: 'pointer',
-                      fontWeight: '600',
-                    }}
-                  >
-                    {settingsLoading ? 'Menyimpan...' : 'Simpan Informasi'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#444', marginBottom: '6px' }}>Password Saat Ini</label>
-                  <input
-                    type="password"
-                    value={passwordForm.currentPassword}
-                    onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                    style={{ width: '100%', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '10px' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#444', marginBottom: '6px' }}>Password Baru</label>
-                  <input
-                    type="password"
-                    value={passwordForm.newPassword}
-                    onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-                    style={{ width: '100%', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '10px' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#444', marginBottom: '6px' }}>Konfirmasi Password Baru</label>
-                  <input
-                    type="password"
-                    value={passwordForm.confirmPassword}
-                    onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                    style={{ width: '100%', padding: '12px 14px', border: '1px solid #d1d5db', borderRadius: '10px' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button
-                    onClick={handleSavePassword}
-                    disabled={settingsLoading}
-                    style={{
-                      background: '#B28A67',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '10px',
-                      padding: '12px 18px',
-                      cursor: 'pointer',
-                      fontWeight: '600',
-                    }}
-                  >
-                    {settingsLoading ? 'Menyimpan...' : 'Ubah Password'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </>
   );
 }
+

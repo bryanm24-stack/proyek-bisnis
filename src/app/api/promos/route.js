@@ -3,8 +3,28 @@ import { query } from '@/lib/db';
 
 // Removed - using SQL queries directly
 
-function toValidDate(value) {
-  if (!value) return null;
+import { readData, writeData, deleteData } from '@/lib/storage';
+
+async function readPromos() {
+  try {
+    const raw = await readData('promos');
+    const parsed = raw;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writePromos(promos) {
+  try {
+    const result = await writeData('promos', promos);
+    console.debug('promos API: writeData result for promos:', result);
+    return result;
+  } catch (err) {
+    console.error('promos API: writePromos error:', err);
+    throw err;
+  }
+}
 
   // Support common localized input format like "18 / 06 / 2026 , 10 . 00"
   if (typeof value === 'string') {
@@ -18,32 +38,44 @@ function toValidDate(value) {
     }
   }
 
-  const date = new Date(value);
+function toValidDate(value) {
+  if (!value) return null;
+  let normalized = value;
+  if (typeof normalized === 'string') {
+    normalized = normalized.trim();
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(normalized)) {
+      normalized = `${normalized.replace(' ', 'T')}Z`;
+    } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?$/.test(normalized) && !normalized.endsWith('Z')) {
+      normalized = `${normalized.replace(/Z?$/, '')}Z`;
+    }
+  }
+  const date = new Date(normalized);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function normalizePromo(promo, options = {}) {
-  const { userId = null, claimedUsersByPromo = new Map() } = options;
-  const startAtDate = toValidDate(promo.start_at || promo.startAt);
-  const endAtDate = toValidDate(promo.end_at || promo.endAt);
-  const maxApplicants = promo.max_applicants || promo.maxApplicants;
-  const claimedUsersFromDb = Array.isArray(promo.claimed_user_ids)
-    ? promo.claimed_user_ids.map((id) => String(id))
-    : (() => {
-        try {
-          const parsed = JSON.parse(promo.claimed_user_ids || '[]');
-          return Array.isArray(parsed) ? parsed.map((id) => String(id)) : [];
-        } catch {
-          return [];
-        }
-      })();
-  const claimedUsersFromTx = Array.from(claimedUsersByPromo.get(String(promo.id)) || []);
-  const claimedUsersUnion = Array.from(new Set([...claimedUsersFromDb, ...claimedUsersFromTx]));
-  const claimedCount = claimedUsersUnion.length;
-  const remainingApplicants = Number.isFinite(Number(maxApplicants))
-    ? Math.max(0, Number(maxApplicants) - claimedCount)
+  const { userId = null, claimedUsersByPromo = new Map(), now = Date.now() } = options;
+  const startAtDate = toValidDate(promo.startAt);
+  const endAtDate = toValidDate(promo.endAt);
+  const claimedUserIds = Array.isArray(promo.claimedUserIds)
+    ? promo.claimedUserIds.map((entryUserId) => String(entryUserId))
+    : [];
+  const claimedUsersFromTransactions = Array.from(claimedUsersByPromo.get(String(promo.id)) || []);
+  const claimedUsersUnion = Array.from(new Set([
+    ...claimedUserIds,
+    ...claimedUsersFromTransactions
+  ]));
+  const maxApplicants = promo.maxApplicants === undefined || promo.maxApplicants === null || promo.maxApplicants === ''
+    ? null
+    : Number(promo.maxApplicants);
+  const claimedCount = Number.isFinite(Number(promo.claimedCount))
+    ? Number(promo.claimedCount)
+    : claimedUsersUnion.length;
+  const hasStarted = !startAtDate || startAtDate.getTime() <= now;
+  const hasEnded = !endAtDate || endAtDate.getTime() >= now;
+  const remainingApplicants = Number.isFinite(maxApplicants)
+    ? Math.max(0, maxApplicants - claimedCount)
     : null;
-  const now = Date.now();
   const normalizedUserId = userId ? String(userId) : null;
   const userHasClaimed = Boolean(normalizedUserId && claimedUsersUnion.includes(normalizedUserId));
 
@@ -60,14 +92,12 @@ function normalizePromo(promo, options = {}) {
     endAt: endAtDate ? endAtDate.toISOString() : null,
     maxApplicants: maxApplicants ? Number(maxApplicants) : null,
     claimedCount,
-    remainingApplicants,
+    claimedUserIds: claimedUsersUnion,
     userHasClaimed,
-    claimLimitPerUser: 1,
-    createdAt: promo.created_at,
-    updatedAt: promo.updated_at,
-    isUpcoming: startAtDate && startAtDate.getTime() > now,
-    isExpired: endAtDate && endAtDate.getTime() <= now,
-    isActiveNow: promo.active && (!startAtDate || startAtDate.getTime() <= now) && (!endAtDate || endAtDate.getTime() > now)
+    remainingApplicants,
+    isUpcoming: Boolean(startAtDate && startAtDate.getTime() > now),
+    isExpired: Boolean(endAtDate && endAtDate.getTime() < now),
+    isActiveNow: promo.active !== false && hasStarted && hasEnded && (remainingApplicants === null || remainingApplicants > 0)
   };
 }
 
@@ -138,14 +168,19 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    // Ensure promo image can store base64 payloads from upload input
+    const rawText = await request.text();
+    console.debug('promos POST raw body:', rawText);
+    let body;
     try {
-      await query('ALTER TABLE promos MODIFY COLUMN image LONGTEXT');
-    } catch {
-      // Ignore when already LONGTEXT or no alter permission
+      body = rawText ? JSON.parse(rawText) : {};
+    } catch (parseErr) {
+      console.error('JSON parse error in promos POST:', parseErr.message);
+      console.error('Raw body was:', rawText);
+      return NextResponse.json({
+        success: false,
+        message: `Invalid JSON: ${parseErr.message}`
+      }, { status: 400 });
     }
-
-    const body = await request.json();
     const {
       vendorId,
       vendorName,
@@ -257,10 +292,9 @@ export async function POST(request) {
     return NextResponse.json({ success: true, message: 'Promo berhasil dibuat.', data: newPromo }, { status: 201 });
   } catch (error) {
     console.error('Error creating promo:', error);
-    return NextResponse.json({
-      success: false,
-      message: error?.message ? `Gagal membuat promo: ${error.message}` : 'Gagal membuat promo.'
-    }, { status: 500 });
+    const message = error && error.message ? String(error.message) : 'Gagal membuat promo.';
+    const stack = error && error.stack ? String(error.stack) : '';
+    return NextResponse.json({ success: false, message: `${message}\n${stack}` }, { status: 500 });
   }
 }
 
@@ -288,7 +322,16 @@ export async function DELETE(request) {
       }
     }
 
-    await query('DELETE FROM promos WHERE id = ?', [promoId]);
+    const [deletedPromo] = promos.splice(promoIndex, 1);
+    try {
+      await deleteData('promos', { id: deletedPromo.id });
+    } catch (err) {
+      console.error('Error deleting promo from SQL:', err);
+      return NextResponse.json({
+        success: false,
+        message: 'Gagal menghapus promo dari database.'
+      }, { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,

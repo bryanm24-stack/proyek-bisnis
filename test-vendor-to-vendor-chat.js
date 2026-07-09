@@ -18,12 +18,12 @@ try {
   
   // Get vendors only
   const vendors = users.filter(u => u.role === 'vendor');
-  console.log(`📊 Found ${vendors.length} vendors:`);
+  console.log(` Found ${vendors.length} vendors:`);
   vendors.forEach(v => {
     console.log(`   - ${v.id}: ${v.vendorName || v.name}`);
   });
   
-  console.log(`\n💬 Total chats: ${chats.length}`);
+  console.log(`\n Total chats: ${chats.length}`);
   
   // Check for vendor-to-vendor chats
   const vendorToVendorChats = chats.filter(chat => {
@@ -35,7 +35,7 @@ try {
   console.log(`\n🎯 Vendor-to-Vendor Chats: ${vendorToVendorChats.length}`);
   
   if (vendorToVendorChats.length > 0) {
-    console.log('\n📋 Details:');
+    console.log('\n Details:');
     vendorToVendorChats.forEach((chat, idx) => {
       const vendor = vendors.find(v => String(v.id) === String(chat.vendorId));
       const customer = vendors.find(v => String(v.id) === String(chat.customerId));
@@ -60,7 +60,7 @@ try {
         });
         
         if (!hasError) {
-          console.log(`       ✅ All message senders are valid`);
+          console.log(`        All message senders are valid`);
         }
       }
     });
@@ -89,10 +89,10 @@ try {
       console.log(`    - Vendor: ${c.vendorName}`);
     });
     
-    console.log(`\n  Total visibility: ${vendorChats.length + customerChats.length} chats ✅`);
+    console.log(`\n  Total visibility: ${vendorChats.length + customerChats.length} chats `);
   }
   
-  console.log('\n✅ Test completed successfully!\n');
+  console.log('\n Test completed successfully!\n');
   
 } catch (error) {
   console.error('❌ Error:', error.message);

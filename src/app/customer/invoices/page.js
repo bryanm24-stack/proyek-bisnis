@@ -44,6 +44,18 @@ export default function CustomerInvoicesPage() {
     return date.toLocaleDateString('id-ID');
   };
 
+  const copyInvoiceId = async (invoiceId, event) => {
+    event.stopPropagation();
+    if (!invoiceId) return;
+    try {
+      await navigator.clipboard.writeText(String(invoiceId));
+      alert(`Invoice ID berhasil disalin: ${invoiceId}`);
+    } catch (error) {
+      console.error('Error copying invoice ID:', error);
+      alert('Gagal menyalin Invoice ID');
+    }
+  };
+
   const fetchInvoices = async (customerId, selectedFilter) => {
     try {
       setIsLoading(true);
@@ -168,7 +180,7 @@ export default function CustomerInvoicesPage() {
       });
 
       if (updateResponse.ok) {
-        alert('✅ Pembayaran berhasil! Invoice sudah terbayar.');
+        alert(' Pembayaran berhasil! Invoice sudah terbayar.');
         setSelectedInvoice(null);
         resetPaymentForm();
         if (user?.id) {
@@ -210,7 +222,7 @@ export default function CustomerInvoicesPage() {
         throw new Error(result.message || 'Gagal menyimpan rating');
       }
 
-      alert('✅ Rating berhasil disimpan.');
+      alert(' Rating berhasil disimpan.');
       setInvoices((prev) => prev.map((item) => (
         item.id === invoice.id ? { ...item, hasCustomerRating: true } : item
       )));
@@ -243,7 +255,7 @@ export default function CustomerInvoicesPage() {
       <div>
         <SharedNavbar />
         <div style={{ textAlign: 'center', padding: '50px', color: '#666' }}>
-          ⏳ Memuat invoice...
+           Memuat invoice...
         </div>
       </div>
     );
@@ -256,7 +268,7 @@ export default function CustomerInvoicesPage() {
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 24px' }}>
         <div style={{ marginBottom: '18px' }}>
           <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>
-            📋 Invoice Pembelian
+             Invoice Pembelian
           </h1>
           <p style={{ color: '#666', fontSize: '16px' }}>
             Kelola invoice pembayaran Anda dengan rincian lengkap.
@@ -280,9 +292,9 @@ export default function CustomerInvoicesPage() {
 
         <div style={{ display: 'flex', gap: '12px', marginBottom: '28px', flexWrap: 'wrap' }}>
           {[
-            { value: 'pending', label: '⏳ Menunggu Pembayaran' },
-            { value: 'paid', label: '✅ Sudah Dibayar' },
-            { value: 'all', label: '📊 Semua Invoice' }
+            { value: 'pending', label: ' Menunggu Pembayaran' },
+            { value: 'paid', label: ' Sudah Dibayar' },
+            { value: 'all', label: ' Semua Invoice' }
           ].map((btn) => (
             <button
               key={btn.value}
@@ -328,11 +340,18 @@ export default function CustomerInvoicesPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <div>
                     <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: '600' }}>
-                      Invoice #{invoice.id?.substring(0, 8) || 'N/A'}
+                      Invoice #{invoice.id || 'N/A'}
                     </h3>
                     <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>
                       Vendor: <strong>{invoice.vendorName || 'Unknown'}</strong>
                     </p>
+                    <button
+                      type="button"
+                      onClick={(event) => copyInvoiceId(invoice.id, event)}
+                      style={{ marginTop: '8px', border: '1px solid #d6d3d1', background: '#fff', color: '#44403c', borderRadius: '8px', padding: '6px 10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      Salin Invoice ID
+                    </button>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '20px', fontWeight: '700', color: '#B28A67', marginBottom: '4px' }}>
@@ -349,7 +368,7 @@ export default function CustomerInvoicesPage() {
                         color: invoice.status === 'paid' ? '#166534' : '#92400e'
                       }}
                     >
-                      {invoice.status === 'paid' ? '✅ Dibayar' : '⏳ Pending'}
+                      {invoice.status === 'paid' ? ' Dibayar' : ' Pending'}
                     </div>
                   </div>
                 </div>
@@ -357,34 +376,47 @@ export default function CustomerInvoicesPage() {
                 <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
                     <div>
-                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>📦 Item Sewa</p>
+                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}> Item Sewa</p>
                       <p style={{ margin: 0, fontSize: '15px', fontWeight: '600' }}>{invoice.serviceTitle || 'N/A'}</p>
                     </div>
                     <div>
-                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>📅 Durasi Sewa</p>
+                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}> Durasi Sewa</p>
                       <p style={{ margin: 0, fontSize: '15px', fontWeight: '600' }}>{invoice.durationDays || 1} hari</p>
                     </div>
                     <div>
-                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>💰 Harga/Hari</p>
+                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}> Harga/Hari</p>
                       <p style={{ margin: 0, fontSize: '15px', fontWeight: '600' }}>{formatCurrency(invoice.basePrice || 0)}</p>
                     </div>
                     <div>
-                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>📆 Batas Pembayaran</p>
+                      <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}> Batas Pembayaran</p>
                       <p style={{ margin: 0, fontSize: '15px', fontWeight: '600' }}>{formatDate(invoice.paymentDeadline)}</p>
                     </div>
                   </div>
 
                   {selectedInvoice?.id === invoice.id && (
                     <div style={{ background: '#f9fafb', padding: '16px', borderRadius: '8px', marginTop: '16px', borderLeft: '4px solid #B28A67' }}>
-                      <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>📋 Detail Invoice</h4>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}> Detail Invoice</h4>
                       <div style={{ display: 'grid', gap: '8px', fontSize: '13px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
+                          <span style={{ color: '#666' }}>Invoice ID Lengkap:</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            <strong style={{ wordBreak: 'break-all', textAlign: 'right' }}>{invoice.id || 'N/A'}</strong>
+                            <button
+                              type="button"
+                              onClick={(event) => copyInvoiceId(invoice.id, event)}
+                              style={{ border: '1px solid #d6d3d1', background: '#fff', color: '#44403c', borderRadius: '8px', padding: '5px 8px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#666' }}>Tanggal Invoice:</span>
                           <strong>{formatDate(invoice.createdAt)}</strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#666' }}>Status Pembayaran:</span>
-                          <strong>{invoice.status === 'paid' ? '✅ Sudah Dibayar' : '⏳ Belum Dibayar'}</strong>
+                          <strong>{invoice.status === 'paid' ? ' Sudah Dibayar' : ' Belum Dibayar'}</strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: '#666' }}>Subtotal:</span>
@@ -412,7 +444,7 @@ export default function CustomerInvoicesPage() {
 
                       {invoice.status === 'pending' && (
                         <div style={{ marginTop: '16px', borderTop: '1px solid #e5e7eb', paddingTop: '14px' }}>
-                          <h4 style={{ margin: '0 0 10px', fontSize: '14px', fontWeight: '700', color: '#1f2937' }}>💳 Bayar Invoice</h4>
+                          <h4 style={{ margin: '0 0 10px', fontSize: '14px', fontWeight: '700', color: '#1f2937' }}> Bayar Invoice</h4>
 
                           <div style={{ display: 'grid', gap: '8px', marginBottom: '10px' }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>

@@ -17,7 +17,6 @@ export default function HomePageClient() {
   const [modalOpen, setModalOpen] = useState(false);
   const [detailTab, setDetailTab] = useState('packages');
   const [modalImageIndex, setModalImageIndex] = useState(0);
-  // ✅ NEW: Track image carousel for product cards
   const [currentImageIndex, setCurrentImageIndex] = useState({});
   const [heroImageIndex, setHeroImageIndex] = useState(0);
   const [chatModalOpen, setChatModalOpen] = useState(false);
@@ -32,6 +31,7 @@ export default function HomePageClient() {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [serviceReviews, setServiceReviews] = useState([]);
+  const [selectedVendorProfile, setSelectedVendorProfile] = useState(null);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewFilter, setReviewFilter] = useState('all');
   const [reviewPage, setReviewPage] = useState(1);
@@ -40,7 +40,7 @@ export default function HomePageClient() {
   const [searchFilters, setSearchFilters] = useState({
     locationTerm: '',
     minRating: 'all',
-    priceRange: 'all',
+    budget: '',
     sortBy: 'recommended'
   });
   const [activePromoIndex, setActivePromoIndex] = useState(0);
@@ -133,8 +133,8 @@ export default function HomePageClient() {
     try {
       const cachedUser = JSON.parse(localStorage.getItem('user') || 'null');
       const promoQuery = cachedUser?.id
-        ? `/api/promos?active=true&userId=${encodeURIComponent(cachedUser.id)}`
-        : '/api/promos?active=true';
+        ? `/api/promos?userId=${encodeURIComponent(cachedUser.id)}`
+        : '/api/promos';
       const response = await fetch(promoQuery, { cache: 'no-store' });
       const data = await response.json();
       if (data.success) {
@@ -208,7 +208,7 @@ export default function HomePageClient() {
     window.location.reload();
   };
 
-  // ✅ NEW: Handle image navigation in carousel
+  //  NEW: Handle image navigation in carousel
   const handleNextImage = (e, serviceId, totalImages) => {
     e.preventDefault();
     e.stopPropagation();
@@ -336,6 +336,7 @@ export default function HomePageClient() {
 
   const openModal = (service) => {
     setSelectedService(service);
+    setSelectedVendorProfile(null);
     setDetailTab('packages');
     setSelectedItemDetail(null);
     setModalImageIndex(0);
@@ -345,6 +346,23 @@ export default function HomePageClient() {
     setReviewFilter('all');
     setReviewPage(1);
     setModalOpen(true);
+
+    const fetchVendorProfile = async () => {
+      try {
+        const response = await fetch(`/api/vendor/profile?vendorId=${encodeURIComponent(service.vendorId)}`);
+        const data = await response.json();
+        if (data.success && data.data) {
+          setSelectedVendorProfile(data.data);
+        } else {
+          setSelectedVendorProfile(null);
+        }
+      } catch (error) {
+        console.error('Error fetching vendor profile:', error);
+        setSelectedVendorProfile(null);
+      }
+    };
+
+    fetchVendorProfile();
 
     // Fetch reviews for this service
     console.log('Fetching reviews for serviceId:', service.id);
@@ -376,6 +394,7 @@ export default function HomePageClient() {
   const closeModal = () => {
     setModalOpen(false);
     setSelectedService(null);
+    setSelectedVendorProfile(null);
     setSelectedItemDetail(null);
     setModalImageIndex(0);
     setActivePromoIndex(0);
@@ -523,9 +542,25 @@ export default function HomePageClient() {
     }
   };
 
+  const isCustomerProfileComplete = (profile) => {
+    return !!(
+      profile &&
+      profile.role === 'customer' &&
+      profile.name &&
+      profile.bankName &&
+      profile.accountNumber &&
+      profile.accountHolder
+    );
+  };
+
   const handleDealAction = async (action) => {
     if (dealProcessing) return;
     if (!selectedService || !user || !chatData?.id) return;
+
+    if (action === 'accept' && user.role === 'customer' && !isCustomerProfileComplete(user)) {
+      alert('Lengkapi profil Anda di halaman Pengaturan (Nama Lengkap, Nama Bank, Nomor Rekening, Nama Pemilik Rekening) sebelum mengajukan deal.');
+      return;
+    }
 
     setDealProcessing(true);
     try {
@@ -537,7 +572,8 @@ export default function HomePageClient() {
           chatId: chatData.id,
           customerId: user.id,
           vendorId: selectedService.vendorId,
-          serviceId: selectedService.id
+          serviceId: selectedService.id,
+          actorId: user.id
         })
       });
 
@@ -570,7 +606,7 @@ export default function HomePageClient() {
   const getDealStatusConfig = () => {
     if (!dealData) {
       return {
-        label: 'Belum ada status deal',
+        label: 'Ajukan Kesepakatan',
         description: 'Transaksi diproses vendor. Kamu cukup lanjut negosiasi di chat.',
         background: '#f3f4f6',
         color: '#374151'
@@ -776,14 +812,12 @@ export default function HomePageClient() {
       filtered = filtered.filter(service => Number(service.rating || 0) >= minimumRating);
     }
 
-    if (searchFilters.priceRange !== 'all') {
+    const budgetRaw = String(searchFilters.budget || '').replace(/[^\d]/g, '');
+    const budgetValue = Number(budgetRaw);
+    if (Number.isFinite(budgetValue) && budgetValue > 0) {
       filtered = filtered.filter((service) => {
         const price = getServicePriceNumber(service);
-        if (searchFilters.priceRange === 'under_100k') return price > 0 && price < 100000;
-        if (searchFilters.priceRange === '100k_250k') return price >= 100000 && price < 250000;
-        if (searchFilters.priceRange === '250k_500k') return price >= 250000 && price < 500000;
-        if (searchFilters.priceRange === 'above_500k') return price >= 500000;
-        return true;
+        return price > 0 && price >= budgetValue;
       });
     }
 
@@ -830,7 +864,7 @@ export default function HomePageClient() {
   // Derive a featured services list for the hero carousel (safe fallback)
   const featuredServices = Array.isArray(filteredServices) ? filteredServices.slice(0, 5) : [];
   const visiblePromos = Array.isArray(promos)
-    ? promos.filter((promo) => Number(promo?.promoPrice) > 0)
+    ? promos.filter((promo) => Number(promo?.promoPrice) > 0 && isPromoActiveNow(promo))
     : [];
 
   const handlePromoCheckout = (promoId) => {
@@ -852,7 +886,7 @@ export default function HomePageClient() {
       return;
     }
 
-    if (promo?.endAt && new Date(promo.endAt).getTime() <= promoNow) {
+    if (promo?.endAt && new Date(promo.endAt).getTime() < promoNow) {
       alert('Promo sudah berakhir.');
       return;
     }
@@ -875,7 +909,7 @@ export default function HomePageClient() {
     if (Number.isNaN(endTime)) return 'Tanpa batas waktu';
 
     const diff = endTime - promoNow;
-    if (diff <= 0) return 'Berakhir';
+    if (diff < 0) return 'Berakhir';
 
     const totalSeconds = Math.floor(diff / 1000);
     const days = Math.floor(totalSeconds / 86400);
@@ -885,6 +919,31 @@ export default function HomePageClient() {
 
     return `${days > 0 ? `${days}d ` : ''}${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`.trim();
   };
+
+  const getImageSrc = (img) => {
+    if (!img) return 'https://via.placeholder.com/800x500?text=Promo';
+    if (typeof img === 'string') return img;
+    if (typeof img === 'object') {
+      if (typeof img.url === 'string' && img.url.trim()) return img.url;
+      if (typeof img.src === 'string' && img.src.trim()) return img.src;
+      if (typeof img.data === 'string' && img.data.trim()) return img.data;
+    }
+    return 'https://via.placeholder.com/800x500?text=Promo';
+  };
+
+  function isPromoActiveNow(promo) {
+    if (!promo) return false;
+    // Check if active field is disabled (0 or false)
+    if (promo.active === 0 || promo.active === false) return false;
+    // If API already calculated isActiveNow, use that (trust API)
+    if (promo.isActiveNow !== undefined) return Boolean(promo.isActiveNow);
+    // Otherwise calculate locally
+    const nowTime = Number.isFinite(Number(promoNow)) ? promoNow : Date.now();
+    const startTime = promo?.startAt ? new Date(promo.startAt).getTime() : -Infinity;
+    const endTime = promo?.endAt ? new Date(promo.endAt).getTime() : Infinity;
+    if (Number.isNaN(startTime) || Number.isNaN(endTime)) return false;
+    return startTime <= nowTime && nowTime <= endTime;
+  }
 
   const getPromoRemainingApplicants = (promo) => {
     if (Number.isFinite(Number(promo?.remainingApplicants))) {
@@ -904,7 +963,7 @@ export default function HomePageClient() {
     : 0;
   const activeServicePromo = selectedServicePromos[normalizedPromoIndex] || null;
   const activeServicePromoRemainingApplicants = getPromoRemainingApplicants(activeServicePromo);
-  const activeServicePromoIsExpired = Boolean(activeServicePromo?.endAt && new Date(activeServicePromo.endAt).getTime() <= promoNow);
+  const activeServicePromoIsExpired = Boolean(activeServicePromo?.endAt && new Date(activeServicePromo.endAt).getTime() < promoNow);
   const activeServicePromoIsClaimed = Boolean(activeServicePromo?.userHasClaimed);
   const activeServicePromoCanCheckout = Boolean(activeServicePromo)
     && !activeServicePromoIsExpired
@@ -959,6 +1018,7 @@ export default function HomePageClient() {
       <div className="hero-section">
         <div className="hero-inner">
           <div className="hero-content">
+            <div className="hero-badge">📍 Khusus Melayani Area Surabaya & Sekitarnya</div>
             <h1>Sewa Apa Saja,<br/>dari Vendor Terbaik</h1>
             <p>Ribuan vendor penyewaan terpercaya siap melayani kebutuhan sewa kamu</p>
             <div className="hero-buttons">
@@ -1157,7 +1217,7 @@ export default function HomePageClient() {
                     {isFavorited(service.id) ? '❤️' : '🤍'}
                   </button>
                   
-                  {/* ✅ CAROUSEL */}
+                  {/*  CAROUSEL */}
                   <div className="vendor-cover" style={{ position: 'relative', overflow: 'hidden' }}>
                     <img 
                       src={service.images && service.images.length > 0 
@@ -1407,7 +1467,7 @@ export default function HomePageClient() {
                       setSelectedItemDetail(null);
                     }}
                   >
-                    📦 Paket Tersedia
+                     Paket Tersedia
                   </button>
                   <button
                     className={`tab ${detailTab === 'description' ? 'active' : ''}`}
@@ -1659,7 +1719,7 @@ export default function HomePageClient() {
                               >
                                 {isUnavailable
                                   ? (isJasaItem ? '⛔ Availability Penuh' : '⛔ Stok Habis')
-                                  : '💬 Chat untuk Paket Ini'}
+                                  : ' Chat untuk Paket Ini'}
                               </button>
                                   </>
                                 );
@@ -1713,7 +1773,7 @@ export default function HomePageClient() {
                             >
                               <div style={{ position: 'relative', height: '190px', background: '#e5e7eb' }}>
                                 <img
-                                  src={activeServicePromo.image || 'https://via.placeholder.com/800x500?text=Promo'}
+                                  src={getImageSrc(activeServicePromo?.image)}
                                   alt={activeServicePromo.title || 'Promo'}
                                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                   onError={(event) => {
@@ -1787,9 +1847,9 @@ export default function HomePageClient() {
                                       Rp {Number(activeServicePromo.promoPrice || 0).toLocaleString('id-ID')}
                                     </p>
                                     <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '12px', color: '#475569' }}>
-                                      <span>⏳ {getPromoCountdownLabel(activeServicePromo)}</span>
+                                      <span> {getPromoCountdownLabel(activeServicePromo)}</span>
                                       <span>
-                                        👤 {activeServicePromoRemainingApplicants === null
+                                         {activeServicePromoRemainingApplicants === null
                                           ? 'Kuota tidak dibatasi'
                                           : `${activeServicePromoRemainingApplicants} kuota tersisa`}
                                       </span>
@@ -1847,10 +1907,42 @@ export default function HomePageClient() {
 
                   {detailTab === 'information' && (
                     <>
-                      <div className="info-section">
-                        <h4>📍 Vendor</h4>
-                        <p>{selectedService.vendorName}</p>
+                      <div className="info-section" style={{ paddingBottom: '16px', borderBottom: '1px solid #e5e7eb', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                          {selectedVendorProfile?.vendorLogo ? (
+                            <img
+                              src={selectedVendorProfile.vendorLogo}
+                              alt={selectedVendorProfile.vendorName || selectedService.vendorName}
+                              style={{ width: '72px', height: '72px', borderRadius: '18px', objectFit: 'cover', border: '1px solid #e2e8f0' }}
+                            />
+                          ) : (
+                            <div style={{ width: '72px', height: '72px', borderRadius: '18px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '14px', border: '1px solid #e2e8f0' }}>
+                              Logo
+                            </div>
+                          )}
+
+                          <div style={{ minWidth: 0 }}>
+                            <p style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#111' }}>
+                              {selectedVendorProfile?.vendorName || selectedService.vendorName || 'Vendor'}
+                            </p>
+                            <p style={{ margin: '8px 0 0 0', color: '#475569', fontSize: '14px', lineHeight: '1.6' }}>
+                              {selectedVendorProfile?.vendorBio || selectedService.shortDescription || 'Belum ada informasi toko tersedia.'}
+                            </p>
+                          </div>
+                        </div>
                       </div>
+
+                      {selectedVendorProfile?.vendorAddress ? (
+                        <div className="info-section">
+                          <h4>📍 Alamat Toko</h4>
+                          <p>{selectedVendorProfile.vendorAddress}</p>
+                        </div>
+                      ) : (selectedService.location || selectedService.lokasi) && (
+                        <div className="info-section">
+                          <h4>📍 Lokasi Penjemputan</h4>
+                          <p>{locationLabel}</p>
+                        </div>
+                      )}
 
                       <div className="info-section">
                         <h4>🏷️ Kategori</h4>
@@ -1858,34 +1950,32 @@ export default function HomePageClient() {
                       </div>
 
                       <div className="info-section">
+                        <h4>⭐ Rating Vendor</h4>
+                        <p>{selectedVendorProfile ? `${selectedVendorProfile.averageRating?.toFixed?.(1) ?? '0.0'} • ${selectedVendorProfile.totalReviews} review` : (selectedService.rating?.toFixed?.(1) ?? selectedService.rating)}</p>
+                      </div>
+
+                      <div className="info-section">
                         <h4>📈 Terjual</h4>
                         <p>{selectedService.rentCount ?? '0'}</p>
                       </div>
 
-                      {(selectedService.location || selectedService.lokasi) && (
+                      {(selectedVendorProfile?.totalServices ?? 0) > 0 && (
                         <div className="info-section">
-                          <h4>📍 Lokasi Penjemputan</h4>
-                          <p>{locationLabel}</p>
+                          <h4>🛒 Jumlah Layanan</h4>
+                          <p>{selectedVendorProfile.totalServices}</p>
                         </div>
                       )}
 
-                      {selectedService.minimumDays && (
+                      {selectedVendorProfile?.memberSince && (
                         <div className="info-section">
-                          <h4>📅 Minimum Sewa</h4>
-                          <p>{selectedService.minimumDays} hari</p>
-                        </div>
-                      )}
-
-                      {selectedService.rentalPolicy && (
-                        <div className="info-section">
-                          <h4>📜 Kebijakan Sewa</h4>
-                          <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.rentalPolicy}</p>
+                          <h4> Bergabung Sejak</h4>
+                          <p>{new Date(selectedVendorProfile.memberSince).toLocaleDateString('id-ID')}</p>
                         </div>
                       )}
 
                       <div className="info-section">
                         <h4>🕒 Status</h4>
-                        <p>Terakhir online baru-baru ini</p>
+                        <p>{selectedVendorProfile?.isOnline ? 'Sedang online' : 'Terakhir online baru-baru ini'}</p>
                       </div>
                     </>
                   )}
@@ -1901,7 +1991,7 @@ export default function HomePageClient() {
 
                       {descriptionTableEntries.length > 0 && (
                         <div className="info-section">
-                          <h4>📋 Detail Produk/Jasa</h4>
+                          <h4> Detail Produk/Jasa</h4>
                           <div style={{ display: 'grid', gap: '10px' }}>
                             {descriptionTableEntries.map(([key, value]) => (
                               <div key={key}>
@@ -1949,7 +2039,7 @@ export default function HomePageClient() {
                       {(selectedService.type === 'barang' || selectedService.category === 'barang') && (
                         <>
                           <div className="info-section">
-                            <h4>📦 Keterangan Barang</h4>
+                            <h4> Keterangan Barang</h4>
                             <p>{selectedService.jenisBarang || selectedService.shortDescription || '-'}</p>
                           </div>
 
@@ -1976,7 +2066,7 @@ export default function HomePageClient() {
 
                           {selectedService.syaratKetentuan && (
                             <div className="info-section">
-                              <h4>📋 Syarat & Ketentuan</h4>
+                              <h4> Syarat & Ketentuan</h4>
                               <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
                             </div>
                           )}
@@ -2001,7 +2091,7 @@ export default function HomePageClient() {
 
                           {selectedService.syaratKetentuan && (
                             <div className="info-section">
-                              <h4>📋 Syarat & Ketentuan</h4>
+                              <h4> Syarat & Ketentuan</h4>
                               <p style={{ whiteSpace: 'pre-wrap' }}>{selectedService.syaratKetentuan}</p>
                             </div>
                           )}
@@ -2128,7 +2218,7 @@ export default function HomePageClient() {
                     title={user && user.id === selectedService.vendorId ? "Anda tidak bisa chat dengan service sendiri" : "Chat dengan vendor"}
                     style={user && user.id === selectedService.vendorId ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                   >
-                    💬 Chat Vendor
+                     Chat Vendor
                   </button>
                   <button className="btn-secondary-modal" onClick={closeModal}>Tutup</button>
                 </div>
@@ -2221,7 +2311,7 @@ export default function HomePageClient() {
                         <button
                           type="button"
                           onClick={() => handleDealAction('accept')}
-                          disabled={dealDisabled || dealProcessing}
+                          disabled={dealDisabled || dealProcessing || (user?.role === 'customer' && !isCustomerProfileComplete(user))}
                           style={{
                             flex: 1,
                             padding: '8px 10px',
@@ -2230,12 +2320,12 @@ export default function HomePageClient() {
                             background: messages.length === 0 ? 'rgba(178, 138, 103, 0.15)' : 'rgba(16, 185, 129, 0.08)',
                             color: messages.length === 0 ? '#8F6B4A' : '#047857',
                             fontWeight: '700',
-                            cursor: dealDisabled || dealProcessing ? 'not-allowed' : 'pointer',
-                            opacity: dealDisabled || dealProcessing ? 0.55 : 1,
+                            cursor: dealDisabled || dealProcessing || (user?.role === 'customer' && !isCustomerProfileComplete(user)) ? 'not-allowed' : 'pointer',
+                            opacity: dealDisabled || dealProcessing || (user?.role === 'customer' && !isCustomerProfileComplete(user)) ? 0.55 : 1,
                             transition: 'all 0.3s ease'
                           }}
                         >
-                          {dealProcessing ? 'Memproses...' : dealData?.status === 'agreed' ? 'Deal Diterima' : 'Terima Deal'}
+                          {dealProcessing ? 'Memproses...' : dealData?.status === 'agreed' ? 'Deal Diterima' : 'Kirim Permintaan'}
                         </button>
                         <button
                           type="button"
@@ -2260,9 +2350,15 @@ export default function HomePageClient() {
                             transition: 'all 0.3s ease'
                           }}
                         >
-                          {dealData?.status === 'cancelled' ? 'Mulai Ulang Negosiasi' : 'Cancel'}
+                          {dealData?.status === 'cancelled' ? 'Mulai Ulang Negosiasi' : 'Batal'}
                         </button>
                       </div>
+
+                      {user?.role === 'customer' && !isCustomerProfileComplete(user) && (
+                        <div style={{ marginTop: '8px', fontSize: '12px', color: '#b91c1c' }}>
+                          Lengkapi profil Anda di <a href="/settings" style={{ color: '#1d4ed8', textDecoration: 'underline' }}>Pengaturan</a> sebelum mengajukan deal.
+                        </div>
+                      )}
 
                       {dealData?.status === 'agreed' && chatData?.dealStatus !== 'closed' && !chatData?.closedAt && (
                         <div style={{ marginTop: '8px', fontSize: '12px', color: '#1e40af' }}>
@@ -2373,6 +2469,22 @@ export default function HomePageClient() {
           margin: 24px 0 30px;
           max-width: 540px;
           line-height: 1.7;
+        }
+
+        .hero-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.8rem 1.1rem;
+          border-radius: 999px;
+          background: rgba(255,255,255,0.15);
+          border: 1px solid rgba(255,255,255,0.28);
+          color: #fff;
+          font-size: 0.95rem;
+          font-weight: 600;
+          margin-bottom: 1.4rem;
+          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+          backdrop-filter: blur(8px);
         }
 
         .hero-buttons {
