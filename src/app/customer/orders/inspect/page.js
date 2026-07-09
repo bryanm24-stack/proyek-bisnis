@@ -245,12 +245,12 @@ function InspectionContent() {
   }
 
   const statusLabels = {
-    checking: '⏳ Menunggu Pengecekan',
-    approved: '✅ Disetujui',
+    checking: ' Menunggu Pengecekan',
+    approved: ' Disetujui',
     complaint: '⚠️ Ada Komplain',
-    refund_requested: '⏳ Permintaan Refund Diajukan',
+    refund_requested: ' Permintaan Refund Diajukan',
     refund_rejected: '❌ Permintaan Refund Ditolak',
-    refunded: '💰 Refund Selesai',
+    refunded: ' Refund Selesai',
     partially_refunded: '💸 Partial Refund Selesai',
     penalty_applied: '⚠️ Denda Diterapkan',
     complaint_rejected: '❌ Komplain Ditolak'
@@ -345,7 +345,7 @@ function InspectionContent() {
 
           {order.inspectionStatus === 'refund_requested' && (
             <div style={{ background: '#f0f9ff', border: '1px solid #93c5fd', borderRadius: '8px', padding: '15px', marginBottom: '20px' }}>
-              <h4 style={{ margin: '0 0 10px 0', color: '#2563eb' }}>⏳ Permintaan Refund Diajukan</h4>
+              <h4 style={{ margin: '0 0 10px 0', color: '#2563eb' }}> Permintaan Refund Diajukan</h4>
               <p style={{ margin: '8px 0', color: '#1d4ed8', fontSize: '14px' }}>
                 Permintaan refund Anda telah terkirim ke vendor. Silakan tunggu keputusan vendor.
               </p>
@@ -371,7 +371,7 @@ function InspectionContent() {
 
           {order.inspectionStatus === 'refunded' && (
             <div style={{ background: '#dcfce7', border: '1px solid #86efac', borderRadius: '8px', padding: '15px', marginBottom: '20px' }}>
-              <h4 style={{ margin: '0 0 10px 0', color: '#15803d' }}>💰 Refund Selesai</h4>
+              <h4 style={{ margin: '0 0 10px 0', color: '#15803d' }}> Refund Selesai</h4>
               <p style={{ margin: '8px 0', color: '#166534', fontSize: '14px' }}>
                 Vendor telah menyetujui komplain Anda. Uang Rp {(order.refundAmount || 0).toLocaleString('id-ID')} akan direfund ke akun Anda.
               </p>
@@ -435,7 +435,7 @@ function InspectionContent() {
                   opacity: isSubmitting ? 0.6 : 1
                 }}
               >
-                ✅ Setuju
+                 Setuju
               </button>
               <button
                 onClick={() => setShowComplaintModal(true)}

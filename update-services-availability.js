@@ -30,5 +30,5 @@ const services = JSON.parse(data);
     }
   }
 
-  console.log(`✅ Upserted ${upserted}/${services.length} services into SQL table services_json`);
+  console.log(` Upserted ${upserted}/${services.length} services into SQL table services_json`);
 })();

@@ -107,6 +107,17 @@ export default function FavoritesPage() {
     return Number(item.hargaPcs || item.hargaSesi || item.harga || item.price || 0);
   };
 
+  const isCustomerProfileComplete = (profile) => {
+    return !!(
+      profile &&
+      profile.role === 'customer' &&
+      profile.name &&
+      profile.bankName &&
+      profile.accountNumber &&
+      profile.accountHolder
+    );
+  };
+
   // Helper function to get display price from items
   const getItemsPrice = (service) => {
     if (!service.items || service.items.length === 0) {
@@ -348,6 +359,11 @@ export default function FavoritesPage() {
   const handleDealAction = async (action) => {
     if (!selectedService || !user || !chatData?.id) return;
 
+    if (action === 'accept' && user.role === 'customer' && !isCustomerProfileComplete(user)) {
+      alert('Lengkapi profil Anda di halaman Pengaturan (Nama Lengkap, Nama Bank, Nomor Rekening, Nama Pemilik Rekening) sebelum mengajukan deal.');
+      return;
+    }
+
     try {
       const response = await fetch('/api/deals', {
         method: 'POST',
@@ -357,7 +373,8 @@ export default function FavoritesPage() {
           chatId: chatData.id,
           customerId: user.id,
           vendorId: selectedService.vendorId,
-          serviceId: selectedService.id
+          serviceId: selectedService.id,
+          actorId: user.id
         })
       });
 
@@ -388,7 +405,7 @@ export default function FavoritesPage() {
   const getDealStatusConfig = () => {
     if (!dealData) {
       return {
-        label: 'Belum ada status deal',
+        label: 'Ajukan Kesepakatan',
         description: 'Transaksi diproses vendor. Kamu cukup lanjut negosiasi di chat.',
         background: '#f3f4f6',
         color: '#374151'
@@ -525,7 +542,7 @@ export default function FavoritesPage() {
   return (
     <>
       <SharedNavbar />
-      <div style={{ minHeight: 'calc(100vh - 300px)', padding: '20px', width: '100%', maxWidth: '1400px', margin: 0 }}>
+      <div style={{ minHeight: 'calc(100vh - 300px)', padding: '24px', maxWidth: '1100px', margin: '0 auto', width: '100%' }}>
         <div style={{ marginBottom: '30px' }}>
           <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '10px' }}>
             ❤️ Favorit Saya
@@ -943,9 +960,9 @@ export default function FavoritesPage() {
                       marginBottom: '-2px'
                     }}
                   >
-                    {tab === 'packages' && '📦 Paket Tersedia'}
+                    {tab === 'packages' && ' Paket Tersedia'}
                     {tab === 'description' && '📝 Deskripsi Produk'}
-                    {tab === 'information' && '📋 Informasi Penjual'}
+                    {tab === 'information' && ' Informasi Penjual'}
                     {tab === 'reviews' && '⭐ Rating & Review'}
                   </button>
                 ))}
@@ -1041,7 +1058,7 @@ export default function FavoritesPage() {
                             onMouseEnter={(e) => e.target.style.backgroundColor = '#8F6B4A'}
                             onMouseLeave={(e) => e.target.style.backgroundColor = '#B28A67'}
                           >
-                            💬 Chat untuk Paket Ini
+                             Chat untuk Paket Ini
                           </button>
                         </div>
                       )}
@@ -1093,7 +1110,7 @@ export default function FavoritesPage() {
 
                   {selectedService.minimumDays && (
                     <div className="info-section">
-                      <h4>📅 Minimum Sewa</h4>
+                      <h4> Minimum Sewa</h4>
                       <p>{selectedService.minimumDays} hari</p>
                     </div>
                   )}
@@ -1240,7 +1257,7 @@ export default function FavoritesPage() {
                   title={user && user.id === selectedService.vendorId ? "Anda tidak bisa chat dengan service sendiri" : "Chat dengan vendor"}
                   style={user && user.id === selectedService.vendorId ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                 >
-                  💬 Chat Vendor
+                   Chat Vendor
                 </button>
                 <button className="btn-secondary-modal" onClick={closeModal}>Tutup</button>
               </div>
@@ -1386,7 +1403,7 @@ export default function FavoritesPage() {
                             opacity: dealDisabled ? 0.55 : 1
                           }}
                         >
-                          {dealData?.status === 'agreed' ? 'Deal Diterima' : 'Terima Deal'}
+                          {dealData?.status === 'agreed' ? 'Deal Diterima' : 'Kirim Permintaan'}
                         </button>
                         <button
                           type="button"
@@ -1404,7 +1421,7 @@ export default function FavoritesPage() {
                             opacity: dealData?.status === 'cancelled' ? 0.55 : 1
                           }}
                         >
-                          {dealData?.status === 'cancelled' ? 'Dibatalkan' : 'Cancel'}
+                          {dealData?.status === 'cancelled' ? 'Dibatalkan' : 'Batal'}
                         </button>
                       </div>
 

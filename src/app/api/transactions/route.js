@@ -129,11 +129,22 @@ async function hasTransactionsShippingAddressColumn() {
 
 export async function GET(request) {
   try {
-    const rows = await query('SELECT * FROM transactions ORDER BY COALESCE(created_at, NOW()) DESC');
+    const rows = await query('SELECT t.*, c.id AS complaint_id, c.status AS complaint_status, c.customer_account_name, c.customer_account_number, c.customer_bank_name, c.refund_amount, c.refund_method, c.refund_reference, c.refund_proof_url FROM transactions t LEFT JOIN complaints c ON c.transaction_id = t.id ORDER BY COALESCE(t.created_at, NOW()) DESC');
     const transactions = rows.map((row) => ({
       ...row,
       card_details: parseJsonSafe(row.card_details, null),
-      identity_verification: parseJsonSafe(row.identity_verification, null)
+      identity_verification: parseJsonSafe(row.identity_verification, null),
+      complaint: row.complaint_id ? {
+        id: row.complaint_id,
+        status: row.complaint_status,
+        customerAccountName: row.customer_account_name,
+        customerAccountNumber: row.customer_account_number,
+        customerBankName: row.customer_bank_name,
+        refundAmount: Number(row.refund_amount || 0),
+        refundMethod: row.refund_method || '',
+        refundReference: row.refund_reference || '',
+        refundProofUrl: row.refund_proof_url || ''
+      } : null
     }));
 
     return NextResponse.json(transactions, { status: 200 });
@@ -153,6 +164,9 @@ export async function POST(request) {
     const createdAt = new Date().toISOString();
     const timestamp = body.timestamp || createdAt;
     const paymentIsPayAfter = body.paymentType === 'pay_after';
+    const isPromoFlow = Boolean(body.promoId);
+    const requestedQuantity = Math.max(1, toFiniteNumber(body.quantity, 1));
+    const requestedDurationDays = isPromoFlow ? 1 : Math.max(1, toFiniteNumber(body.durationDays, 1));
 
     // Determine service ID early from deal or direct parameter
     let serviceId = body.serviceId;
@@ -244,17 +258,40 @@ export async function POST(request) {
       }
     }
 
+    if (!isPromoFlow && serviceId) {
+      try {
+        const serviceRows = await query(
+          'SELECT minimum_days FROM services WHERE id = ? LIMIT 1',
+          [serviceId]
+        );
+        const minimumDurationDays = Math.max(1, Number(serviceRows?.[0]?.minimum_days || 1));
+
+        if (requestedDurationDays < minimumDurationDays) {
+          return NextResponse.json({
+            success: false,
+            error: 'Durasi minimum tidak terpenuhi',
+            message: `Durasi sewa minimal ${minimumDurationDays} hari untuk layanan ini.`,
+            minimumDurationDays,
+            requestedDurationDays,
+            status: 'minimum_duration_not_met'
+          }, { status: 400 });
+        }
+      } catch (minimumDaysError) {
+        console.warn('Minimum duration validation warning:', minimumDaysError.message);
+      }
+    }
+
     // Validate stock availability before processing payment
-    if ((body.status === 'success' || !body.status) && body.startDate && body.durationDays && serviceId) {
+    if ((body.status === 'success' || !body.status) && body.startDate && requestedDurationDays && serviceId) {
       try {
         // Calculate end date based on start date and duration
         const startDate = new Date(body.startDate);
         const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + Number(body.durationDays || 0));
+        endDate.setDate(endDate.getDate() + requestedDurationDays);
 
         // Check availability
         const services = await query(
-          'SELECT id, quantity FROM services WHERE id = ? LIMIT 1',
+          'SELECT id, quantity, minimum_days FROM services WHERE id = ? LIMIT 1',
           [serviceId]
         );
 
@@ -326,10 +363,6 @@ export async function POST(request) {
       : [];
     const currentDealForPricing = currentDealRowsForPricing[0] || null;
 
-    const isPromoFlow = Boolean(body.promoId);
-    const requestedQuantity = Math.max(1, toFiniteNumber(body.quantity, 1));
-    const requestedDurationDays = isPromoFlow ? 1 : Math.max(1, toFiniteNumber(body.durationDays, 1));
-
     const dealUnitFinalPrice = toFiniteNumber(currentDealForPricing?.final_price, 0);
     const dealUnitOriginalPrice = toFiniteNumber(currentDealForPricing?.original_price, 0);
     const payloadBasePrice = toFiniteNumber(body.basePrice ?? body.amount, 0);
@@ -370,7 +403,7 @@ export async function POST(request) {
         effectiveUnitPrice,
         Number(requestedQuantity) || 1,
         body.quantityType || 'Unit',
-        Number(body.durationDays ?? 0) || null,
+        isPromoFlow ? null : Number(requestedDurationDays),
         body.notes || '',
         toDateOnly(body.startDate),
         computedAmount,
@@ -392,7 +425,7 @@ export async function POST(request) {
         effectiveUnitPrice,
         Number(requestedQuantity) || 1,
         body.quantityType || 'Unit',
-        Number(body.durationDays ?? 0) || null,
+        isPromoFlow ? null : Number(requestedDurationDays),
         body.notes || '',
         toDateOnly(body.startDate),
         computedAmount,

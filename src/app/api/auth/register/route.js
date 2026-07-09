@@ -65,14 +65,14 @@ export async function POST(request) {
 
     // Insert new user
     await query(
-      `INSERT INTO users (id, username, password, name, role_id, role, email, phone, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [newId, username, password, name, 1, 'customer', email, '', now]
+      `INSERT INTO users (id, username, password, name, role_id, role, email, phone, ktp_status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [newId, username, password, name, 1, 'customer', email, '', 'not_submitted', now]
     );
 
     // Verify insert was successful
     const newUser = await query(
-      'SELECT id, username, name, email, role FROM users WHERE id = ? LIMIT 1',
+      'SELECT id, username, name, email, role, ktp_status FROM users WHERE id = ? LIMIT 1',
       [newId]
     );
 
@@ -91,7 +91,8 @@ export async function POST(request) {
         name: newUser[0].name,
         email: newUser[0].email,
         phone: newUser[0].phone || '',
-        role: newUser[0].role
+        role: newUser[0].role,
+        ktp_status: newUser[0].ktp_status || 'not_submitted'
       }
     }, { status: 201 });
 

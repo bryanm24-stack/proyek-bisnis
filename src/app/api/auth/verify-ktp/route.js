@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { readData, writeData } from '@/lib/storage';
+import { query } from '@/lib/db';
 
-const DATASET = 'ktp_verifications';
-
+// GET: ?userId=...
 export async function GET(request) {
   try {
     const url = new URL(request.url);
@@ -12,56 +11,78 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'userId wajib diisi.' }, { status: 400 });
     }
 
-    const records = await readData(DATASET);
-    const verification = Array.isArray(records)
-      ? records.find((item) => String(item.userId) === String(userId))
-      : null;
+    const [user] = await query(
+      'SELECT id, name, email, ktp_status, ktp_data, ktp_submitted_at, ktp_verified_by, ktp_verified_at, ktp_rejection_reason FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
 
-    return NextResponse.json({ success: true, data: verification || null }, { status: 200 });
+    if (!user) {
+      return NextResponse.json({ success: false, message: 'User tidak ditemukan.' }, { status: 404 });
+    }
+
+    const ktpData = user.ktp_data || {};
+    const verification = {
+      status: user.ktp_status || 'not_submitted',
+      submittedAt: user.ktp_submitted_at || null,
+      verifiedAt: user.ktp_verified_at || null,
+      verifiedBy: user.ktp_verified_by || null,
+      rejectionReason: user.ktp_rejection_reason || null,
+      name: ktpData.name || user.name || null,
+      email: ktpData.email || user.email || null,
+      idType: ktpData.idType || 'ktp',
+      nik: ktpData.nik || null,
+      idPhotoPreview: ktpData.idPhotoPreview || null,
+      selfiePhotoPreview: ktpData.selfiePhotoPreview || null,
+      notes: ktpData.notes || ''
+    };
+
+    return NextResponse.json({ success: true, data: verification }, { status: 200 });
   } catch (error) {
     console.error('Error reading KTP verification:', error);
     return NextResponse.json({ success: false, message: 'Terjadi kesalahan saat memuat status verifikasi.' }, { status: 500 });
   }
 }
 
+// POST: body JSON { userId, name, email, idType, nik, idPhotoPreview, selfiePhotoPreview, notes }
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { userId, name, email, idType, nik, idPhotoPreview, selfiePhotoPreview, status, notes } = body;
+    const { userId, name, email, idType, nik, idPhotoPreview, selfiePhotoPreview, notes } = body || {};
 
     if (!userId || !nik) {
       return NextResponse.json({ success: false, message: 'userId dan NIK wajib diisi.' }, { status: 400 });
     }
 
-    const records = await readData(DATASET);
-    const existingRecord = Array.isArray(records)
-      ? records.find((item) => String(item.userId) === String(userId))
-      : null;
+    const [user] = await query(
+      'SELECT id, name, email FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
 
-    const newRecord = {
-      id: existingRecord?.id || `KTP-${Date.now()}`,
-      userId: String(userId),
-      name: name || null,
-      email: email || null,
+    if (!user) {
+      return NextResponse.json({ success: false, message: 'User tidak ditemukan.' }, { status: 404 });
+    }
+
+    const now = new Date().toISOString();
+    const ktpPayload = {
+      name: name || user.name || null,
+      email: email || user.email || null,
       idType: idType || 'ktp',
       nik: String(nik).trim(),
       idPhotoPreview: typeof idPhotoPreview === 'string' ? idPhotoPreview : null,
       selfiePhotoPreview: typeof selfiePhotoPreview === 'string' ? selfiePhotoPreview : null,
-      status: status || 'pending',
-      notes: notes || '',
-      submittedAt: new Date().toISOString(),
-      reviewedAt: existingRecord?.reviewedAt || null,
-      reviewedBy: existingRecord?.reviewedBy || null,
-      adminNotes: existingRecord?.adminNotes || ''
+      notes: notes || ''
     };
 
-    const updated = existingRecord
-      ? records.map((item) => (String(item.userId) === String(userId) ? newRecord : item))
-      : [...(Array.isArray(records) ? records : []), newRecord];
+    await query(
+      `UPDATE users SET ktp_status = 'pending', ktp_data = ?, ktp_submitted_at = ?, ktp_verified_by = NULL, ktp_verified_at = NULL, ktp_rejection_reason = NULL WHERE id = ?`,
+      [JSON.stringify(ktpPayload), now, userId]
+    );
 
-    await writeData(DATASET, updated);
-
-    return NextResponse.json({ success: true, message: 'Permohonan verifikasi KTP disimpan.', data: newRecord }, { status: 200 });
+    return NextResponse.json({
+      success: true,
+      message: 'Permohonan verifikasi KTP disimpan.',
+      data: { status: 'pending', submittedAt: now, ...ktpPayload }
+    }, { status: 200 });
   } catch (error) {
     console.error('Error saving KTP verification:', error);
     return NextResponse.json({ success: false, message: 'Terjadi kesalahan saat menyimpan verifikasi.' }, { status: 500 });

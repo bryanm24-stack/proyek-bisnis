@@ -28,24 +28,22 @@ function normalizeServiceCapacity(service) {
 
   const parsedImages = parseJsonSafe(normalized.images, []);
   const parsedSpecifications = parseJsonSafe(normalized.specifications, {});
+  const parsedSpecificationOptions = parseJsonSafe(normalized.specificationOptions, {});
   const parsedDescriptionTable = parseJsonSafe(normalized.descriptionTable, {});
   const parsedChecklist = parseJsonSafe(normalized.checklist, {});
   const parsedItems = parseJsonSafe(normalized.items, []);
   const parsedVariations = parseJsonSafe(normalized.variations, {});
 
-  const parsedRentGuardShipping = normalized.pengirimanRentguard;
-  const hasRentGuardShipping = parsedRentGuardShipping === true || parsedRentGuardShipping === 1 || parsedRentGuardShipping === '1' || parsedRentGuardShipping === 'true';
-
   if (normalized.type === 'jasa') {
     const capacity = Number(normalized.availableQuantity ?? normalized.availability ?? normalized.quantity ?? 0);
     return {
       ...normalized,
-      pengirimanRentguard: Boolean(hasRentGuardShipping),
       availableQuantity: capacity,
       availability: capacity,
       quantity: capacity,
       images: Array.isArray(parsedImages) ? parsedImages : [],
       specifications: parsedSpecifications,
+      specificationOptions: parsedSpecificationOptions,
       descriptionTable: parsedDescriptionTable,
       checklist: parsedChecklist,
       items: parsedItems,
@@ -55,9 +53,9 @@ function normalizeServiceCapacity(service) {
 
   return {
     ...normalized,
-    pengirimanRentguard: Boolean(hasRentGuardShipping),
     images: Array.isArray(parsedImages) ? parsedImages : [],
     specifications: parsedSpecifications,
+    specificationOptions: parsedSpecificationOptions,
     descriptionTable: parsedDescriptionTable,
     checklist: parsedChecklist,
     items: parsedItems,
@@ -109,6 +107,7 @@ export async function POST(request) {
       location,
       category,
       specifications,
+      specificationOptions,
       descriptionTable,
       checklist,
       items,
@@ -180,8 +179,9 @@ export async function POST(request) {
         quantity: normalizedQuantity,
         rental_policy: rentalPolicy || '',
         location,
-        pengiriman_rentguard: Boolean(body.pengirimanRentGuard),
+        pengiriman_rentguard: false,
         specifications: specifications && typeof specifications === 'object' ? specifications : {},
+        specification_options: specificationOptions && typeof specificationOptions === 'object' ? specificationOptions : {},
         description_table: descriptionTable && typeof descriptionTable === 'object' ? descriptionTable : {},
         checklist: checklist && typeof checklist === 'object' ? checklist : {},
         items: items && Array.isArray(items) ? items : [],
@@ -195,8 +195,8 @@ export async function POST(request) {
         availability: normalizedAvailability
       };
 
-      const sql = `INSERT INTO services (id, vendor_id, vendor_name, main_category, sub_category, super_sub_category, category, title, short_description, description, detail_description, price, minimum_days, available_quantity, quantity, rental_policy, location, pengiriman_rentguard, specifications, description_table, checklist, items, variations, type, rating, rent_count, images, availability)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      const sql = `INSERT INTO services (id, vendor_id, vendor_name, main_category, sub_category, super_sub_category, category, title, short_description, description, detail_description, price, minimum_days, available_quantity, quantity, rental_policy, location, pengiriman_rentguard, specifications, specification_options, description_table, checklist, items, variations, type, rating, rent_count, images, availability)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       
       const values = [
         newService.id,
@@ -216,8 +216,9 @@ export async function POST(request) {
         newService.quantity,
         newService.rental_policy,
         newService.location,
-        newService.pengiriman_rentguard ? 1 : 0,
+        0,
         JSON.stringify(newService.specifications),
+        JSON.stringify(newService.specification_options),
         JSON.stringify(newService.description_table),
         JSON.stringify(newService.checklist),
         JSON.stringify(newService.items),
@@ -271,12 +272,13 @@ export async function PUT(request) {
       quantity,
       rentalPolicy,
       location,
-      pengirimanRentGuard,
       images,
       category,
       specifications,
+      specificationOptions,
       descriptionTable,
       checklist,
+      variations,
       items
     } = body;
 
@@ -303,8 +305,8 @@ export async function PUT(request) {
       main_category = ?, sub_category = ?, super_sub_category = ?, title = ?,
       short_description = ?, description = ?, price = ?, minimum_days = ?,
       availability = ?, available_quantity = ?, quantity = ?, rental_policy = ?,
-      location = ?, type = ?, pengiriman_rentguard = ?, images = ?, category = ?, specifications = ?,
-      description_table = ?, checklist = ?, items = ?
+      location = ?, type = ?, pengiriman_rentguard = ?, images = ?, category = ?, specifications = ?, specification_options = ?,
+      description_table = ?, checklist = ?, items = ?, variations = ?
       WHERE id = ? AND vendor_id = ?`;
 
     const updateValues = [
@@ -322,13 +324,15 @@ export async function PUT(request) {
       rentalPolicy || service.rental_policy,
       location || service.location,
       type || service.type,
-      pengirimanRentGuard !== undefined ? (pengirimanRentGuard ? 1 : 0) : (service.pengiriman_rentguard ? 1 : 0),
+      0,
       JSON.stringify(images && images.length > 0 ? images : JSON.parse(service.images || '[]')),
       category || service.category,
       JSON.stringify(specifications || JSON.parse(service.specifications || '{}')),
+      JSON.stringify(specificationOptions || JSON.parse(service.specification_options || '{}')),
       JSON.stringify(descriptionTable || JSON.parse(service.description_table || '{}')),
       JSON.stringify(checklist || JSON.parse(service.checklist || '{}')),
       JSON.stringify(items || JSON.parse(service.items || '[]')),
+      JSON.stringify(variations || JSON.parse(service.variations || '{}')),
       id,
       vendorId
     ];

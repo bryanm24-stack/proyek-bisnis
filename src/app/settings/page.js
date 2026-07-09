@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import SharedNavbar from '../components/SharedNavbar';
 
 const initialProfileForm = { name: '', email: '', phone: '' };
-const initialAddressForm = { address: '', city: '', province: '', postalCode: '' };
+const initialAddressForm = { address: '', city: '', postalCode: '' };
 const initialBankForm = { bankName: '', accountNumber: '', accountHolder: '' };
 const initialPasswordForm = { currentPassword: '', newPassword: '', confirmPassword: '' };
 const initialKtpForm = {
@@ -65,6 +65,11 @@ export default function SettingsPage() {
       name: parsedUser.name || '',
       email: parsedUser.email || '',
       phone: parsedUser.phone || ''
+    });
+    setBankForm({
+      bankName: parsedUser.bankName || '',
+      accountNumber: parsedUser.accountNumber || '',
+      accountHolder: parsedUser.accountHolder || ''
     });
 
     const loadData = async () => {
@@ -174,6 +179,48 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('Error saving profile:', error);
       setGlobalMessage('Terjadi kesalahan saat menyimpan profil.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleBankSave = async () => {
+    if (!user) return;
+    setGlobalMessage('');
+    setIsSaving(true);
+
+    try {
+      const response = await fetch('/api/auth/update-profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: user.id,
+          name: profileForm.name || user.name,
+          email: profileForm.email || user.email,
+          phone: profileForm.phone || user.phone,
+          bankName: bankForm.bankName,
+          accountNumber: bankForm.accountNumber,
+          accountHolder: bankForm.accountHolder
+        })
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setGlobalMessage(result.message || 'Gagal menyimpan rekening bank.');
+        return;
+      }
+
+      const updatedUser = {
+        ...user,
+        bankName: result.user?.bankName || bankForm.bankName,
+        accountNumber: result.user?.accountNumber || bankForm.accountNumber,
+        accountHolder: result.user?.accountHolder || bankForm.accountHolder
+      };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setGlobalMessage('Rekening berhasil disimpan.');
+    } catch (error) {
+      console.error('Error saving bank details:', error);
+      setGlobalMessage('Terjadi kesalahan saat menyimpan rekening bank.');
     } finally {
       setIsSaving(false);
     }
@@ -518,27 +565,15 @@ export default function SettingsPage() {
                         style={{ width: '100%', minHeight: '120px', padding: '14px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '15px', resize: 'vertical' }}
                       />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '8px', color: '#475569', fontWeight: '600' }}>Kota</label>
-                        <input
-                          name="city"
-                          value={addressForm.city}
-                          onChange={handleInputChange(setAddressForm)}
-                          placeholder="Jakarta"
-                          style={{ width: '100%', padding: '14px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '15px' }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '8px', color: '#475569', fontWeight: '600' }}>Provinsi</label>
-                        <input
-                          name="province"
-                          value={addressForm.province}
-                          onChange={handleInputChange(setAddressForm)}
-                          placeholder="DKI Jakarta"
-                          style={{ width: '100%', padding: '14px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '15px' }}
-                        />
-                      </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', color: '#475569', fontWeight: '600' }}>Kecamatan</label>
+                      <input
+                        name="city"
+                        value={addressForm.city}
+                        onChange={handleInputChange(setAddressForm)}
+                        placeholder="Contoh: Wonokromo"
+                        style={{ width: '100%', padding: '14px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '15px' }}
+                      />
                     </div>
                     <div>
                       <label style={{ display: 'block', marginBottom: '8px', color: '#475569', fontWeight: '600' }}>Kode Pos</label>
@@ -598,10 +633,11 @@ export default function SettingsPage() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <button
-                      onClick={() => setGlobalMessage('Fungsi rekening bank akan diaktifkan setelah integrasi backend.')}
-                      style={{ padding: '14px 22px', borderRadius: '14px', border: 'none', background: '#B28A67', color: 'white', fontWeight: '700', cursor: 'pointer' }}
+                      onClick={handleBankSave}
+                      disabled={isSaving}
+                      style={{ padding: '14px 22px', borderRadius: '14px', border: 'none', background: '#B28A67', color: 'white', fontWeight: '700', cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.65 : 1 }}
                     >
-                      Simpan Rekening
+                      {isSaving ? 'Menyimpan...' : 'Simpan Rekening'}
                     </button>
                   </div>
                 </div>

@@ -52,6 +52,6 @@ if (componentVendorChats.length === 0 && componentCustomerChats.length === 0) {
   console.log('   2. API response is empty');
   console.log('   3. Filter comparison is failing');
 } else {
-  console.log('✅ Both filters work correctly');
+  console.log(' Both filters work correctly');
   console.log(`   Vendor will see ${componentVendorChats.length} + ${componentCustomerChats.length} = ${componentVendorChats.length + componentCustomerChats.length} chats`);
 }

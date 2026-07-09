@@ -182,7 +182,7 @@ export default function VendorApprovalPage() {
         {/* Pending Registrations */}
         <div className="registration-section pending">
           <div className="section-header">
-            <h2>⏳ Menunggu Verifikasi</h2>
+            <h2> Menunggu Verifikasi</h2>
             <span className="section-badge pending-badge">{pendingRegistrations.length}</span>
           </div>
 
@@ -312,7 +312,7 @@ export default function VendorApprovalPage() {
         {approvedRegistrations.length > 0 && (
           <div className="registration-section approved">
             <div className="section-header">
-              <h2>✅ Sudah Disetujui</h2>
+              <h2> Sudah Disetujui</h2>
               <span className="section-badge approved-badge">{approvedRegistrations.length}</span>
             </div>
             <div className="registrations-list">

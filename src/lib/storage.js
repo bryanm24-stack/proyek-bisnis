@@ -115,7 +115,10 @@ function normalizeRecord(row) {
 }
 
 async function readFromJsonFile(dataset) {
-  if (!isServer) return [];
+  if (!isServer) {
+    console.log(`[readFromJsonFile ${dataset}] isServer is FALSE, returning []`);
+    return [];
+  }
   const fs = await import('fs/promises');
   const path = await import('path');
   const { fileURLToPath } = await import('url');
@@ -124,8 +127,11 @@ async function readFromJsonFile(dataset) {
   const filepath = path.join(__dirname, '..', '..', `${dataset}.json`);
   try {
     const raw = await fs.readFile(filepath, 'utf-8');
-    return normalizeJsonData(raw);
-  } catch {
+    const result = normalizeJsonData(raw);
+    console.log(`[readFromJsonFile ${dataset}] SUCCESS: read ${result.length} records`);
+    return result;
+  } catch (error) {
+    console.log(`[readFromJsonFile ${dataset}] ERROR: ${error.message}`);
     return [];
   }
 }
@@ -311,10 +317,12 @@ export async function readData(name) {
   try {
     if (isServer) {
       if (await hasTable(dataset)) {
+        console.log(`[readData ${name}] hasTable returned TRUE, reading from table`);
         return await readFromTable(dataset);
       }
 
       if (await hasTable(APP_DATA_TABLE)) {
+        console.log(`[readData ${name}] hasAppDataTable returned TRUE, reading from app_data`);
         return await readFromAppData(dataset);
       }
     }
@@ -322,6 +330,7 @@ export async function readData(name) {
     console.error(`readData SQL error for ${name}:`, error.message);
   }
 
+  console.log(`[readData ${name}] No SQL table found, trying JSON fallback...`);
   try {
     return await readFromJsonFile(dataset);
   } catch (error) {

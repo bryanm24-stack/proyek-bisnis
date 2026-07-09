@@ -6,7 +6,7 @@ import { readData, writeData } from '@/lib/storage';
  * POST /api/bookings/pickup
  * Confirm that customer has picked up or received item
  * Updates booking status: confirmed → active
- * ✅ CRITICAL: This is where STOCK GETS DECREMENTED!
+ *  CRITICAL: This is where STOCK GETS DECREMENTED!
  */
 export async function POST(request) {
   try {
@@ -58,7 +58,7 @@ export async function POST(request) {
       booking.status = 'active';
       booking.pickupConfirmedAt = new Date().toISOString();
 
-      // ✅ CRITICAL: DECREMENT ACTUAL STOCK!
+      //  CRITICAL: DECREMENT ACTUAL STOCK!
       const serviceType = service.type || 'barang';
       let totalQuantity = 0;
       
@@ -104,7 +104,7 @@ export async function POST(request) {
       // Save updated services
       await writeData('service', services);
 
-      console.log(`✅ Pickup confirmed for booking ${bookingId}. Stock decremented by ${booking.quantity}.`);
+      console.log(` Pickup confirmed for booking ${bookingId}. Stock decremented by ${booking.quantity}.`);
 
       return NextResponse.json({
         success: true,
