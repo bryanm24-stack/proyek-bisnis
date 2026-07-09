@@ -12,49 +12,6 @@ export default function VendorSettingsPage() {
 
   return <div style={{ padding: '40px', textAlign: 'center' }}>Mengalihkan ke pengaturan...</div>;
 
-  useEffect(() => {
-    const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
-    if (!storedUser) {
-      router.push('/login');
-      return;
-    }
-
-    const parsedUser = JSON.parse(storedUser);
-    if (!parsedUser || parsedUser.role !== 'vendor') {
-      router.push('/');
-      return;
-    }
-
-    setUser(parsedUser);
-
-    const loadProfile = async () => {
-      try {
-        const response = await fetch(`/api/vendor/profile?vendorId=${encodeURIComponent(parsedUser.id)}`); 
-        const result = await response.json();
-        if (response.ok && result.success && result.data) {
-          setProfileForm({
-            vendorName: result.data.vendorName || parsedUser.name || '',
-            vendorLogo: result.data.vendorLogo || '',
-            vendorAddress: result.data.vendorAddress || '',
-            vendorBio: result.data.vendorBio || '',
-            isOnline: Boolean(result.data.isOnline)
-          });
-        } else {
-          setProfileForm((prev) => ({
-            ...prev,
-            vendorName: parsedUser.name || prev.vendorName
-          }));
-        }
-      } catch (error) {
-        console.error('Error loading vendor profile:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProfile();
-  }, [router]);
-
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setProfileForm((prev) => ({

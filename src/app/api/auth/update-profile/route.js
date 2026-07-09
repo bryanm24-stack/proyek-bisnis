@@ -18,7 +18,7 @@ async function updateJsonUserProfile(id, updates) {
 export async function PUT(request) {
   try {
     const body = await request.json();
-    const { id, name, email, phone, bankName, accountNumber, accountHolder } = body;
+    const { id, name, email, phone, address, city, postalCode, bankName, accountNumber, accountHolder } = body;
 
     if (!id || !name || !email) {
       return NextResponse.json({ success: false, message: 'ID, nama, dan email harus diisi.' }, { status: 400 });
@@ -28,6 +28,9 @@ export async function PUT(request) {
       name,
       email,
       phone: phone || null,
+      address: address || null,
+      city: city || null,
+      postalCode: postalCode || null,
       bankName: bankName || null,
       accountNumber: accountNumber || null,
       accountHolder: accountHolder || null
@@ -48,8 +51,8 @@ export async function PUT(request) {
       user = users[0];
 
       await query(
-        'UPDATE users SET name = ?, email = ?, phone = ?, bankName = ?, accountNumber = ?, accountHolder = ? WHERE id = ?',
-        [updates.name, updates.email, updates.phone, updates.bankName, updates.accountNumber, updates.accountHolder, id]
+        'UPDATE users SET name = ?, email = ?, phone = ?, address = ?, city = ?, postalCode = ?, bankName = ?, accountNumber = ?, accountHolder = ? WHERE id = ?',
+        [updates.name, updates.email, updates.phone, updates.address, updates.city, updates.postalCode, updates.bankName, updates.accountNumber, updates.accountHolder, id]
       );
 
       updatedUser = {
@@ -57,6 +60,9 @@ export async function PUT(request) {
         name: updates.name,
         email: updates.email,
         phone: updates.phone,
+        address: updates.address,
+        city: updates.city,
+        postalCode: updates.postalCode,
         bankName: updates.bankName,
         accountNumber: updates.accountNumber,
         accountHolder: updates.accountHolder,

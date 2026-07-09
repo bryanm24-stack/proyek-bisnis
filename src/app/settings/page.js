@@ -25,6 +25,40 @@ const initialVendorForm = {
   isOnline: false
 };
 
+const dataSurabaya = {
+  "Tegalsari": ["60261 (Kedungdoro)", "60262 (Tegalsari)", "60263 (Wonorejo)", "60264 (Dr. Soetomo)", "60265 (Keputran)"],
+  "Simokerto": ["60141 (Kapasan)", "60142 (Tambakrejo)", "60143 (Simokerto)", "60144 (Simolawang)", "60145 (Sidodadi)"],
+  "Genteng": ["60271 (Embong Kaliasin)", "60272 (Ketabang)", "60273 (Kapasari)", "60274 (Peneleh)", "60275 (Genteng)"],
+  "Bubutan": ["60171 (Jepara)", "60172 (Gundih)", "60173 (Tembok Dukuh)", "60174 (Alun-Alun Contong / Bubutan)"],
+  "Bulak": ["60122 (Sukolilo Baru)", "60123 (Kenjeran)", "60124 (Bulak)", "60125 (Kedung Cowek)"],
+  "Kenjeran": ["60126 (Tambak Wedi)", "60127 (Bulak Banteng)", "60128 (Sidotopo Wetan)", "60129 (Tanah Kali Kedinding)"],
+  "Semampir": ["60151 (Ampel)", "60152 (Sidotopo)", "60153 (Pegirian)", "60154 (Wonokusumo)", "60155 (Ujung)"],
+  "Pabean Cantian": ["60161 (Bongkaran)", "60162 (Nyamplungan)", "60163 (Krembangan Utara)", "60164 (Perak Timur)", "60165 (Perak Utara)"],
+  "Krembangan": ["60175 (Krembangan Selatan)", "60176 (Kemayoran)", "60177 (Perak Barat)", "60178 (Morokrembangan)", "60179 (Dupak)"],
+  "Gubeng": ["60281 (Gubeng)", "60282 (Kertajaya)", "60283 (Pucang Sewu)", "60284 (Baratajaya)", "60285 (Mojo)", "60286 (Airlangga)"],
+  "Gunung Anyar": ["60293 (Rungkut Menanggal / Tengah)", "60294 (Gunung Anyar / Tambak)"],
+  "Sukolilo": ["60111 (Keputih)", "60117 (Gebang Putih / Klampis Ngasem)", "60118 (Menur Pumpungan / Nginden Jangkungan)", "60119 (Medokan Semampir / Semolowaru)"],
+  "Tambaksari": ["60131 (Pacar Keling)", "60132 (Pacar Kembang)", "60133 (Ploso)", "60134 (Gading)", "60135 (Rangkah)", "60136 (Tambaksari)", "60137 (Kapas Madya Baru)", "60138 (Dukuh Setro)"],
+  "Mulyorejo": ["60112 (Kalisari / Kejawen Putih Tambak)", "60113 (Dukuh Sutorejo)", "60114 (Kalijudan)", "60115 (Mulyorejo)", "60116 (Manyar Sabrangan)"],
+  "Rungkut": ["60293 (Kalirungkut / Rungkut Kidul)", "60295 (Medokan Ayu)", "60296 (Wonorejo)", "60297 (Penjaringan Sari)", "60298 (Kedung Baruk)"],
+  "Tenggilis Mejoyo": ["60291 (Kutisari)", "60292 (Kendangsari / Tenggilis Mejoyo)", "60299 (Panjang Jiwo)"],
+  "Wonokromo": ["60241 (Darmo)", "60242 (Sawunggaling)", "60243 (Wonokromo)", "60244 (Jagir)", "60245 (Ngagelrejo)", "60246 (Ngagel)"],
+  "Wonocolo": ["60236 (Siwalankerto)", "60237 (Jemur Wonosari)", "60238 (Margorejo)", "60239 (Bendul Merisi / Sidosermo)"],
+  "Wiyung": ["60222 (Balas Klumprik)", "60227 (Babatan)", "60228 (Wiyung)", "60229 (Jajar Tunggal)"],
+  "Karang Pilang": ["60221 (Karangpilang / Warugunung)", "60222 (Kebraon)", "60223 (Kedurus)"],
+  "Jambangan": ["60232 (Karah / Jambangan)", "60233 (Kebonsari / Pagesangan)"],
+  "Gayungan": ["60231 (Ketintang)", "60234 (Dukuh Menanggal / Menanggal)", "60235 (Gayungan)"],
+  "Dukuh Pakis": ["60224 (Gunung Sari)", "60225 (Dukuh Kupang / Pakis)", "60226 (Pradah Kali Kendal)"],
+  "Sawahan": ["60251 (Sawahan)", "60252 (Petemon)", "60253 (Kupang Krajan)", "60254 (Banyu Urip)", "60255 (Putat Jaya)", "60256 (Pakis)"],
+  "Benowo": ["60191 (Tambak Osowilangun)", "60192 (Romokalisari)", "60198 (Sememi)", "60199 (Kandangan)"],
+  "Pakal": ["60192 (Sumberejo)", "60196 (Pakal)", "60195 (Benowo)", "60197 (Babat Jerawat)"],
+  "Asemrowo": ["60182 (Asemrowo)", "60183 (Genting Kalianak)", "60184 (Tambak Sarioso)"],
+  "Sukomanunggal": ["60187 (Tanjungsari)", "60188 (Sukomanunggal)", "60189 (Sonokwijenan / Putat Gede)", "60281 (Simomulyo / Baru)"],
+  "Tandes": ["60184 (Manukan Wetan)", "60185 (Banjar Sugihan / Manukan Kulon)", "60186 (Balongsari / Karang Poh)", "60187 (Tandes)"],
+  "Sambikerep": ["60216 (Lontar)", "60217 (Sambikerep)", "60218 (Bringin)", "60219 (Made)"],
+  "Lakarsantri": ["60211 (Lakarsantri)", "60212 (Jeruk)", "60213 (Lidah Kulon / Wetan)", "60214 (Bangkingan)", "60215 (Sumur Welut)"]
+};
+
 export default function SettingsPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -39,6 +73,8 @@ export default function SettingsPage() {
   const [vendorForm, setVendorForm] = useState(initialVendorForm);
   const [isSaving, setIsSaving] = useState(false);
   const [globalMessage, setGlobalMessage] = useState('');
+
+  const postalCodeOptions = dataSurabaya[addressForm.city] || [];
 
   useEffect(() => {
     const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
@@ -65,6 +101,11 @@ export default function SettingsPage() {
       name: parsedUser.name || '',
       email: parsedUser.email || '',
       phone: parsedUser.phone || ''
+    });
+    setAddressForm({
+      address: parsedUser.address || '',
+      city: parsedUser.city || '',
+      postalCode: parsedUser.postalCode || ''
     });
     setBankForm({
       bankName: parsedUser.bankName || '',
@@ -145,6 +186,20 @@ export default function SettingsPage() {
     setter((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
+  const handleAddressChange = (e) => {
+    const { name, value } = e.target;
+    setAddressForm((prev) => {
+      if (name === 'city') {
+        return {
+          ...prev,
+          city: value,
+          postalCode: dataSurabaya[value]?.[0] || ''
+        };
+      }
+      return { ...prev, [name]: value };
+    });
+  };
+
   const handleProfileSave = async () => {
     if (!user) return;
     setGlobalMessage('');
@@ -221,6 +276,48 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('Error saving bank details:', error);
       setGlobalMessage('Terjadi kesalahan saat menyimpan rekening bank.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAddressSave = async () => {
+    if (!user) return;
+    setGlobalMessage('');
+    setIsSaving(true);
+
+    try {
+      const response = await fetch('/api/auth/update-profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: user.id,
+          name: profileForm.name || user.name,
+          email: profileForm.email || user.email,
+          phone: profileForm.phone || user.phone,
+          address: addressForm.address,
+          city: addressForm.city,
+          postalCode: addressForm.postalCode
+        })
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setGlobalMessage(result.message || 'Gagal menyimpan alamat.');
+        return;
+      }
+
+      const updatedUser = {
+        ...user,
+        address: result.user?.address || addressForm.address,
+        city: result.user?.city || addressForm.city,
+        postalCode: result.user?.postalCode || addressForm.postalCode
+      };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setGlobalMessage('Alamat berhasil disimpan.');
+    } catch (error) {
+      console.error('Error saving address:', error);
+      setGlobalMessage('Terjadi kesalahan saat menyimpan alamat.');
     } finally {
       setIsSaving(false);
     }
@@ -368,9 +465,9 @@ export default function SettingsPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f3ff' }}>
+    <div style={{ minHeight: '100vh', background: '#f5f3ff', paddingBottom: '120px' }}>
       <SharedNavbar />
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
+      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px 120px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '24px', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 290px', minWidth: '260px', background: 'white', borderRadius: '20px', padding: '24px', boxShadow: '0 20px 55px rgba(15, 23, 42, 0.08)' }}>
             <div style={{ marginBottom: '24px' }}>
@@ -567,31 +664,41 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <label style={{ display: 'block', marginBottom: '8px', color: '#475569', fontWeight: '600' }}>Kecamatan</label>
-                      <input
+                      <select
                         name="city"
                         value={addressForm.city}
-                        onChange={handleInputChange(setAddressForm)}
-                        placeholder="Contoh: Wonokromo"
-                        style={{ width: '100%', padding: '14px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '15px' }}
-                      />
+                        onChange={handleAddressChange}
+                        style={{ width: '100%', padding: '14px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '15px', background: 'white' }}
+                      >
+                        <option value="">Pilih Kecamatan...</option>
+                        {Object.keys(dataSurabaya).map((district) => (
+                          <option key={district} value={district}>{district}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label style={{ display: 'block', marginBottom: '8px', color: '#475569', fontWeight: '600' }}>Kode Pos</label>
-                      <input
+                      <select
                         name="postalCode"
                         value={addressForm.postalCode}
-                        onChange={handleInputChange(setAddressForm)}
-                        placeholder="12345"
-                        style={{ width: '100%', padding: '14px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '15px' }}
-                      />
+                        onChange={handleAddressChange}
+                        disabled={!addressForm.city}
+                        style={{ width: '100%', padding: '14px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '15px', background: addressForm.city ? 'white' : '#f8fafc' }}
+                      >
+                        <option value="">{addressForm.city ? 'Pilih Kode Pos...' : 'Pilih Kecamatan terlebih dahulu'}</option>
+                        {postalCodeOptions.map((code) => (
+                          <option key={code} value={code}>{code}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <button
-                      onClick={() => setGlobalMessage('Fungsi alamat akan diaktifkan setelah integrasi backend.')}
-                      style={{ padding: '14px 22px', borderRadius: '14px', border: 'none', background: '#B28A67', color: 'white', fontWeight: '700', cursor: 'pointer' }}
+                      onClick={handleAddressSave}
+                      disabled={isSaving}
+                      style={{ padding: '14px 22px', borderRadius: '14px', border: 'none', background: isSaving ? '#94a3b8' : '#B28A67', color: 'white', fontWeight: '700', cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.75 : 1 }}
                     >
-                      Simpan Alamat
+                      {isSaving ? 'Menyimpan...' : 'Simpan Alamat'}
                     </button>
                   </div>
                 </div>
