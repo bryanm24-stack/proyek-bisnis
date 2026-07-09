@@ -47,13 +47,15 @@ function NavLink({ href, active, children }) {
     <Link
       href={href}
       style={{
-          fontSize: '14px',
-          color: active ? '#B28A67' : '#666',
+          fontSize: '16px',
+          color: active ? '#B28A67' : '#444',
           textDecoration: 'none',
           fontWeight: active ? '600' : '500',
-          padding: '6px 12px',
-          borderRadius: '6px',
-          background: active ? '#f0e6ff' : 'transparent',
+          padding: '14px 16px',
+          borderRadius: '12px',
+          background: active ? '#f8f4ef' : 'transparent',
+          transition: 'background 0.2s ease, color 0.2s ease',
+          display: 'block',
         }}
     >
       {children}
@@ -102,16 +104,19 @@ export default function SharedNavbar() {
     if (typeof document === 'undefined') return;
 
     const body = document.body;
+    body.style.paddingTop = '80px';
+
     if (!isMobile && sidebarOpen) {
-      body.style.marginLeft = '220px';
+      body.style.marginLeft = '280px';
     } else {
       body.style.marginLeft = '0px';
     }
 
     return () => {
+      body.style.paddingTop = '0px';
       body.style.marginLeft = '0px';
     };
-  });
+  }, [isMobile, sidebarOpen]);
 
   const isActive = (href) => pathname === href || pathname.startsWith(href + '/');
   const isExactPath = (href) => pathname === href;
@@ -158,8 +163,11 @@ export default function SharedNavbar() {
       <>
         <div
           style={{
-            position: 'sticky',
+            position: 'fixed',
             top: 0,
+            left: 0,
+            right: 0,
+            height: '80px',
             zIndex: 110,
             background: 'white',
             borderBottom: '1px solid #e5e7eb',
@@ -226,20 +234,6 @@ export default function SharedNavbar() {
         >
           <div style={{ padding: '18px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
             <div style={{ fontWeight: '700', color: '#333', fontSize: '15px' }}>Akun</div>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              style={{
-                background: 'none',
-                border: 'none',
-                fontSize: '18px',
-                cursor: 'pointer',
-                color: '#666',
-                display: sidebarOpen ? 'inline-flex' : 'none',
-              }}
-              aria-label="Tutup sidebar tamu"
-            >
-              ×
-            </button>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 14px 16px' }}>
@@ -303,16 +297,19 @@ export default function SharedNavbar() {
     <>
       <div
         style={{
-          position: 'sticky',
+          position: 'fixed',
           top: 0,
-          zIndex: 110,
+          left: 0,
+          right: 0,
+          height: '80px',
+          zIndex: 50,
           background: 'white',
           borderBottom: '1px solid #e5e7eb',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '14px 20px',
+          padding: '0 22px',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -424,14 +421,14 @@ export default function SharedNavbar() {
                         onMouseLeave={(e) => e.currentTarget.style.background = '#fef9f3'}
                       >
                         <div style={{ fontSize: '13px', color: '#B28A67', fontWeight: '600', marginBottom: '4px' }}>
-                          {getNotificationTitle(notif.type)}
+                          {getNotificationTitle(notif.type, notif.sender_name, notif.message_count)}
                         </div>
                         <div style={{ fontSize: '12px', color: '#333', marginBottom: '4px', lineHeight: '1.4' }}>
                           {notif.message.substring(0, 70)}
                           {notif.message.length > 70 ? '...' : ''}
                         </div>
                         <div style={{ fontSize: '11px', color: '#999' }}>
-                          {new Date(notif.created_at).toLocaleString('id-ID')}
+                          {new Date(notif.updated_at || notif.created_at).toLocaleString('id-ID')}
                         </div>
                       </div>
                     ))}
@@ -505,7 +502,7 @@ export default function SharedNavbar() {
               fontWeight: '600',
             }}
           >
-            <span>👤</span>
+            <span></span>
             Profil Saya
           </Link>
 
@@ -530,68 +527,55 @@ export default function SharedNavbar() {
       <aside
         style={{
           position: 'fixed',
-          top: '64px',
+          top: '80px',
           left: 0,
           bottom: 0,
-          width: sidebarOpen ? '220px' : '0px',
+          width: sidebarOpen ? '280px' : '0px',
+          height: sidebarOpen ? 'calc(100vh - 80px)' : '0px',
           overflow: 'hidden',
-          transition: 'width 0.2s ease',
+          transition: 'width 0.25s ease, height 0.25s ease',
           borderRight: sidebarOpen ? '1px solid #e5e7eb' : 'none',
           background: '#fafafa',
-          zIndex: 105,
+          zIndex: 45,
         }}
       >
         <div style={{ padding: '18px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-          <div style={{ fontWeight: '700', color: '#333', fontSize: '15px' }}>Navigasi</div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '18px',
-              cursor: 'pointer',
-              color: '#666',
-              display: sidebarOpen ? 'inline-flex' : 'none',
-            }}
-            aria-label="Tutup sidebar"
-          >
-            ×
-          </button>
+          <div style={{ fontWeight: '700', color: '#333', fontSize: '16px' }}>Navigasi</div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '0 14px 16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '0 14px 20px', maxHeight: '60vh', overflowY: 'auto' }}>
           <NavLink href="/" active={isActive('/')}>
-            🏠 Home
+            Home
           </NavLink>
           <NavLink href="/notifications" active={isActive('/notifications')}>
-            🔔 Notifikasi
+            Notifikasi
           </NavLink>
           <NavLink href={user.role === 'vendor' ? '/vendor/chats' : '/customer/chats'} active={isActive('/customer/chats') || isActive('/vendor/chats')}>
-            💬 Chat
+            Chat
           </NavLink>
           <NavLink href="/returns" active={isActive('/returns')}>
-            🧾 Returns
+            Returns
           </NavLink>
 
           {(user.role === 'customer' || user.role === 'member' || user.role === 'vendor') && (
             <NavLink href="/complaints" active={isExactPath('/complaints')}>
-              ⚠️ Complaint
+              Complaint
             </NavLink>
           )}
 
           {(user.role === 'customer' || user.role === 'member' || user.role === 'vendor') && (
             <NavLink href="/riwayat-transaksi" active={isActive('/riwayat-transaksi')}>
-              🧾 Riwayat Transaksi
+              Riwayat Transaksi
             </NavLink>
           )}
 
           {(user.role === 'customer' || user.role === 'member') && (
             <>
               <NavLink href="/customer/invoices" active={isActive('/customer/invoices')}>
-                📋 Invoice
+                Invoice
               </NavLink>
               <NavLink href="/customer/favorites" active={isActive('/customer/favorites')}>
-                ❤️ Favorit
+                Favorit
               </NavLink>
             </>
           )}
@@ -599,19 +583,19 @@ export default function SharedNavbar() {
           {user.role === 'vendor' && (
             <>
               <NavLink href="/vendor/invoices" active={isActive('/vendor/invoices')}>
-                📋 Invoice
+                Invoice
               </NavLink>
               <NavLink href="/vendor/complaints" active={isActive('/vendor/complaints')}>
-                ⚠️ Instruksi Complaint
+                Instruksi Complaint
               </NavLink>
               <NavLink href="/vendor/favorites" active={isActive('/vendor/favorites')}>
-                ❤️ Favorit
+                Favorit
               </NavLink>
               <NavLink href="/vendor/produk" active={isActive('/vendor/produk')}>
-                📦 Barang/Jasa Saya
+                Barang/Jasa Saya
               </NavLink>
               <NavLink href="/vendor/tambah-produk" active={isActive('/vendor/tambah-produk')}>
-                ➕ Tambahkan Barang/Jasa
+                Tambahkan Barang/Jasa
               </NavLink>
             </>
           )}
@@ -619,16 +603,16 @@ export default function SharedNavbar() {
           {user.role === 'admin' && (
             <>
               <NavLink href="/admin/vendor-approval" active={isActive('/admin/vendor-approval')}>
-                ✓ Verifikasi Vendor
+                Verifikasi Vendor
               </NavLink>
               <NavLink href="/admin/customer-verification" active={isActive('/admin/customer-verification')}>
-                👤 Verifikasi Customer
+                Verifikasi Customer
               </NavLink>
               <NavLink href="/admin/transaction-verification" active={isActive('/admin/transaction-verification')}>
-                🪪 Verifikasi Transaksi
+                Verifikasi Transaksi
               </NavLink>
               <NavLink href="/admin/complaints" active={isActive('/admin/complaints')}>
-                ⚠️ Manajemen Keluhan
+                Manajemen Keluhan
               </NavLink>
             </>
           )}

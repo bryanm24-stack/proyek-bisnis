@@ -111,6 +111,26 @@ export default function VendorChatsPage() {
     setMessages(chat.messages || []);
     setNewMessage('');
     
+    // Mark chat as read
+    if (chat.id && !chat.is_read) {
+      try {
+        await fetch('/api/chat', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chatId: chat.id })
+        });
+        await fetch('/api/notifications', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ relatedId: chat.id })
+        });
+        // Update chat in list to mark as read
+        setChats(prev => prev.map(c => c.id === chat.id ? { ...c, isRead: 1, is_read: 1 } : c));
+      } catch (error) {
+        console.error('Error marking chat as read:', error);
+      }
+    }
+    
     try {
       const dealResponse = await fetch(`/api/deals?chatId=${chat.id}`);
       const dealDataResp = await dealResponse.json();
@@ -182,8 +202,8 @@ export default function VendorChatsPage() {
         setNewMessage('');
         
         // Update chats list
-        setChats(chats.map(c => 
-          c.id === selectedChat.id ? data.data : c
+        setChats(prev => prev.map(c => 
+          c.id === selectedChat.id ? { ...c, ...data.data } : c
         ));
         setSelectedChat(data.data);
       }
@@ -359,7 +379,7 @@ export default function VendorChatsPage() {
           flexDirection: 'column'
         }}>
           <div style={{ padding: '20px', paddingBottom: '0' }}>
-            <h2 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>💬 Chat</h2>
+            <h2 style={{ margin: '0 0 16px 0', fontSize: '18px' }}> Chat</h2>
             
             {/* Tab Navigation */}
             {vendorChats.length > 0 || customerChats.length > 0 ? (
@@ -407,7 +427,7 @@ export default function VendorChatsPage() {
                     marginBottom: '-2px'
                   }}
                 >
-                  👤 Pembelian {customerChats.length > 0 && `(${customerChats.length})`}
+                   Pembelian {customerChats.length > 0 && `(${customerChats.length})`}
                 </button>
               </div>
             ) : null}
@@ -500,17 +520,42 @@ export default function VendorChatsPage() {
                               background: selectedChat?.id === chat.id ? '#B28A67' : '#fff',
                               color: selectedChat?.id === chat.id ? '#fff' : '#333',
                               border: selectedChat?.id === chat.id ? '2px solid #B28A67' : '1px solid #eee',
-                              transition: 'all 0.3s'
+                              transition: 'all 0.3s',
+                              position: 'relative'
                             }}
                           >
-                            <div style={{ fontWeight: '600', fontSize: '14px' }}>
-                              {chat.customerName}
-                            </div>
-                            <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '4px' }}>
-                              {getChatTopicLabel(chat)}
-                            </div>
-                            <div style={{ fontSize: '12px', opacity: 0.6, marginTop: '4px' }}>
-                              {chat.messages?.length || 0} pesan
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: '600', fontSize: '14px' }}>
+                                  {chat.customerName}
+                                </div>
+                                <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '4px' }}>
+                                  {getChatTopicLabel(chat)}
+                                </div>
+                                <div style={{ fontSize: '12px', opacity: 0.6, marginTop: '4px' }}>
+                                  {chat.messages?.length || 0} pesan
+                                </div>
+                              </div>
+                              {!chat.is_read && chat.last_sender_id !== String(user?.id) && (
+                                <div
+                                  style={{
+                                    background: '#10b981',
+                                    color: 'white',
+                                    width: '20px',
+                                    height: '20px',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '12px',
+                                    fontWeight: 'bold',
+                                    flexShrink: 0
+                                  }}
+                                  title="Chat belum dibaca"
+                                >
+                                  ●
+                                </div>
+                              )}
                             </div>
                           </div>
                         ))
@@ -610,7 +655,7 @@ export default function VendorChatsPage() {
                     fontSize: '12px'
                   }}
                 >
-                  👤 Profil
+                   Profil
                 </button>
               </div>
 
@@ -635,7 +680,7 @@ export default function VendorChatsPage() {
                           disabled={!canVendorAccept}
                           style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: !canVendorAccept ? '#94d3a2' : '#10b981', color: 'white', fontWeight: '700', cursor: !canVendorAccept ? 'not-allowed' : 'pointer', opacity: !canVendorAccept ? 0.6 : 1 }}
                         >
-                          {dealProcessing ? 'Memproses...' : '✅ Terima Deal'}
+                          {dealProcessing ? 'Memproses...' : ' Terima Deal'}
                         </button>
                         <button
                           onClick={() => handleDealAction('cancel')}
@@ -649,7 +694,7 @@ export default function VendorChatsPage() {
                             onClick={() => setDiscountMode('yes')}
                             style={{ padding: '8px 10px', border: 'none', borderRadius: '8px', background: '#f59e0b', color: 'white', fontWeight: '700', cursor: 'pointer' }}
                           >
-                            💰 Kasih Promo
+                             Kasih Promo
                           </button>
                         )}
                       </div>
@@ -938,7 +983,7 @@ export default function VendorChatsPage() {
                     fontSize: '14px'
                   }}
                 >
-                  {dealProcessing ? 'Memproses...' : '✅ Terima Deal'}
+                  {dealProcessing ? 'Memproses...' : ' Terima Deal'}
                 </button>
                 <button
                   onClick={() => {
@@ -989,7 +1034,7 @@ export default function VendorChatsPage() {
                         onMouseEnter={(e) => e.target.style.background = '#d97706'}
                         onMouseLeave={(e) => e.target.style.background = '#f59e0b'}
                       >
-                        💰 Aplikasikan Diskon
+                         Aplikasikan Diskon
                       </button>
                     )}
                   </>
@@ -1053,7 +1098,7 @@ export default function VendorChatsPage() {
                       fontSize: '14px'
                     }}
                   >
-                    💳 Lanjut ke Pembayaran
+                     Lanjut ke Pembayaran
                   </button>
                 )}
 

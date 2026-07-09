@@ -59,7 +59,7 @@ async function testRegistration() {
     const response = await makeRequest('POST', '/api/auth/register', testUser);
     
     if (response.status === 201 && response.data.success) {
-      console.log('✅ Registration successful!');
+      console.log(' Registration successful!');
       console.log('   User ID:', response.data.user.id);
       console.log('   Email:', response.data.user.email);
       console.log('   Username:', response.data.user.username);
@@ -98,7 +98,7 @@ async function testAvailabilityCheck() {
     console.log(`  Response Status: ${response.status}`);
     
     if (response.data.success) {
-      console.log('✅ Stock is available!');
+      console.log(' Stock is available!');
       console.log(`   Total Available: ${response.data.availableQuantity}/${response.data.totalQuantity}`);
       console.log(`   Currently Booked: ${response.data.bookedQuantity}`);
       if (response.data.warningMessage) {
@@ -119,7 +119,7 @@ async function testAvailabilityCheck() {
 }
 
 async function testTransactionWithStockCheck() {
-  console.log('\n💳 TEST 3: Transaction with Stock Validation');
+  console.log('\n TEST 3: Transaction with Stock Validation');
   console.log('─'.repeat(50));
 
   const transaction = {
@@ -146,7 +146,7 @@ async function testTransactionWithStockCheck() {
     console.log(`  Response Status: ${response.status}`);
 
     if (response.data.success) {
-      console.log('✅ Transaction created successfully!');
+      console.log(' Transaction created successfully!');
       console.log(`   Transaction ID: ${response.data.transactionId}`);
     } else {
       console.log('❌ Transaction failed');
@@ -174,9 +174,9 @@ async function runAllTests() {
   await testTransactionWithStockCheck();
 
   console.log('\n═'.repeat(50));
-  console.log('✅ All tests completed!');
+  console.log(' All tests completed!');
   console.log('═'.repeat(50));
-  console.log('\n📋 Summary:');
+  console.log('\n Summary:');
   console.log('  • User registration data should be in SQL database');
   console.log('  • Stock availability should check date overlaps');
   console.log('  • Transactions should block if stock unavailable');

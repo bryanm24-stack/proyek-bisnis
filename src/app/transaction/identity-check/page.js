@@ -259,7 +259,7 @@ function IdentityCheckContent() {
 
         <form onSubmit={handleSubmit} className="verification-form">
           <div className="form-section">
-            <h3>📋 Data Pribadi</h3>
+            <h3> Data Pribadi</h3>
             
             <div className="form-row">
               <div className="form-group">

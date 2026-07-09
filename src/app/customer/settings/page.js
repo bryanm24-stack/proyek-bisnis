@@ -401,25 +401,14 @@ export default function CustomerSettingsPage() {
                         style={{ width: '100%', minHeight: '120px', padding: '14px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '15px', resize: 'vertical' }}
                       />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '8px', color: '#475569', fontWeight: '600' }}>Kota</label>
-                        <input
-                          value={addressForm.city}
-                          onChange={(e) => setAddressForm((prev) => ({ ...prev, city: e.target.value }))}
-                          placeholder="Jakarta"
-                          style={{ width: '100%', padding: '14px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '15px' }}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '8px', color: '#475569', fontWeight: '600' }}>Provinsi</label>
-                        <input
-                          value={addressForm.province}
-                          onChange={(e) => setAddressForm((prev) => ({ ...prev, province: e.target.value }))}
-                          placeholder="DKI Jakarta"
-                          style={{ width: '100%', padding: '14px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '15px' }}
-                        />
-                      </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', color: '#475569', fontWeight: '600' }}>Kecamatan</label>
+                      <input
+                        value={addressForm.city}
+                        onChange={(e) => setAddressForm((prev) => ({ ...prev, city: e.target.value }))}
+                        placeholder="Contoh: Wonokromo"
+                        style={{ width: '100%', padding: '14px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '15px' }}
+                      />
                     </div>
                     <div>
                       <label style={{ display: 'block', marginBottom: '8px', color: '#475569', fontWeight: '600' }}>Kode Pos</label>

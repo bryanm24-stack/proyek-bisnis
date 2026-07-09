@@ -34,14 +34,10 @@ function normalizeServiceCapacity(service) {
   const parsedItems = parseJsonSafe(normalized.items, []);
   const parsedVariations = parseJsonSafe(normalized.variations, {});
 
-  const parsedRentGuardShipping = normalized.pengirimanRentguard;
-  const hasRentGuardShipping = parsedRentGuardShipping === true || parsedRentGuardShipping === 1 || parsedRentGuardShipping === '1' || parsedRentGuardShipping === 'true';
-
   if (normalized.type === 'jasa') {
     const capacity = Number(normalized.availableQuantity ?? normalized.availability ?? normalized.quantity ?? 0);
     return {
       ...normalized,
-      pengirimanRentguard: Boolean(hasRentGuardShipping),
       availableQuantity: capacity,
       availability: capacity,
       quantity: capacity,
@@ -57,7 +53,6 @@ function normalizeServiceCapacity(service) {
 
   return {
     ...normalized,
-    pengirimanRentguard: Boolean(hasRentGuardShipping),
     images: Array.isArray(parsedImages) ? parsedImages : [],
     specifications: parsedSpecifications,
     specificationOptions: parsedSpecificationOptions,
@@ -184,7 +179,7 @@ export async function POST(request) {
         quantity: normalizedQuantity,
         rental_policy: rentalPolicy || '',
         location,
-        pengiriman_rentguard: Boolean(body.pengirimanRentGuard),
+        pengiriman_rentguard: false,
         specifications: specifications && typeof specifications === 'object' ? specifications : {},
         specification_options: specificationOptions && typeof specificationOptions === 'object' ? specificationOptions : {},
         description_table: descriptionTable && typeof descriptionTable === 'object' ? descriptionTable : {},
@@ -221,7 +216,7 @@ export async function POST(request) {
         newService.quantity,
         newService.rental_policy,
         newService.location,
-        newService.pengiriman_rentguard ? 1 : 0,
+        0,
         JSON.stringify(newService.specifications),
         JSON.stringify(newService.specification_options),
         JSON.stringify(newService.description_table),
@@ -277,7 +272,6 @@ export async function PUT(request) {
       quantity,
       rentalPolicy,
       location,
-      pengirimanRentGuard,
       images,
       category,
       specifications,
@@ -330,7 +324,7 @@ export async function PUT(request) {
       rentalPolicy || service.rental_policy,
       location || service.location,
       type || service.type,
-      pengirimanRentGuard !== undefined ? (pengirimanRentGuard ? 1 : 0) : (service.pengiriman_rentguard ? 1 : 0),
+      0,
       JSON.stringify(images && images.length > 0 ? images : JSON.parse(service.images || '[]')),
       category || service.category,
       JSON.stringify(specifications || JSON.parse(service.specifications || '{}')),

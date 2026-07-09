@@ -11,12 +11,12 @@ const path = require('path');
 // Helper
 const normalizeId = (id) => String(id || '').trim();
 
-console.log('\n📋 ============================================');
+console.log('\n ============================================');
 console.log('🧪 TEST FIXES - RentGuard Platform');
 console.log('============================================\n');
 
 // ============= TEST 1: Late Charge Calculation =============
-console.log('✅ TEST 1: Late Charge Calculation Formula');
+console.log(' TEST 1: Late Charge Calculation Formula');
 console.log('─────────────────────────────────────────');
 
 // Scenario: 4-day rental @ 1,000,000, 2 days late
@@ -50,17 +50,17 @@ console.log(`\nNew (CORRECT): dailyRate = ${testScenario.totalPrice} / ${rentalD
 console.log(`New (CORRECT): lateCharge = ${testScenario.daysLate} × ${newDailyRate.toLocaleString('id-ID')} = ${newLateCharge.toLocaleString('id-ID')}`);
 
 const difference = newLateCharge - oldLateCharge;
-console.log(`\n💰 DIFFERENCE (Fix Impact): Rp ${difference.toLocaleString('id-ID')}`);
+console.log(`\n DIFFERENCE (Fix Impact): Rp ${difference.toLocaleString('id-ID')}`);
 console.log(`📈 Improvement: +${((difference / oldLateCharge) * 100).toFixed(1)}% for vendor`);
 
 if (difference > 0) {
-  console.log('✅ PASS: Late charge calculation is now CORRECT\n');
+  console.log(' PASS: Late charge calculation is now CORRECT\n');
 } else {
   console.log('❌ FAIL: Late charge calculation not improved\n');
 }
 
 // ============= TEST 2: Booking Creation =============
-console.log('✅ TEST 2: Booking Creation on Payment');
+console.log(' TEST 2: Booking Creation on Payment');
 console.log('─────────────────────────────────────────');
 
 const servicesPath = path.join(__dirname, 'services.json');
@@ -81,14 +81,14 @@ try {
   console.log(`Expected: Minimal 1 service dengan bookings untuk items yang sudah disewa`);
   
   if (bookingsFound >= 0) {
-    console.log('✅ PASS: Bookings array initialized for services\n');
+    console.log(' PASS: Bookings array initialized for services\n');
   }
 } catch (error) {
   console.log(`⚠️  WARNING: Could not check bookings: ${error.message}\n`);
 }
 
 // ============= TEST 3: Invoice Deduplication =============
-console.log('✅ TEST 3: Invoice Deduplication');
+console.log(' TEST 3: Invoice Deduplication');
 console.log('─────────────────────────────────────────');
 
 const invoicesPath = path.join(__dirname, 'invoices.json');
@@ -127,7 +127,7 @@ try {
   });
   
   if (duplicateCount === 0) {
-    console.log('✅ PASS: No duplicate invoices found\n');
+    console.log(' PASS: No duplicate invoices found\n');
   } else {
     console.log(`❌ FAIL: Found ${duplicateCount} duplicate invoices\n`);
   }
@@ -136,22 +136,22 @@ try {
 }
 
 // ============= SUMMARY =============
-console.log('📊 ============================================');
+console.log(' ============================================');
 console.log('   SUMMARY OF FIXES');
 console.log('============================================');
 console.log('');
-console.log('✅ FIX #1: Late Charge Calculation');
+console.log(' FIX #1: Late Charge Calculation');
 console.log('   Status: IMPLEMENTED');
 console.log('   File: src/app/api/returns/route.js (POST method)');
 console.log('   Change: Use rentalDays instead of hardcoded /5');
 console.log('   Impact: +20% late charge revenue for 4-day rentals');
 console.log('');
-console.log('✅ FIX #2: Booking Creation');
+console.log(' FIX #2: Booking Creation');
 console.log('   Status: VERIFIED (already implemented)');
 console.log('   File: src/app/api/transactions/route.js (POST method)');
 console.log('   Feature: Bookings created when payment successful');
 console.log('');
-console.log('✅ FIX #3: Invoice Deduplication');
+console.log(' FIX #3: Invoice Deduplication');
 console.log('   Status: IMPROVED with normalizeId');
 console.log('   File: src/app/api/invoices/route.js (GET method)');
 console.log('   Change: Added normalizeId for consistent ID matching');

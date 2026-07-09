@@ -19,7 +19,6 @@ function PaymentContent() {
   const [quantity, setQuantity] = useState(1);
   const [durationDays, setDurationDays] = useState(1);
   const [notes, setNotes] = useState('');
-  const [shippingAddress, setShippingAddress] = useState('');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [isLoading, setIsLoading] = useState(true);
   const [step, setStep] = useState('detail'); // 'detail' or 'payment'
@@ -363,11 +362,6 @@ function PaymentContent() {
       }
     }
 
-    if (service?.pengirimanRentguard && !shippingAddress.trim()) {
-      alert('Alamat lengkap pengiriman dan penjemputan wajib diisi untuk layanan Rent Guard.');
-      return;
-    }
-
     if (paymentMethod === 'card' && !validateCardDetails()) {
       return;
     }
@@ -434,7 +428,6 @@ function PaymentContent() {
         returnCondition: null,
         returnNotes: '',
         lastReminderSent: null,
-        shippingAddress: shippingAddress.trim() || null,
         identityVerification,
         promo: selectedPromo
           ? {
@@ -684,7 +677,7 @@ function PaymentContent() {
                           </div>
                           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px', fontSize: '12px', color: '#e2e8f0' }}>
                             <span>⏳ {formatPromoCountdown(selectedPromo.endAt) || 'Tanpa batas waktu'}</span>
-                            <span>👤 {Number.isFinite(Number(selectedPromo.remainingApplicants)) ? `${selectedPromo.remainingApplicants} kuota tersisa` : 'Kuota tidak dibatasi'}</span>
+                            <span> {Number.isFinite(Number(selectedPromo.remainingApplicants)) ? `${selectedPromo.remainingApplicants} kuota tersisa` : 'Kuota tidak dibatasi'}</span>
                           </div>
                         </div>
                       </>
@@ -937,22 +930,6 @@ function PaymentContent() {
                       <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Tambahkan catatan khusus untuk vendor..." style={{ width: '100%', border: '1px solid #ddd', borderRadius: '8px', padding: '12px', fontSize: '14px', fontFamily: 'inherit', minHeight: '80px', boxSizing: 'border-box' }} />
                     </div>
 
-                    {service?.pengirimanRentguard && (
-                      <div style={{ marginBottom: '20px', padding: '20px', border: '1px solid #e5e7eb', borderRadius: '12px', background: '#f8fafc' }}>
-                        <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', fontWeight: '700', color: '#1f2937' }}>🚚 Dukungan Pengiriman Rent Guard</h3>
-                        <p style={{ margin: '0 0 14px 0', fontSize: '14px', color: '#374151', lineHeight: '1.6' }}>
-                          Produk ini mendukung layanan antar-jemput Rent Guard. Isi alamat lengkap pengiriman dan penjemputan agar vendor dapat memproses jadwal pengiriman dengan benar.
-                        </p>
-                        <label style={{ fontSize: '14px', fontWeight: '600', display: 'block', marginBottom: '8px', color: '#1f2937' }}>Alamat Lengkap Pengiriman & Penjemputan</label>
-                        <textarea
-                          value={shippingAddress}
-                          onChange={(e) => setShippingAddress(e.target.value)}
-                          placeholder="Masukkan alamat lengkap pengiriman dan penjemputan"
-                          style={{ width: '100%', border: '1px solid #ddd', borderRadius: '8px', padding: '12px', fontSize: '14px', fontFamily: 'inherit', minHeight: '120px', boxSizing: 'border-box' }}
-                          required
-                        />
-                      </div>
-                    )}
                   </>
                 ) : null}
 

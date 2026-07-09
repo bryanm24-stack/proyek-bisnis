@@ -57,9 +57,9 @@ if (vendorChats.length === 0 && customerChats.length === 0) {
   console.log(`  - Displays: "Belum ada pesan"`);
   console.log(`  - PROBLEM: User should see ${apiResponse.length} chats!`);
 } else {
-  console.log(`  ✅ RESULT: ${vendorChats.length + customerChats.length} chats displayed`);
+  console.log(`   RESULT: ${vendorChats.length + customerChats.length} chats displayed`);
   console.log(`  - 🏪 Sebagai Vendor: ${vendorChats.length} chats`);
-  console.log(`  - 👤 Sebagai Customer: ${customerChats.length} chats`);
+  console.log(`  -  Sebagai Customer: ${customerChats.length} chats`);
 }
 
 // Analysis

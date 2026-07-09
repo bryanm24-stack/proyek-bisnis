@@ -200,7 +200,7 @@ export default function NotificationsPage() {
                 </button>
               )}
               <button className={styles['btn-delete-all']} onClick={handleDeleteAll}>
-                🗑️ Hapus Semua
+                Hapus Semua
               </button>
             </div>
           )}
@@ -230,9 +230,9 @@ export default function NotificationsPage() {
                 <div className={styles['notification-content']}>
                   <div className={styles['notification-header']}>
                     <div>
-                      <div className={styles['notification-type']}>{getNotificationTitle(notif.type)}</div>
+                      <div className={styles['notification-type']}>{getNotificationTitle(notif.type, notif.sender_name, notif.message_count)}</div>
                       <div className={styles['notification-time']}>
-                        {new Date(notif.created_at).toLocaleString('id-ID')}
+                        {new Date(notif.updated_at || notif.created_at).toLocaleString('id-ID')}
                       </div>
                     </div>
                     {!notif.is_read && <div className={styles['unread-badge']}>●</div>}

@@ -93,17 +93,17 @@ export default function SharedFooter() {
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {[
-                { label: '🏠 Home', href: '/' },
+                { label: ' Home', href: '/' },
                 ...(user?.role === 'vendor'
                   ? [
-                      { label: '📦 Barang/Jasa Saya', href: '/vendor/produk' },
-                      { label: '💬 Chat', href: '/vendor/chats' },
-                      { label: '📋 Invoice', href: '/vendor/invoices' }
+                      { label: ' Barang/Jasa Saya', href: '/vendor/produk' },
+                      { label: ' Chat', href: '/vendor/chats' },
+                      { label: ' Invoice', href: '/vendor/invoices' }
                     ]
                   : [
                       { label: '📝 Daftar Vendor', href: '/vendor/register' },
-                      { label: '💬 Chat', href: '/customer/chats' },
-                      { label: '📋 Invoice', href: '/customer/invoices' }
+                      { label: ' Chat', href: '/customer/chats' },
+                      { label: ' Invoice', href: '/customer/invoices' }
                     ])
               ].map((link, idx) => (
                 <Link
@@ -141,7 +141,7 @@ export default function SharedFooter() {
                 { label: '❓ FAQ', href: '#' },
                 { label: '📧 Hubungi Kami', href: 'mailto:support@rentguard.com' },
                 { label: '📞 Telepon', href: 'tel:+62800123456' },
-                { label: '📋 Kebijakan Privasi', href: '#' },
+                { label: ' Kebijakan Privasi', href: '#' },
                 { label: '⚖️ Syarat & Ketentuan', href: '#' }
               ].map((link, idx) => (
                 <a

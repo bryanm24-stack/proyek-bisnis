@@ -300,7 +300,7 @@ export default function VendorRegisterPage() {
                 </div>
 
                 <button type="submit" className="btn-primary" disabled={isSubmitting}>
-                  {isSubmitting ? 'Sedang memproses...' : '🔄 Submit Ulang'}
+                  {isSubmitting ? 'Sedang memproses...' : ' Submit Ulang'}
                 </button>
               </form>
             </>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import Link from 'next/link';
 import SharedNavbar from '@/app/components/SharedNavbar';
 import styles from './page.module.css';
@@ -176,7 +176,7 @@ export default function CustomerVerificationPage() {
       <SharedNavbar />
       <div className={styles.container}>
         <div className={styles.header}>
-        <h1>📋 Verifikasi Customer KTP</h1>
+        <h1> Verifikasi Customer KTP</h1>
         <p className={styles.subtitle}>Kelola dan verifikasi dokumen identitas customer</p>
       </div>
 
@@ -186,7 +186,7 @@ export default function CustomerVerificationPage() {
       {/* Summary Cards */}
       <div className={styles['summary-grid']}>
         <div className={`${styles['summary-card']} ${styles['card-pending']}`}>
-          <div className={styles['card-icon']}>⏳</div>
+          <div className={styles['card-icon']}></div>
           <div className={styles['card-content']}>
             <div className={styles['card-title']}>Menunggu Review</div>
             <div className={styles['card-value']}>{summaryData.pending}</div>
@@ -194,7 +194,7 @@ export default function CustomerVerificationPage() {
         </div>
 
         <div className={`${styles['summary-card']} ${styles['card-approved']}`}>
-          <div className={styles['card-icon']}>✅</div>
+          <div className={styles['card-icon']}></div>
           <div className={styles['card-content']}>
             <div className={styles['card-title']}>Disetujui</div>
             <div className={styles['card-value']}>{summaryData.approved}</div>
@@ -254,7 +254,7 @@ export default function CustomerVerificationPage() {
               </tr>
             </thead>
             <tbody>
-              {verifications.map((verification) => {
+              {verifications.map((verification, index) => {
                 const ktpData = parseKtpData(verification.ktp_data);
                 const verificationHistory = verification.ktp_verified_at
                   ? (verification.ktp_status === 'approved' ? 'Disetujui' : 'Ditolak')
@@ -263,7 +263,7 @@ export default function CustomerVerificationPage() {
                   : 'Belum ditinjau';
 
                 return (
-                  <>
+                  <Fragment key={`verification-${verification.id || index}`}>
                     <tr className={styles['table-row']}>
                       <td className={styles['cell-name']}>
                         <strong>{verification.name}</strong>
@@ -341,7 +341,7 @@ export default function CustomerVerificationPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>

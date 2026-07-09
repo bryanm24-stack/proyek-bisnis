@@ -34,7 +34,6 @@ export default function TambahProdukPage() {
     quantity: '',
     rentalPolicy: '',
     location: '',
-    pengirimanRentGuard: false,
     images: [],
     specifications: {},
     specificationOptions: {},
@@ -136,7 +135,6 @@ export default function TambahProdukPage() {
         checklist: formData.checklist || {},
         items: formData.items || [],
         variations: formData.variations || {},
-        pengirimanRentGuard: Boolean(formData.pengirimanRentGuard),
         // ✅ FIXED: Accept all valid image formats (base64, http, https, blob)
         images: (formData.images || [])
           .filter(img => typeof img === 'string' && (img.startsWith('data:') || img.startsWith('http') || img.startsWith('blob:')))
