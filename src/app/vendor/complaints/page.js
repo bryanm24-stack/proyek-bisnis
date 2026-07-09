@@ -73,6 +73,10 @@ export default function VendorComplaintsPage() {
       form.append('note', notesById[complaintId] || '');
       form.append('refundMethod', methodById[complaintId] || '');
       form.append('refundReference', referenceById[complaintId] || '');
+      form.append('refundMetadata', JSON.stringify({
+        selectedMethod: methodById[complaintId] || '',
+        refundReference: referenceById[complaintId] || ''
+      }));
       form.append('refundPaidAt', paidAtById[complaintId] || new Date().toISOString());
       form.append('refundProof', proofById[complaintId]);
 
@@ -130,11 +134,6 @@ export default function VendorComplaintsPage() {
                   <div><strong>Nominal refund:</strong> Rp {Number(complaint.refundAmount || 0).toLocaleString('id-ID')}</div>
                 </div>
 
-                <div style={{ padding: '14px', borderRadius: '14px', background: '#fff7ed', color: '#7c2d12', lineHeight: 1.5, marginBottom: '12px' }}>
-                  <strong>Instruksi admin:</strong><br />
-                  {complaint.adminNote || 'Admin belum menambahkan catatan detail. Gunakan nominal refund dan konteks complaint sebagai acuan.'}
-                </div>
-
                 {complaint.refundProofUrl && (
                   <div style={{ padding: '14px', borderRadius: '14px', background: '#f0fdf4', color: '#166534', lineHeight: 1.5, marginBottom: '12px' }}>
                     <strong>Refund sudah disubmit vendor.</strong><br />
@@ -177,21 +176,60 @@ export default function VendorComplaintsPage() {
 
                 {complaint.status === 'FORWARDED_TO_VENDOR' ? (
                   <div style={{ display: 'grid', gap: '12px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                      <input
-                        type="text"
-                        placeholder="Metode refund, contoh: Transfer BCA"
+                    <div style={{ display: 'grid', gap: '12px' }}>
+                      <select
                         value={methodById[complaint.id] || ''}
-                        onChange={(event) => setMethodById((prev) => ({ ...prev, [complaint.id]: event.target.value }))}
-                        style={{ borderRadius: '12px', border: '1px solid #cbd5e1', padding: '12px' }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Nomor referensi transfer"
-                        value={referenceById[complaint.id] || ''}
-                        onChange={(event) => setReferenceById((prev) => ({ ...prev, [complaint.id]: event.target.value }))}
-                        style={{ borderRadius: '12px', border: '1px solid #cbd5e1', padding: '12px' }}
-                      />
+                        onChange={(event) => {
+                          setMethodById((prev) => ({ ...prev, [complaint.id]: event.target.value }));
+                          if (event.target.value === 'Transfer Bank' && complaint.vendorAccountNumber) {
+                            setReferenceById((prev) => ({ ...prev, [complaint.id]: complaint.vendorAccountNumber }));
+                          } else if (event.target.value === 'Cash on Delivery (COD)') {
+                            setReferenceById((prev) => ({ ...prev, [complaint.id]: '' }));
+                          }
+                        }}
+                        style={{ borderRadius: '12px', border: '1px solid #cbd5e1', padding: '12px', background: '#fff' }}
+                      >
+                        <option value="">Pilih metode refund</option>
+                        <option value="Transfer Bank">Transfer Bank</option>
+                        <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
+                      </select>
+
+                      {methodById[complaint.id] === 'Transfer Bank' && complaint.vendorAccountNumber && (
+                        <div style={{ padding: '12px', borderRadius: '12px', background: '#ecfeff', border: '1px solid #bae6fd', color: '#0c4a6e' }}>
+                          <div style={{ fontWeight: '700', marginBottom: '8px' }}>📌 Data Rekening Bank Anda:</div>
+                          <div style={{ marginBottom: '6px' }}>
+                            <strong>Nomor Rekening:</strong> {complaint.vendorAccountNumber}
+                          </div>
+                          {complaint.vendorAccountHolder && (
+                            <div>
+                              <strong>Nama Pengirim:</strong> {complaint.vendorAccountHolder}
+                            </div>
+                          )}
+                          {complaint.vendorBankName && (
+                            <div>
+                              <strong>Bank:</strong> {complaint.vendorBankName}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {methodById[complaint.id] === 'Cash on Delivery (COD)' && (
+                        <div style={{ padding: '12px', borderRadius: '12px', background: '#fef3c7', border: '1px solid #fcd34d', color: '#92400e' }}>
+                          <div style={{ fontWeight: '700' }}>📍 Refund via Tunai saat COD</div>
+                          <div style={{ fontSize: '12px', marginTop: '4px' }}>Pembeli akan menerima uang tunai saat pengiriman.</div>
+                        </div>
+                      )}
+
+                      {methodById[complaint.id] === 'Transfer Bank' && (
+                        <input
+                          type="text"
+                          placeholder="Nomor referensi transfer (opsional - override nomor rekening di atas jika berbeda)"
+                          value={referenceById[complaint.id] || ''}
+                          onChange={(event) => setReferenceById((prev) => ({ ...prev, [complaint.id]: event.target.value }))}
+                          style={{ borderRadius: '12px', border: '1px solid #cbd5e1', padding: '12px' }}
+                        />
+                      )}
+
                       <input
                         type="datetime-local"
                         value={paidAtById[complaint.id] || ''}

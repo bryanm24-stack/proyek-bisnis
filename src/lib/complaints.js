@@ -44,6 +44,7 @@ export async function ensureComplaintsTable() {
       refund_amount DECIMAL(18,2) DEFAULT 0,
       refund_method VARCHAR(100),
       refund_reference VARCHAR(255),
+      refund_metadata TEXT,
       refund_proof_url TEXT,
       refund_paid_at DATETIME(3),
       admin_verified_at DATETIME(3),
@@ -79,8 +80,11 @@ export async function ensureComplaintsTable() {
   if (!columnNames.has('refund_reference')) {
     await query('ALTER TABLE complaints ADD COLUMN refund_reference VARCHAR(255) AFTER refund_method');
   }
+  if (!columnNames.has('refund_metadata')) {
+    await query('ALTER TABLE complaints ADD COLUMN refund_metadata TEXT AFTER refund_reference');
+  }
   if (!columnNames.has('refund_proof_url')) {
-    await query('ALTER TABLE complaints ADD COLUMN refund_proof_url TEXT AFTER refund_reference');
+    await query('ALTER TABLE complaints ADD COLUMN refund_proof_url TEXT AFTER refund_metadata');
   }
   if (!columnNames.has('refund_paid_at')) {
     await query('ALTER TABLE complaints ADD COLUMN refund_paid_at DATETIME(3) AFTER refund_proof_url');
@@ -235,6 +239,13 @@ export function isPaidTransactionContext(context) {
 
 export function mapComplaintRow(row) {
   if (!row) return null;
+  let refundMetadata = null;
+  try {
+    refundMetadata = row.refund_metadata ? JSON.parse(row.refund_metadata) : null;
+  } catch (error) {
+    refundMetadata = null;
+  }
+
   return {
     id: row.id,
     userId: row.user_id,
@@ -251,6 +262,7 @@ export function mapComplaintRow(row) {
     refundAmount: Number(row.refund_amount || 0),
     refundMethod: row.refund_method || '',
     refundReference: row.refund_reference || '',
+    refundMetadata,
     refundProofUrl: parseEvidenceUrl(row.refund_proof_url),
     customerAccountName: row.customer_account_name || '',
     customerAccountNumber: row.customer_account_number || '',
@@ -271,7 +283,13 @@ export function mapComplaintRow(row) {
     paymentStatus: row.payment_status || '',
     totalAmount: Number(row.total_amount || 0),
     serviceTitle: row.service_title || '',
-    serviceId: row.service_id || null
+    serviceId: row.service_id || null,
+    vendorBankName: row.vendor_bank_name || '',
+    vendorAccountNumber: row.vendor_account_number || '',
+    vendorAccountHolder: row.vendor_account_holder || '',
+    vendorAddress: row.vendor_address || '',
+    vendorCity: row.vendor_city || '',
+    vendorPostalCode: row.vendor_postal_code || ''
   };
 }
 
@@ -290,7 +308,13 @@ async function loadComplaintRowById(complaintId) {
        s.title AS service_title,
        s.id AS service_id,
        d.id AS deal_id,
-       i.id AS invoice_id
+       i.id AS invoice_id,
+       v.bankName AS vendor_bank_name,
+       v.accountNumber AS vendor_account_number,
+       v.accountHolder AS vendor_account_holder,
+       v.address AS vendor_address,
+       v.city AS vendor_city,
+       v.postalCode AS vendor_postal_code
      FROM complaints c
      LEFT JOIN users u ON u.id = c.user_id
      LEFT JOIN users v ON v.id = c.vendor_id
@@ -352,10 +376,10 @@ export async function createComplaintDraft({
     `INSERT INTO complaints (
       id, user_id, vendor_id, transaction_id, type, description, evidence_url, status,
       customer_account_name, customer_account_number, customer_bank_name,
-      admin_note, vendor_note, refund_amount, refund_method, refund_reference, refund_proof_url, 
+      admin_note, vendor_note, refund_amount, refund_method, refund_reference, refund_metadata, refund_proof_url,
       refund_paid_at, admin_verified_at, customer_confirmed_at, forwarded_at, vendor_processed_at,
       resolved_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       complaintId,
       String(userId),
@@ -371,6 +395,7 @@ export async function createComplaintDraft({
       adminNote || '',
       '',
       Number(refundAmount || 0),
+      null,
       null,
       null,
       null,
@@ -412,7 +437,13 @@ export async function listComplaintsForCustomer(userId) {
        s.title AS service_title,
        s.id AS service_id,
        d.id AS deal_id,
-       i.id AS invoice_id
+       i.id AS invoice_id,
+       v.bankName AS vendor_bank_name,
+       v.accountNumber AS vendor_account_number,
+       v.accountHolder AS vendor_account_holder,
+       v.address AS vendor_address,
+       v.city AS vendor_city,
+       v.postalCode AS vendor_postal_code
      FROM complaints c
      LEFT JOIN users u ON u.id = c.user_id
      LEFT JOIN users v ON v.id = c.vendor_id
@@ -443,7 +474,13 @@ export async function listComplaintsForAdmin() {
        s.title AS service_title,
        s.id AS service_id,
        d.id AS deal_id,
-       i.id AS invoice_id
+       i.id AS invoice_id,
+       v.bankName AS vendor_bank_name,
+       v.accountNumber AS vendor_account_number,
+       v.accountHolder AS vendor_account_holder,
+       v.address AS vendor_address,
+       v.city AS vendor_city,
+       v.postalCode AS vendor_postal_code
      FROM complaints c
      LEFT JOIN users u ON u.id = c.user_id
      LEFT JOIN users v ON v.id = c.vendor_id
@@ -472,7 +509,13 @@ export async function listComplaintsForVendor(vendorId) {
        s.title AS service_title,
        s.id AS service_id,
        d.id AS deal_id,
-       i.id AS invoice_id
+       i.id AS invoice_id,
+       v.bankName AS vendor_bank_name,
+       v.accountNumber AS vendor_account_number,
+       v.accountHolder AS vendor_account_holder,
+       v.address AS vendor_address,
+       v.city AS vendor_city,
+       v.postalCode AS vendor_postal_code
      FROM complaints c
      LEFT JOIN users u ON u.id = c.user_id
      LEFT JOIN users v ON v.id = c.vendor_id
@@ -498,6 +541,7 @@ export async function updateComplaintWorkflow({
   refundAmount,
   refundMethod = '',
   refundReference = '',
+  refundMetadata = null,
   refundProofUrl = '',
   refundPaidAt = null,
   verifiedRecipientName = '',
@@ -519,12 +563,11 @@ export async function updateComplaintWorkflow({
 
       await query(
         `UPDATE complaints
-         SET status = ?, admin_note = ?, refund_amount = ?, forwarded_at = ?, updated_at = ?
+         SET status = ?, refund_amount = ?, forwarded_at = ?, updated_at = ?
          WHERE id = ?`,
         [
           COMPLAINT_STATUSES.FORWARDED_TO_VENDOR,
-          String(note || '').trim(),
-          Number(refundAmount || current.refund_amount || 0),
+          Number(current.total_amount || 0),
           now,
           now,
           String(complaintId)
@@ -546,30 +589,11 @@ export async function updateComplaintWorkflow({
         throw new Error('Bukti refund vendor belum lengkap');
       }
 
-      const expectedRecipientName = String(current.customer_account_name || '').trim();
-      const expectedRecipientNumber = normalizeAccountNumber(current.customer_account_number);
-      const providedRecipientName = String(verifiedRecipientName || '').trim();
-      const providedRecipientNumber = normalizeAccountNumber(verifiedRecipientAccountNumber);
-
-      if (!expectedRecipientName || !expectedRecipientNumber) {
-        throw new Error('Data rekening customer belum lengkap, admin tidak dapat melakukan verifikasi akhir');
-      }
-      if (!providedRecipientName || !providedRecipientNumber) {
-        throw new Error('Nama penerima dan nomor rekening tujuan refund wajib diisi untuk verifikasi admin');
-      }
-
-      if (normalizePersonName(providedRecipientName) !== normalizePersonName(expectedRecipientName)) {
-        throw new Error('Nama penerima refund tidak sesuai dengan nama rekening customer');
-      }
-      if (providedRecipientNumber !== expectedRecipientNumber) {
-        throw new Error('Nomor rekening tujuan refund tidak sesuai dengan data customer');
-      }
-
       await query(
         `UPDATE complaints
-         SET status = ?, admin_note = ?, admin_verified_at = ?, resolved_at = ?, updated_at = ?
+         SET status = ?, resolved_at = ?, updated_at = ?
          WHERE id = ?`,
-        [COMPLAINT_STATUSES.RESOLVED, String(note || current.admin_note || '').trim(), now, now, now, String(complaintId)]
+        [COMPLAINT_STATUSES.RESOLVED, now, now, String(complaintId)]
       );
 
       await createNotification(
@@ -625,6 +649,18 @@ export async function updateComplaintWorkflow({
     const normalizedRefundReference = String(refundReference || '').trim();
     const normalizedRefundProofUrl = parseEvidenceUrl(refundProofUrl);
     const normalizedRefundPaidAt = refundPaidAt ? new Date(refundPaidAt).toISOString() : now;
+    let normalizedRefundMetadata = null;
+    if (refundMetadata) {
+      if (typeof refundMetadata === 'string') {
+        try {
+          normalizedRefundMetadata = JSON.stringify(JSON.parse(refundMetadata));
+        } catch {
+          normalizedRefundMetadata = JSON.stringify({ value: String(refundMetadata) });
+        }
+      } else {
+        normalizedRefundMetadata = JSON.stringify(refundMetadata);
+      }
+    }
 
     if (!normalizedRefundMethod) {
       throw new Error('Metode refund wajib diisi vendor');
@@ -635,26 +671,20 @@ export async function updateComplaintWorkflow({
 
     await query(
       `UPDATE complaints
-       SET status = ?, vendor_note = ?, refund_method = ?, refund_reference = ?, refund_proof_url = ?, refund_paid_at = ?, vendor_processed_at = ?, updated_at = ?
+       SET status = ?, vendor_note = ?, refund_method = ?, refund_reference = ?, refund_metadata = ?, refund_proof_url = ?, refund_paid_at = ?, vendor_processed_at = ?, updated_at = ?
        WHERE id = ?`,
       [
         COMPLAINT_STATUSES.REFUND_PROCESSED,
         String(note || '').trim(),
         normalizedRefundMethod,
         normalizedRefundReference || null,
+        normalizedRefundMetadata,
         normalizedRefundProofUrl,
         normalizedRefundPaidAt,
         now,
         now,
         String(complaintId)
       ]
-    );
-
-    await notifyAdmins(
-      'complaint_vendor_processed',
-      'Vendor telah mengirim bukti pembayaran refund untuk complaint.',
-      complaintId,
-      { complaintId, transactionId: current.transaction_id, vendorId: current.vendor_id }
     );
 
     await createNotification(

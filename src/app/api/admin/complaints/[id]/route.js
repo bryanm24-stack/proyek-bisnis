@@ -42,6 +42,7 @@ export async function PATCH(request, { params }) {
         refundAmount: form.get('refundAmount') || 0,
         refundMethod: form.get('refundMethod') || '',
         refundReference: form.get('refundReference') || '',
+        refundMetadata: form.get('refundMetadata') || null,
         refundPaidAt: form.get('refundPaidAt') || '',
         verifiedRecipientName: form.get('verifiedRecipientName') || '',
         verifiedRecipientAccountNumber: form.get('verifiedRecipientAccountNumber') || '',
