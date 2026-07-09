@@ -39,6 +39,15 @@ function mapInvoiceRow(row) {
     vendorName: row.vendor_name || 'Vendor',
     serviceTitle: row.service_title || 'Item sewa',
     serviceImage: row.service_image || '',
+    startDate: row.start_date || null,
+    installment1Amount: row.installment_1_amount ? toNumber(row.installment_1_amount) : null,
+    installment1DueDate: row.installment_1_due_date || null,
+    installment2Amount: row.installment_2_amount ? toNumber(row.installment_2_amount) : null,
+    installment2DueDate: row.installment_2_due_date || null,
+    installment3Amount: row.installment_3_amount ? toNumber(row.installment_3_amount) : null,
+    installment3DueDate: row.installment_3_due_date || null,
+    vendorDiscount: row.vendor_discount ? toNumber(row.vendor_discount) : 0,
+    vendorDiscountReason: row.vendor_discount_reason || null,
     quantity,
     durationDays,
     basePrice,
@@ -63,6 +72,7 @@ export async function GET(request) {
     const searchParams = request.nextUrl.searchParams;
     const customerId = searchParams.get('customerId');
     const vendorId = searchParams.get('vendorId');
+    const transactionId = searchParams.get('transactionId');
     const statusRaw = searchParams.get('status');
     const status = statusRaw && statusRaw !== 'all' ? statusRaw : null;
 
@@ -76,6 +86,10 @@ export async function GET(request) {
     if (vendorId) {
       conditions.push('i.vendor_id = ?');
       params.push(String(vendorId));
+    }
+    if (transactionId) {
+      conditions.push('(i.transaction_id = ? OR i.payment_transaction_id = ?)');
+      params.push(String(transactionId), String(transactionId));
     }
     if (status) {
       conditions.push('i.status = ?');
@@ -95,12 +109,21 @@ export async function GET(request) {
            ''
          ) AS service_image,
          t.base_price,
+         t.start_date,
          t.quantity,
          t.duration_days,
          t.service_fee,
          t.total_amount AS tx_total_amount,
         t.status AS transaction_status,
          t.promo_id,
+         t.installment_1_amount,
+         t.installment_1_due_date,
+         t.installment_2_amount,
+         t.installment_2_due_date,
+         t.installment_3_amount,
+         t.installment_3_due_date,
+         t.vendor_discount,
+         t.vendor_discount_reason,
          p.title AS promo_title,
          p.promo_price
        FROM invoices i

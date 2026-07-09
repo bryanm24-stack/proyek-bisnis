@@ -185,6 +185,21 @@
     qr_code VARCHAR(255),
     identity_verification JSON,
     shipping_address TEXT,
+    payment_type VARCHAR(50),
+    installment_1_amount DECIMAL(18,2),
+    installment_1_due_date DATE,
+    installment_1_status VARCHAR(50) DEFAULT 'pending',
+    installment_1_paid_at DATETIME(3),
+    installment_2_amount DECIMAL(18,2),
+    installment_2_due_date DATE,
+    installment_2_status VARCHAR(50) DEFAULT 'pending',
+    installment_2_paid_at DATETIME(3),
+    installment_3_amount DECIMAL(18,2),
+    installment_3_due_date DATE,
+    installment_3_status VARCHAR(50) DEFAULT 'pending',
+    installment_3_paid_at DATETIME(3),
+    vendor_discount DECIMAL(18,2) DEFAULT 0,
+    vendor_discount_reason VARCHAR(255),
     created_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3)
   );
 
@@ -535,8 +550,226 @@
   ('notif_1777493759509','3','deal_pending','Ada penawaran baru dari customer','1777493750510', '{"customerId":"4","serviceId":"svc-d93b7e16"}', false, '2026-04-29 20:15:59.509'),
   ('notif_1777493805417','4','deal_accepted','Vendor menerima penawaran Anda!','1777493750510', '{"vendorId":"3","serviceId":"svc-d93b7e16"}', false, '2026-04-29 20:16:45.417'),
   ('notif_1777493820734','2','deal_discount_applied','Vendor memberikan diskon. Harga akhir: Rp 40.000','1777493750510', '{"vendorId":"3","serviceId":"svc-d93b7e16","finalPrice":40000,"amount":10000}', false, '2026-04-29 20:17:00.734'),
-  ('notif_1777493820785','2','deal_discount_applied','Vendor memberikan diskon. Harga akhir: Rp 40.000','1777493750510', '{"vendorId":"3","serviceId":"svc-d93b7e16","finalPrice":40000,"amount":10000}', false, '2026-04-29 20:17:00.785')
-  ;
+  ('notif_1777493820785','2','deal_discount_applied','Vendor memberikan diskon. Harga akhir: Rp 40.000','1777493750510', '{"vendorId":"3","serviceId":"svc-d93b7e16","finalPrice":40000,"amount":10000}', false, '2026-04-29 20:17:00.785');
+
+  -- ===============================================
+  -- MIGRATION SCRIPT: Database Schema Upgrade v2
+  -- Purpose: Add installment payment tracking columns
+  -- Run this if upgrading an existing rent_guard database
+  -- ===============================================
+  
+  -- Migration: Check if columns already exist and add them if needed
+  SET @db_name = DATABASE();
+  
+  -- Add payment_type column
+  SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'transactions' AND COLUMN_NAME = 'payment_type'
+  );
+  
+  SET @sql = IF(@column_exists = 0, 
+    'ALTER TABLE transactions ADD COLUMN payment_type VARCHAR(50) AFTER shipping_address',
+    'SELECT "Column payment_type already exists"'
+  );
+  PREPARE stmt FROM @sql;
+  EXECUTE stmt;
+  DEALLOCATE PREPARE stmt;
+  
+  -- Add installment_1_amount column
+  SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'transactions' AND COLUMN_NAME = 'installment_1_amount'
+  );
+  
+  SET @sql = IF(@column_exists = 0, 
+    'ALTER TABLE transactions ADD COLUMN installment_1_amount DECIMAL(18,2) AFTER payment_type',
+    'SELECT "Column installment_1_amount already exists"'
+  );
+  PREPARE stmt FROM @sql;
+  EXECUTE stmt;
+  DEALLOCATE PREPARE stmt;
+  
+  -- Add installment_1_due_date column
+  SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'transactions' AND COLUMN_NAME = 'installment_1_due_date'
+  );
+  
+  SET @sql = IF(@column_exists = 0, 
+    'ALTER TABLE transactions ADD COLUMN installment_1_due_date DATE AFTER installment_1_amount',
+    'SELECT "Column installment_1_due_date already exists"'
+  );
+  PREPARE stmt FROM @sql;
+  EXECUTE stmt;
+  DEALLOCATE PREPARE stmt;
+  
+  -- Add installment_1_status column
+  SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'transactions' AND COLUMN_NAME = 'installment_1_status'
+  );
+  
+  SET @sql = IF(@column_exists = 0, 
+    'ALTER TABLE transactions ADD COLUMN installment_1_status VARCHAR(50) DEFAULT "pending" AFTER installment_1_due_date',
+    'SELECT "Column installment_1_status already exists"'
+  );
+  PREPARE stmt FROM @sql;
+  EXECUTE stmt;
+  DEALLOCATE PREPARE stmt;
+  
+  -- Add installment_1_paid_at column
+  SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'transactions' AND COLUMN_NAME = 'installment_1_paid_at'
+  );
+  
+  SET @sql = IF(@column_exists = 0, 
+    'ALTER TABLE transactions ADD COLUMN installment_1_paid_at DATETIME(3) AFTER installment_1_status',
+    'SELECT "Column installment_1_paid_at already exists"'
+  );
+  PREPARE stmt FROM @sql;
+  EXECUTE stmt;
+  DEALLOCATE PREPARE stmt;
+  
+  -- Add installment_2_amount column
+  SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'transactions' AND COLUMN_NAME = 'installment_2_amount'
+  );
+  
+  SET @sql = IF(@column_exists = 0, 
+    'ALTER TABLE transactions ADD COLUMN installment_2_amount DECIMAL(18,2) AFTER installment_1_paid_at',
+    'SELECT "Column installment_2_amount already exists"'
+  );
+  PREPARE stmt FROM @sql;
+  EXECUTE stmt;
+  DEALLOCATE PREPARE stmt;
+  
+  -- Add installment_2_due_date column
+  SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'transactions' AND COLUMN_NAME = 'installment_2_due_date'
+  );
+  
+  SET @sql = IF(@column_exists = 0, 
+    'ALTER TABLE transactions ADD COLUMN installment_2_due_date DATE AFTER installment_2_amount',
+    'SELECT "Column installment_2_due_date already exists"'
+  );
+  PREPARE stmt FROM @sql;
+  EXECUTE stmt;
+  DEALLOCATE PREPARE stmt;
+  
+  -- Add installment_2_status column
+  SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'transactions' AND COLUMN_NAME = 'installment_2_status'
+  );
+  
+  SET @sql = IF(@column_exists = 0, 
+    'ALTER TABLE transactions ADD COLUMN installment_2_status VARCHAR(50) DEFAULT "pending" AFTER installment_2_due_date',
+    'SELECT "Column installment_2_status already exists"'
+  );
+  PREPARE stmt FROM @sql;
+  EXECUTE stmt;
+  DEALLOCATE PREPARE stmt;
+  
+  -- Add installment_2_paid_at column
+  SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'transactions' AND COLUMN_NAME = 'installment_2_paid_at'
+  );
+  
+  SET @sql = IF(@column_exists = 0, 
+    'ALTER TABLE transactions ADD COLUMN installment_2_paid_at DATETIME(3) AFTER installment_2_status',
+    'SELECT "Column installment_2_paid_at already exists"'
+  );
+  PREPARE stmt FROM @sql;
+  EXECUTE stmt;
+  DEALLOCATE PREPARE stmt;
+  
+  -- Add installment_3_amount column
+  SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'transactions' AND COLUMN_NAME = 'installment_3_amount'
+  );
+  
+  SET @sql = IF(@column_exists = 0, 
+    'ALTER TABLE transactions ADD COLUMN installment_3_amount DECIMAL(18,2) AFTER installment_2_paid_at',
+    'SELECT "Column installment_3_amount already exists"'
+  );
+  PREPARE stmt FROM @sql;
+  EXECUTE stmt;
+  DEALLOCATE PREPARE stmt;
+  
+  -- Add installment_3_due_date column
+  SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'transactions' AND COLUMN_NAME = 'installment_3_due_date'
+  );
+  
+  SET @sql = IF(@column_exists = 0, 
+    'ALTER TABLE transactions ADD COLUMN installment_3_due_date DATE AFTER installment_3_amount',
+    'SELECT "Column installment_3_due_date already exists"'
+  );
+  PREPARE stmt FROM @sql;
+  EXECUTE stmt;
+  DEALLOCATE PREPARE stmt;
+  
+  -- Add installment_3_status column
+  SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'transactions' AND COLUMN_NAME = 'installment_3_status'
+  );
+  
+  SET @sql = IF(@column_exists = 0, 
+    'ALTER TABLE transactions ADD COLUMN installment_3_status VARCHAR(50) DEFAULT "pending" AFTER installment_3_due_date',
+    'SELECT "Column installment_3_status already exists"'
+  );
+  PREPARE stmt FROM @sql;
+  EXECUTE stmt;
+  DEALLOCATE PREPARE stmt;
+  
+  -- Add installment_3_paid_at column
+  SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'transactions' AND COLUMN_NAME = 'installment_3_paid_at'
+  );
+  
+  SET @sql = IF(@column_exists = 0, 
+    'ALTER TABLE transactions ADD COLUMN installment_3_paid_at DATETIME(3) AFTER installment_3_status',
+    'SELECT "Column installment_3_paid_at already exists"'
+  );
+  PREPARE stmt FROM @sql;
+  EXECUTE stmt;
+  DEALLOCATE PREPARE stmt;
+  
+  -- Add vendor_discount column
+  SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'transactions' AND COLUMN_NAME = 'vendor_discount'
+  );
+  
+  SET @sql = IF(@column_exists = 0, 
+    'ALTER TABLE transactions ADD COLUMN vendor_discount DECIMAL(18,2) DEFAULT 0 AFTER installment_3_paid_at',
+    'SELECT "Column vendor_discount already exists"'
+  );
+  PREPARE stmt FROM @sql;
+  EXECUTE stmt;
+  DEALLOCATE PREPARE stmt;
+  
+  -- Add vendor_discount_reason column
+  SET @column_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'transactions' AND COLUMN_NAME = 'vendor_discount_reason'
+  );
+  
+  SET @sql = IF(@column_exists = 0, 
+    'ALTER TABLE transactions ADD COLUMN vendor_discount_reason VARCHAR(255) AFTER vendor_discount',
+    'SELECT "Column vendor_discount_reason already exists"'
+  );
+  PREPARE stmt FROM @sql;
+  EXECUTE stmt;
+  DEALLOCATE PREPARE stmt;
 
   -- RATINGS
   INSERT IGNORE INTO ratings (id, service_id, customer_id, vendor_id, rating, review, created_at) VALUES

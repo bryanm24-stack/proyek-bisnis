@@ -14,6 +14,7 @@ function SuccessContent() {
 
   const [user, setUser] = useState(null);
   const [transaction, setTransaction] = useState(null);
+  const [invoice, setInvoice] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -26,21 +27,49 @@ function SuccessContent() {
     const parsedUser = JSON.parse(userData);
     setUser(parsedUser);
 
-    // Fetch transaction data
+    // ✅ NEW: Fetch transaction data with better error handling
     const fetchTransactionData = async () => {
       try {
-        const response = await fetch('/api/transactions');
-        const transactions = await response.json();
-        const currentTransaction = transactions.find(t => t.id === transactionId);
-        setTransaction(currentTransaction);
+        if (!transactionId) {
+          setIsLoading(false);
+          return;
+        }
+
+        // Try to fetch from API with transactionId parameter
+        const response = await fetch(`/api/transactions?id=${transactionId}`);
+        if (response.ok) {
+          const data = await response.json();
+          // Handle both direct object and array response
+          const txn = Array.isArray(data) ? data.find(t => t.id === transactionId) : data;
+          setTransaction(txn || null);
+        } else {
+          console.error('Failed to fetch transaction:', response.status);
+        }
       } catch (error) {
         console.error('Error fetching transaction:', error);
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchTransactionData();
+
+    // Also try to fetch invoice by transactionId (if invoice exists)
+    const fetchInvoice = async () => {
+      try {
+        if (!transactionId) return;
+        const resp = await fetch(`/api/invoices?transactionId=${transactionId}`);
+        if (resp.ok) {
+          const invs = await resp.json();
+          // invoices API returns array mapped via mapInvoiceRow
+          const inv = Array.isArray(invs) ? invs.find(i => i.transactionId === transactionId || i.paymentTransactionId === transactionId) : invs;
+          setInvoice(inv || null);
+        }
+      } catch (err) {
+        console.error('Error fetching invoice:', err);
+      }
+    };
+
+    fetchInvoice();
   }, [router, transactionId]);
 
   const getPaymentMethodLabel = (method) => {
@@ -52,10 +81,25 @@ function SuccessContent() {
     return labels[method] || method;
   };
 
-  const serviceFee = transaction?.serviceFee || 1000;
-  const totalAmount = transaction?.totalAmount || ((transaction?.amount || 0) + serviceFee);
+  // Normalize fields from API (snake_case) to expected camelCase
+  const paymentType = transaction?.paymentType || transaction?.payment_type || null;
+  const paymentMethod = transaction?.paymentMethod || transaction?.payment_method || null;
+  // Prefer invoice values if available
+  const serviceFee = (invoice?.serviceFee ?? invoice?.serviceFee) || transaction?.serviceFee || transaction?.service_fee || 1000;
+  const totalAmount = invoice?.totalAmount || invoice?.totalAmount || transaction?.totalAmount || transaction?.total_amount || ((transaction?.amount || 0) + serviceFee);
+  const timestamp = transaction?.timestamp || transaction?.created_at || null;
+  const status = transaction?.status || transaction?.status || 'pending';
   const invoicePath = user?.role === 'vendor' ? '/vendor/invoices' : '/customer/invoices';
   const chatPath = user?.role === 'vendor' ? '/vendor/chats' : '/customer/chats';
+
+  // Derived display values (prefer invoice, then transaction, then computed)
+  const displayStartDate = invoice?.startDate || transaction?.start_date || null;
+  const displayDuration = invoice?.durationDays || transaction?.duration_days || null;
+  const displayInstallment3Due = invoice?.installment3DueDate || transaction?.installment_3_due_date || null;
+  const computedExpectedReturn = displayStartDate && displayDuration ? (() => { const d = new Date(displayStartDate); d.setDate(d.getDate() + (Math.max(1, Number(displayDuration)) - 1)); return d; })() : null;
+  const expectedReturnDateObj = displayInstallment3Due ? new Date(displayInstallment3Due) : computedExpectedReturn;
+  const expectedReturnLabel = expectedReturnDateObj ? expectedReturnDateObj.toLocaleDateString('id-ID') : '-';
+  const vendorDiscountValue = invoice?.vendorDiscount ?? transaction?.vendor_discount ?? 0;
 
   if (isLoading) {
     return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>;
@@ -90,19 +134,37 @@ function SuccessContent() {
             {transaction?.quantity && (
               <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid #ddd' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ color: '#6b7280' }}>Harga per {transaction.quantityType}</span>
-                  <span style={{ fontWeight: '600', color: '#1f2937' }}>Rp{transaction?.basePrice?.toLocaleString('id-ID') || '0'}</span>
+                  <span style={{ color: '#6b7280' }}>Harga per {transaction?.quantityType || invoice?.quantityType || 'Unit'}</span>
+                  <span style={{ fontWeight: '600', color: '#1f2937' }}>Rp{(transaction?.basePrice || invoice?.basePrice || 0).toLocaleString('id-ID')}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ color: '#6b7280' }}>Jumlah {transaction.quantityType}</span>
-                  <span style={{ fontWeight: '600', color: '#1f2937' }}>{transaction.quantity} {transaction.quantityType}</span>
+                    <span style={{ color: '#6b7280' }}>Jumlah {transaction?.quantityType || invoice?.quantityType || 'Unit'}</span>
+                    <span style={{ fontWeight: '600', color: '#1f2937' }}>{transaction?.quantity || invoice?.quantity || 1} {transaction?.quantityType || invoice?.quantityType || 'Unit'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#1f2937', fontWeight: '600' }}>Subtotal</span>
-                  <span style={{ fontWeight: '700', color: '#22c55e' }}>Rp{transaction?.amount?.toLocaleString('id-ID') || '0'}</span>
+                    <span style={{ color: '#1f2937', fontWeight: '600' }}>Subtotal</span>
+                    <span style={{ fontWeight: '700', color: '#22c55e' }}>Rp{(transaction?.amount || invoice?.discountedSubtotal || 0).toLocaleString('id-ID')}</span>
                 </div>
               </div>
             )}
+
+            {/* Move Biaya Layanan below the Total as requested */}
+
+            {/* ✅ NEW: Display vendor discount if exists */}
+            {((invoice && invoice.vendorDiscount > 0) || (transaction?.vendor_discount && transaction.vendor_discount > 0)) && (
+              <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid #ddd' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#6b7280' }}>Diskon Dari Vendor</span>
+                  <span style={{ fontWeight: '600', color: '#22c55e' }}>{vendorDiscountValue ? `-Rp${Number(vendorDiscountValue).toLocaleString('id-ID')}` : '-Rp0'}</span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#6b7280' }}>{invoice?.vendorDiscountReason || transaction?.vendor_discount_reason || ''}</div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <span style={{ fontWeight: '700', color: '#1f2937', fontSize: '16px' }}>Total Pembayaran</span>
+              <span style={{ fontWeight: '700', color: '#22c55e', fontSize: '24px' }}>Rp{totalAmount.toLocaleString('id-ID')}</span>
+            </div>
 
             <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid #ddd' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -111,26 +173,61 @@ function SuccessContent() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <span style={{ fontWeight: '700', color: '#1f2937', fontSize: '16px' }}>Total Pembayaran</span>
-              <span style={{ fontWeight: '700', color: '#22c55e', fontSize: '24px' }}>Rp{totalAmount.toLocaleString('id-ID')}</span>
-            </div>
+            {/* ✅ NEW: Display Pay After installment details */}
+            {(paymentType === 'pay_after' || transaction?.payment_type === 'pay_after') && (
+              <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid #ddd', background: '#fffbeb', padding: '12px', borderRadius: '6px' }}>
+                <p style={{ fontSize: '14px', fontWeight: '700', color: '#92400e', marginBottom: '12px' }}>📋 Rincian Cicilan 3 Tahap:</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
+                  {transaction?.installment_1_amount && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                      <span style={{ color: '#6b7280' }}>
+                        Stage 1 (DP) - {transaction?.installment_1_due_date ? new Date(transaction.installment_1_due_date).toLocaleDateString('id-ID') : 'Hari ini'}
+                      </span>
+                      <span style={{ fontWeight: '600', color: '#22c55e' }}>Rp{Number(transaction.installment_1_amount).toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
+                  {transaction?.installment_2_amount && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                      <span style={{ color: '#6b7280' }}>
+                        Stage 2 (Mid) - {transaction?.installment_2_due_date ? new Date(transaction.installment_2_due_date).toLocaleDateString('id-ID') : 'Tgl pinjam (tengah hari)'}
+                      </span>
+                      <span style={{ fontWeight: '600', color: '#f59e0b' }}>Rp{Number(transaction.installment_2_amount).toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
+                  {transaction?.installment_3_amount && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                      <span style={{ color: '#6b7280' }}>
+                        Stage 3 (Final) - {transaction?.installment_3_due_date ? new Date(transaction.installment_3_due_date).toLocaleDateString('id-ID') : 'Saat pengembalian'}
+                      </span>
+                      <span style={{ fontWeight: '600', color: '#8b5cf6' }}>Rp{Number(transaction.installment_3_amount).toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
+            {/* Dates and status */}
             <div style={{ paddingTop: '12px', borderTop: '1px solid #ddd' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ color: '#6b7280' }}>Tanggal Sewa</span>
+                <span style={{ fontWeight: '600', color: '#1f2937' }}>{displayStartDate ? new Date(displayStartDate).toLocaleDateString('id-ID') : '-'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ color: '#6b7280' }}>Estimasi Kembali</span>
+                <span style={{ fontWeight: '600', color: '#1f2937' }}>{expectedReturnLabel}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <span style={{ color: '#6b7280' }}>Metode Pembayaran</span>
-                <span style={{ fontWeight: '600', color: '#1f2937' }}>{getPaymentMethodLabel(transaction?.paymentMethod)}</span>
+                <span style={{ fontWeight: '600', color: '#1f2937' }}>{getPaymentMethodLabel(invoice?.paymentMethod || paymentMethod)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <span style={{ color: '#6b7280' }}>Tanggal & Waktu</span>
-                <span style={{ fontWeight: '600', color: '#1f2937' }}>
-                  {transaction?.timestamp ? new Date(transaction.timestamp).toLocaleString('id-ID') : 'N/A'}
-                </span>
+                <span style={{ fontWeight: '600', color: '#1f2937' }}>{(invoice?.createdAt || timestamp) ? new Date(invoice?.createdAt || timestamp).toLocaleString('id-ID') : 'N/A'}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#6b7280' }}>Status</span>
                 <span style={{ fontWeight: '600', color: '#22c55e', background: '#f0fdf4', padding: '4px 12px', borderRadius: '20px', fontSize: '13px' }}>
-                  ✓ {transaction?.status === 'success' ? 'Berhasil' : 'Pending'}
+                  ✓ {status === 'success' ? 'Berhasil' : (status === 'pending' ? 'Pending' : status)}
                 </span>
               </div>
             </div>

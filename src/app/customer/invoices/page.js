@@ -422,6 +422,14 @@ export default function CustomerInvoicesPage() {
                           <span style={{ color: '#666' }}>Subtotal:</span>
                           <strong>{formatCurrency(invoice.discountedSubtotal || invoice.basePrice || 0)}</strong>
                         </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: '#666' }}>Tanggal Sewa:</span>
+                          <strong>{formatDate(invoice.startDate)}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: '#666' }}>Estimasi Kembali:</span>
+                          <strong>{formatDate(invoice.installment3DueDate || invoice.startDate ? (() => { const d = new Date(invoice.installment3DueDate || invoice.startDate); return d.setDate ? new Date(d).toLocaleDateString('id-ID') : 'N/A'; })() : null)}</strong>
+                        </div>
                         {Number(invoice.discountAmount || 0) > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: '#666' }}>Diskon:</span>
@@ -432,6 +440,23 @@ export default function CustomerInvoicesPage() {
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: '#666' }}>Biaya Layanan:</span>
                             <strong>{formatCurrency(invoice.serviceFee)}</strong>
+                          </div>
+                        )}
+                        {/* Show installment breakdown if present */}
+                        {(invoice.installment1Amount || invoice.installment2Amount || invoice.installment3Amount) && (
+                          <div style={{ marginTop: '6px', borderTop: '1px dashed #eee', paddingTop: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: '#666' }}>Stage 1 (DP)</span>
+                              <strong>{invoice.installment1Amount ? formatCurrency(invoice.installment1Amount) : '-'}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: '#666' }}>Stage 2 (Mid)</span>
+                              <strong>{invoice.installment2Amount ? formatCurrency(invoice.installment2Amount) : '-'}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: '#666' }}>Stage 3 (Final)</span>
+                              <strong>{invoice.installment3Amount ? formatCurrency(invoice.installment3Amount) : '-'}</strong>
+                            </div>
                           </div>
                         )}
                         {invoice.promo?.code && (

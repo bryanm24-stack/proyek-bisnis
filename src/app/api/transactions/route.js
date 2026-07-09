@@ -377,7 +377,40 @@ export async function POST(request) {
 
     const computedServiceFee = isPromoFlow ? 0 : Math.max(0, Math.round(computedSubtotal * 0.05));
     const computedTotalAmount = isPromoFlow ? computedSubtotal : (computedSubtotal + computedServiceFee);
-    const computedDownPayment = isPromoFlow ? null : Math.round(computedTotalAmount * 0.2);
+    
+    // ✅ NEW: 3-Stage Installment Calculation
+    const computedInstallment1Amount = isPromoFlow ? null : Math.round(computedTotalAmount * 0.30);
+    const computedInstallment2Amount = isPromoFlow ? null : Math.round(computedTotalAmount * 0.40);
+    const computedInstallment3Amount = isPromoFlow ? null : (computedTotalAmount - computedInstallment1Amount - computedInstallment2Amount);
+    
+    // Calculate due dates for installments
+    const today = toDateOnly(new Date());
+    let computedInstallment1DueDate = null;
+    let computedInstallment2DueDate = null;
+    let computedInstallment3DueDate = null;
+    
+    if (!isPromoFlow) {
+      computedInstallment1DueDate = today; // Stage 1 is due today
+      
+      if (body.startDate) {
+        // Stage 2 should be the middle day of the rental period.
+        // Use offset = floor(requestedDurationDays / 2)
+        const stage2Date = new Date(body.startDate);
+        const offset = Math.floor(Math.max(1, Number(requestedDurationDays || 1)) / 2);
+        stage2Date.setDate(stage2Date.getDate() + offset);
+        computedInstallment2DueDate = toDateOnly(stage2Date);
+      }
+      
+      if (body.startDate && requestedDurationDays) {
+        const stage3Date = new Date(body.startDate);
+        // Expected return should be start + (durationDays - 1)
+        const days = Math.max(1, Number(requestedDurationDays || 1));
+        stage3Date.setDate(stage3Date.getDate() + (days - 1));
+        computedInstallment3DueDate = toDateOnly(stage3Date);
+      }
+    }
+    
+    const computedDownPayment = isPromoFlow ? null : computedInstallment1Amount;
     const computedRemainingPayment = isPromoFlow ? null : Math.max(computedTotalAmount - computedDownPayment, 0);
     const computedAmount = isPromoFlow
       ? computedTotalAmount
@@ -391,6 +424,10 @@ export async function POST(request) {
     }
 
     const shippingAddressValue = body.shippingAddress || null;
+    const paymentTypeValue = body.paymentType || 'full';
+    const vendorDiscountValue = toFiniteNumber(body.vendor_discount, 0);
+    const vendorDiscountReasonValue = body.vendor_discount_reason || null;
+    
     const baseInsertValues = hasServiceIdColumn
       ? [
         txId,
@@ -413,7 +450,20 @@ export async function POST(request) {
         timestamp,
         body.cardDetails ? JSON.stringify(body.cardDetails) : null,
         body.qrCode || null,
-        body.identityVerification ? JSON.stringify(body.identityVerification) : null
+        body.identityVerification ? JSON.stringify(body.identityVerification) : null,
+        // ✅ NEW: Add payment_type and installment fields
+        paymentTypeValue,
+        paymentIsPayAfter ? computedInstallment1Amount : null,
+        paymentIsPayAfter ? computedInstallment1DueDate : null,
+        paymentIsPayAfter ? 'pending' : null,
+        paymentIsPayAfter ? computedInstallment2Amount : null,
+        paymentIsPayAfter ? computedInstallment2DueDate : null,
+        paymentIsPayAfter ? 'pending' : null,
+        paymentIsPayAfter ? computedInstallment3Amount : null,
+        paymentIsPayAfter ? computedInstallment3DueDate : null,
+        paymentIsPayAfter ? 'pending' : null,
+        vendorDiscountValue,
+        vendorDiscountReasonValue
       ]
       : [
         txId,
@@ -435,7 +485,20 @@ export async function POST(request) {
         timestamp,
         body.cardDetails ? JSON.stringify(body.cardDetails) : null,
         body.qrCode || null,
-        body.identityVerification ? JSON.stringify(body.identityVerification) : null
+        body.identityVerification ? JSON.stringify(body.identityVerification) : null,
+        // ✅ NEW: Add payment_type and installment fields
+        paymentTypeValue,
+        paymentIsPayAfter ? computedInstallment1Amount : null,
+        paymentIsPayAfter ? computedInstallment1DueDate : null,
+        paymentIsPayAfter ? 'pending' : null,
+        paymentIsPayAfter ? computedInstallment2Amount : null,
+        paymentIsPayAfter ? computedInstallment2DueDate : null,
+        paymentIsPayAfter ? 'pending' : null,
+        paymentIsPayAfter ? computedInstallment3Amount : null,
+        paymentIsPayAfter ? computedInstallment3DueDate : null,
+        paymentIsPayAfter ? 'pending' : null,
+        vendorDiscountValue,
+        vendorDiscountReasonValue
       ];
 
     if (hasShippingAddressColumn) {
@@ -451,27 +514,43 @@ export async function POST(request) {
             id, invoice_id, deal_id, service_id, user_id, promo_id, payment_method, base_price,
             quantity, quantity_type, duration_days, notes, start_date,
             amount, service_fee, total_amount, status, timestamp,
-            card_details, qr_code, identity_verification, shipping_address, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            card_details, qr_code, identity_verification, payment_type,
+            installment_1_amount, installment_1_due_date, installment_1_status,
+            installment_2_amount, installment_2_due_date, installment_2_status,
+            installment_3_amount, installment_3_due_date, installment_3_status,
+            vendor_discount, vendor_discount_reason, shipping_address, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         : `INSERT INTO transactions (
             id, invoice_id, deal_id, service_id, user_id, promo_id, payment_method, base_price,
             quantity, quantity_type, duration_days, notes, start_date,
             amount, service_fee, total_amount, status, timestamp,
-            card_details, qr_code, identity_verification, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            card_details, qr_code, identity_verification, payment_type,
+            installment_1_amount, installment_1_due_date, installment_1_status,
+            installment_2_amount, installment_2_due_date, installment_2_status,
+            installment_3_amount, installment_3_due_date, installment_3_status,
+            vendor_discount, vendor_discount_reason, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       : hasShippingAddressColumn
         ? `INSERT INTO transactions (
             id, invoice_id, deal_id, user_id, promo_id, payment_method, base_price,
             quantity, quantity_type, duration_days, notes, start_date,
             amount, service_fee, total_amount, status, timestamp,
-            card_details, qr_code, identity_verification, shipping_address, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            card_details, qr_code, identity_verification, payment_type,
+            installment_1_amount, installment_1_due_date, installment_1_status,
+            installment_2_amount, installment_2_due_date, installment_2_status,
+            installment_3_amount, installment_3_due_date, installment_3_status,
+            vendor_discount, vendor_discount_reason, shipping_address, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         : `INSERT INTO transactions (
             id, invoice_id, deal_id, user_id, promo_id, payment_method, base_price,
             quantity, quantity_type, duration_days, notes, start_date,
             amount, service_fee, total_amount, status, timestamp,
-            card_details, qr_code, identity_verification, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            card_details, qr_code, identity_verification, payment_type,
+            installment_1_amount, installment_1_due_date, installment_1_status,
+            installment_2_amount, installment_2_due_date, installment_2_status,
+            installment_3_amount, installment_3_due_date, installment_3_status,
+            vendor_discount, vendor_discount_reason, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
     await query(insertSql, insertValues);
 

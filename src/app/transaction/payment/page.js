@@ -362,6 +362,12 @@ function PaymentContent() {
       }
     }
 
+    // ✅ NEW: Validate Pay After requires minimum 4 days rental
+    if (paymentType === 'pay_after' && durationDays < 4) {
+      alert('❌ Metode Pay After hanya berlaku untuk penyewaan minimal 4 hari.');
+      return;
+    }
+
     if (paymentMethod === 'card' && !validateCardDetails()) {
       return;
     }
@@ -410,9 +416,20 @@ function PaymentContent() {
           return end.toISOString().split('T')[0];
         })(),
         paymentType: selectedPromo ? 'promo' : paymentType,
+        // ✅ NEW: 3-Stage Installment Data
         amount: selectedPromo ? selectedPromo.price : (paymentType === 'pay_after' ? downPayment : discountedSubtotal),
         downPayment: selectedPromo ? null : (paymentType === 'pay_after' ? downPayment : null),
         remainingPayment: selectedPromo ? null : (paymentType === 'pay_after' ? remainingPayment : null),
+        // ✅ NEW: Add all 3 installment amounts and due dates
+        installment_1_amount: paymentType === 'pay_after' ? downPayment : null,
+        installment_1_due_date: paymentType === 'pay_after' ? stage1DueDate.toISOString().split('T')[0] : null,
+        installment_1_status: paymentType === 'pay_after' ? 'pending' : null,
+        installment_2_amount: paymentType === 'pay_after' ? middlePayment : null,
+        installment_2_due_date: paymentType === 'pay_after' && stage2DueDate ? stage2DueDate.toISOString().split('T')[0] : null,
+        installment_2_status: paymentType === 'pay_after' ? 'pending' : null,
+        installment_3_amount: paymentType === 'pay_after' ? finalPayment : null,
+        installment_3_due_date: paymentType === 'pay_after' && stage3DueDate ? stage3DueDate.toISOString().split('T')[0] : null,
+        installment_3_status: paymentType === 'pay_after' ? 'pending' : null,
         discountedSubtotal: selectedPromo ? selectedPromo.price : discountedSubtotal,
         serviceFee: selectedPromo ? 0 : serviceFee,
         totalAmount: selectedPromo ? selectedPromo.price : totalAmount,
@@ -553,8 +570,31 @@ function PaymentContent() {
   const discountAmount = selectedPromo ? 0 : (deal?.discountGiven ? (dealDiscountAmount * quantity * durationDays) : 0);
   const appliedPromo = null; // ✅ NEW: No promo code in new system
   const totalAmount = discountedSubtotal + serviceFee; // ✅ NEW: No service fee for promo
-  const downPayment = Math.round(totalAmount * 0.2); // 20% down payment
-  const remainingPayment = totalAmount - downPayment; // 80% remaining
+  
+  // ✅ NEW: 3-Stage Installment System (30%-40%-30%)
+  // Stage 1 (DP): 30% due on approval date
+  // Stage 2 (Mid): 40% due on rental start date + 2 days
+  // Stage 3 (Final): 30% due on return date
+  const downPayment = Math.round(totalAmount * 0.30); // 30% DP (Stage 1)
+  const middlePayment = Math.round(totalAmount * 0.40); // 40% middle (Stage 2)
+  const finalPayment = Math.round(totalAmount - downPayment - middlePayment); // 30% final (Stage 3)
+  const remainingPayment = totalAmount - downPayment; // For compatibility
+  
+  // Calculate due dates for installments
+  const today = new Date();
+  const stage1DueDate = new Date(today);
+  let stage2DueDate = null;
+  let stage3DueDate = null;
+  if (startDate) {
+    // Stage 2 should be the middle day of the rental period.
+    // Compute offset = floor(durationDays / 2) so:
+    // - 7 days -> offset 3 -> start + 3 => day 4
+    // - 4 days -> offset 2 -> start + 2 => day 3
+    const stage2Offset = Math.floor(Math.max(1, Number(durationDays || 1)) / 2);
+    stage2DueDate = new Date(`${startDate}T00:00:00.000Z`);
+    stage2DueDate.setUTCDate(stage2DueDate.getUTCDate() + stage2Offset);
+  }
+  
   const isService = service?.type === 'jasa' || deal?.serviceType === 'jasa' || deal?.type === 'jasa';
   const quantityLabel = isService ? 'Tim/Provider' : 'Item';
   const displayedAvailableQuantity = Number(
@@ -566,10 +606,19 @@ function PaymentContent() {
   const expectedReturnDate = startDate
     ? (() => {
         const result = new Date(`${startDate}T00:00:00.000Z`);
-        result.setUTCDate(result.getUTCDate() + durationDays);
+        // Rental of N days starting on `startDate` should return on start + (N - 1)
+        // e.g., start 10 Juli, duration 4 -> return 13 Juli (10 + 3)
+        const days = Math.max(1, Number(durationDays || 1));
+        result.setUTCDate(result.getUTCDate() + (days - 1));
         return result;
       })()
     : null;
+  // Set stage3DueDate to return date
+  if (expectedReturnDate) {
+    stage3DueDate = new Date(expectedReturnDate);
+  }
+  const stage2DueDateLabel = stage2DueDate ? stage2DueDate.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Tgl pinjam + tengah hari';
+  
   const expectedReturnDateLabel = expectedReturnDate
     ? expectedReturnDate.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
     : '-';
@@ -1073,14 +1122,52 @@ function PaymentContent() {
 
                   {/* Pay After Option */}
                   <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', border: paymentType === 'pay_after' ? '2px solid #B28A67' : '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', background: paymentType === 'pay_after' ? '#f3f4f6' : 'transparent', transition: 'all 0.2s' }}>
-                      <input type="radio" name="paymentType" value="pay_after" checked={paymentType === 'pay_after'} onChange={(e) => setPaymentType(e.target.value)} style={{ marginTop: '4px', cursor: 'pointer' }} />
+                    {/* ✅ NEW: Disable if duration < 4 days */}
+                    {durationDays < 4 && (
+                      <div style={{ marginBottom: '12px', padding: '12px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px' }}>
+                        <p style={{ margin: '0', fontSize: '13px', fontWeight: '600', color: '#b91c1c' }}>
+                          ⚠️ Metode Pay After hanya berlaku untuk penyewaan minimal 4 hari
+                        </p>
+                      </div>
+                    )}
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', border: paymentType === 'pay_after' ? '2px solid #B28A67' : '1px solid #ddd', borderRadius: '8px', cursor: durationDays < 4 ? 'not-allowed' : 'pointer', background: paymentType === 'pay_after' ? '#f3f4f6' : 'transparent', transition: 'all 0.2s', opacity: durationDays < 4 ? 0.5 : 1 }}>
+                      <input type="radio" name="paymentType" value="pay_after" checked={paymentType === 'pay_after'} onChange={(e) => setPaymentType(e.target.value)} disabled={durationDays < 4} style={{ marginTop: '4px', cursor: durationDays < 4 ? 'not-allowed' : 'pointer' }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: '600', color: '#1f2937' }}>🔄 Bayar Kemudian (Pay After)</div>
-                        <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>Bayar 20% sekarang, sisa 80% dalam 2 hari setelah kedua belah pihak setuju</p>
-                        <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: '600', color: '#666' }}>
-                          <p style={{ margin: '4px 0' }}>📌 Uang muka (20%): <span style={{ color: '#22c55e', fontWeight: '700' }}>Rp {downPayment.toLocaleString('id-ID')}</span></p>
-                          <p style={{ margin: '4px 0' }}>📋 Sisa pembayaran (80%): <span style={{ color: '#B28A67', fontWeight: '700' }}>Rp {remainingPayment.toLocaleString('id-ID')}</span></p>
+                        <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px', marginBottom: 0 }}>Cicilan 3 tahap dengan total pembayaran yang fleksibel</p>
+                        <div style={{ marginTop: '8px', fontSize: '12px', fontWeight: '600', color: '#1f2937', background: '#f9fafb', padding: '10px', borderRadius: '6px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '6px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid #e5e7eb' }}>
+                              <div>
+                                <div style={{ fontSize: '11px', color: '#6b7280' }}>Stage 1 (DP) - Hari ini</div>
+                                <div style={{ fontSize: '13px', fontWeight: '700', color: '#22c55e' }}>Rp {downPayment.toLocaleString('id-ID')}</div>
+                                <div style={{ fontSize: '10px', color: '#6b7280' }}>30% dari total</div>
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '24px' }}>30%</div>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid #e5e7eb' }}>
+                              <div>
+                                <div style={{ fontSize: '11px', color: '#6b7280' }}>Stage 2 (Mid) - {stage2DueDate ? stage2DueDateLabel : 'Tgl pinjam (tengah hari)'}</div>
+                                <div style={{ fontSize: '13px', fontWeight: '700', color: '#f59e0b' }}>Rp {middlePayment.toLocaleString('id-ID')}</div>
+                                <div style={{ fontSize: '10px', color: '#6b7280' }}>40% dari total</div>
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '24px' }}>40%</div>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <div>
+                                <div style={{ fontSize: '11px', color: '#6b7280' }}>Stage 3 (Final) - Saat pengembalian</div>
+                                <div style={{ fontSize: '13px', fontWeight: '700', color: '#8b5cf6' }}>Rp {finalPayment.toLocaleString('id-ID')}</div>
+                                <div style={{ fontSize: '10px', color: '#6b7280' }}>30% dari total</div>
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '24px' }}>30%</div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </label>
