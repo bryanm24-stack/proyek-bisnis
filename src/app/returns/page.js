@@ -15,19 +15,53 @@ export default function ReturnsPage() {
   // Form state for customer submit
   const [dealId, setDealId] = useState('');
   const [invoicePreview, setInvoicePreview] = useState(null);
+  const [invoiceSummary, setInvoiceSummary] = useState(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [invoiceError, setInvoiceError] = useState('');
   const [invoiceConfirmed, setInvoiceConfirmed] = useState(false);
   const [itemCondition, setItemCondition] = useState('good');
+  const [lostQuantity, setLostQuantity] = useState(0);
+  const [lostError, setLostError] = useState('');
+  const [fineAmount, setFineAmount] = useState(0);
+  const [codLocation, setCodLocation] = useState('');
   const [invoiceDetailOpen, setInvoiceDetailOpen] = useState(false);
   const [damageDescription, setDamageDescription] = useState('');
   const [photos, setPhotos] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
+  const normalizeItemCondition = (value) => {
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) return null;
+
+    if (['good', 'baik'].includes(raw)) {
+      return { code: 'good', label: 'Baik', percentage: 0 };
+    }
+    if (['goresan', 'scratch', 'minor_damage', 'minor', 'rusak ringan', 'rusak_ringan'].includes(raw)) {
+      return { code: 'goresan', label: 'Goresan', percentage: 0.2 };
+    }
+    if (['rusak', 'rusak berat', 'major_damage', 'major', 'rusak_berat'].includes(raw)) {
+      return { code: 'rusak', label: 'Rusak', percentage: 0.5 };
+    }
+    if (['hilang', 'lost'].includes(raw)) {
+      return { code: 'hilang', label: 'Hilang', percentage: 1.0 };
+    }
+
+    return null;
+  };
+
+  const getConditionLabel = (value) => {
+    const condition = normalizeItemCondition(value);
+    return condition ? condition.label : (value || '-');
+  };
+
+  const formatCurrency = (amount) => {
+    return `Rp ${Number(amount || 0).toLocaleString('id-ID')}`;
+  };
+
   // Inspector state for vendor
   const [inspecting, setInspecting] = useState(null);
-  const [damageStatus, setDamageStatus] = useState('none');
-  const [damageCharge, setDamageCharge] = useState(0);
+  const [vendorAction, setVendorAction] = useState('approve');
+  const [rejectionReason, setRejectionReason] = useState('');
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
@@ -40,38 +74,32 @@ export default function ReturnsPage() {
   // Debounced invoice lookup when user types an Invoice ID
   useEffect(() => {
     setInvoicePreview(null);
+    setInvoiceSummary(null);
     setInvoiceError('');
     setInvoiceConfirmed(false);
+    setFineAmount(0);
+    setLostQuantity(0);
+    setLostError('');
     const v = (dealId || '').trim();
     if (!v) return;
 
     const normalized = v.replace(/^#/, '').trim();
-    const looksLikeInvoice = /inv/i.test(normalized);
-    if (!looksLikeInvoice) return;
+    if (!normalized) return;
 
     let cancelled = false;
     setInvoiceLoading(true);
     const timer = setTimeout(async () => {
       try {
-        const resp = await fetch('/api/invoices');
-        if (!resp.ok) throw new Error('Gagal mengambil daftar invoice');
-        const list = await resp.json();
-        const searchKey = normalized.toLowerCase();
-        const found = list.find((inv) => {
-          if (!inv || !inv.id) return false;
-          const idLower = String(inv.id).toLowerCase();
-          if (idLower === searchKey) return true;
-          if (idLower.includes(searchKey.replace(/^#/, ''))) return true;
-          const digits = searchKey.replace(/[^0-9]/g, '');
-          if (digits && idLower.includes(digits)) return true;
-          return false;
-        });
+        const resp = await fetch(`/api/returns?invoiceId=${encodeURIComponent(normalized)}`);
+        const json = await resp.json();
         if (cancelled) return;
-        if (!found) {
+        if (!resp.ok || json.success === false) {
           setInvoicePreview(null);
-          setInvoiceError('Invoice tidak ditemukan');
+          setInvoiceSummary(null);
+          setInvoiceError(json.message || 'Invoice tidak ditemukan');
         } else {
-          setInvoicePreview(found);
+          setInvoicePreview(json.data);
+          setInvoiceSummary(json.data.orderSummary || null);
           setInvoiceError('');
         }
       } catch (err) {
@@ -91,6 +119,55 @@ export default function ReturnsPage() {
     if (!user) return;
     loadReturns();
   }, [user]);
+
+  useEffect(() => {
+    if (!invoiceSummary) {
+      setFineAmount(0);
+      return;
+    }
+
+    const totalAmount = Number(invoiceSummary.totalAmount || 0);
+    const totalQuantity = Number(invoiceSummary.totalQuantity || 1);
+    const condition = normalizeItemCondition(itemCondition);
+
+    if (!condition) {
+      setFineAmount(0);
+      return;
+    }
+
+    if (condition.code === 'good') {
+      setFineAmount(0);
+      setLostError('');
+      return;
+    }
+
+    if (condition.code === 'goresan' || condition.code === 'rusak') {
+      setFineAmount(Math.round(totalAmount * (condition.percentage || 0)));
+      setLostError('');
+      return;
+    }
+
+    if (condition.code === 'hilang') {
+      const lost = Number(lostQuantity || 0);
+      const validLost = Math.max(0, lost);
+      if (validLost <= 0) {
+        setLostError('Masukkan jumlah barang hilang');
+        setFineAmount(0);
+        return;
+      }
+      if (validLost > totalQuantity) {
+        setLostError('Jumlah barang hilang tidak boleh lebih dari total sewa');
+        setFineAmount(0);
+        return;
+      }
+      setLostError('');
+      const portion = totalQuantity > 0 ? validLost / totalQuantity : 1;
+      setFineAmount(Math.round(totalAmount * portion));
+      return;
+    }
+
+    setFineAmount(0);
+  }, [itemCondition, invoiceSummary, lostQuantity]);
 
   async function loadReturns() {
     setLoading(true);
@@ -121,30 +198,24 @@ export default function ReturnsPage() {
       let targetDealId = dealId.trim();
       // If user already confirmed an invoice preview, prefer it
       if (invoiceConfirmed && invoicePreview) {
-        targetDealId = invoicePreview.dealId || invoicePreview.id || targetDealId;
+        targetDealId = invoicePreview.dealId || invoicePreview.invoiceId || targetDealId;
       }
       const normalized = targetDealId.replace(/^#/, '').trim();
       const looksLikeInvoice = /inv/i.test(normalized);
       if (looksLikeInvoice && !invoiceConfirmed) {
-        // If input looks like invoice but user didn't confirm preview, try to resolve now
-        const respInv = await fetch('/api/invoices');
-        if (!respInv.ok) throw new Error('Gagal mengambil data invoice');
-        const invList = await respInv.json();
-        const searchKey = normalized.toLowerCase();
-        const found = invList.find((inv) => {
-          if (!inv || !inv.id) return false;
-          const idLower = String(inv.id).toLowerCase();
-          if (idLower === searchKey) return true;
-          if (idLower.includes(searchKey.replace(/^#/, ''))) return true;
-          const digits = searchKey.replace(/[^0-9]/g, '');
-          if (digits && idLower.includes(digits)) return true;
-          return false;
-        });
-
-        if (!found) {
-          throw new Error('Invoice tidak ditemukan. Pastikan ID benar.');
+        const resp = await fetch(`/api/returns?invoiceId=${encodeURIComponent(normalized)}`);
+        const json = await resp.json();
+        if (!resp.ok || json.success === false || !json.data) {
+          throw new Error(json.message || 'Invoice tidak ditemukan. Pastikan ID benar.');
         }
-        targetDealId = found.dealId || targetDealId;
+        targetDealId = json.data.dealId || json.data.invoiceId || targetDealId;
+      }
+
+      if (itemCondition === 'hilang' && invoiceSummary) {
+        const lost = Number(lostQuantity || 0);
+        if (lost < 0 || lost > Number(invoiceSummary.totalQuantity || 0)) {
+          throw new Error('Jumlah barang hilang tidak valid');
+        }
       }
 
       const form = new FormData();
@@ -153,6 +224,13 @@ export default function ReturnsPage() {
       form.append('customerId', user.id);
       form.append('itemCondition', itemCondition);
       form.append('damageDescription', damageDescription || '');
+      form.append('codLocationDetail', codLocation || '');
+      form.append('fineAmount', fineAmount);
+      form.append('codStatus', 'Pending');
+      form.append('codCondition', itemCondition);
+      if (itemCondition === 'hilang') {
+        form.append('lostQuantity', lostQuantity);
+      }
       photos.forEach((p) => form.append('photos', p));
 
       const r = await fetch('/api/returns', { method: 'POST', body: form });
@@ -172,20 +250,26 @@ export default function ReturnsPage() {
 
   async function openInspectModal(deal) {
     setInspecting(deal);
-    setDamageStatus(deal.damageStatus || 'none');
-    setDamageCharge(deal.damageCharge || 0);
     setNotes(deal.inspectionNotes || '');
+    setVendorAction(deal.returnStatus === 'rejected' ? 'reject' : 'approve');
+    setRejectionReason(deal.rejectionReason || '');
   }
 
-  async function submitInspection() {
+  async function submitInspection(action) {
     if (!inspecting || !user) return;
+    const selectedAction = action || vendorAction;
+    setVendorAction(selectedAction);
+    if (selectedAction === 'reject' && !rejectionReason.trim()) {
+      return alert('Alasan penolakan wajib diisi');
+    }
+
     try {
       const body = {
         dealId: inspecting.id,
         vendorId: user.id,
-        damageStatus,
-        damageCharge: Number(damageCharge) || 0,
-        notes
+        action: selectedAction,
+        notes,
+        rejectionReason: selectedAction === 'reject' ? rejectionReason : ''
       };
       const r = await fetch('/api/returns', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const j = await r.json();
@@ -228,16 +312,22 @@ export default function ReturnsPage() {
     <div>
       <SharedNavbar />
       <div className={styles.container}>
-      <h2>Retur (Pengembalian Akhir)</h2>
-      {!user && (
-        <div style={{ color: '#6b7280' }}>Silakan login untuk melihat atau mengajukan retur.</div>
-      )}
+        <div className={styles.pageHeader}>
+          <h2 className={styles.pageTitle}>Retur (Pengembalian Akhir)</h2>
+          <p className={styles.pageSubtitle}>
+            Ajukan retur dan cek estimasi denda secara otomatis dari invoice atau deal Anda.
+          </p>
+        </div>
+        {!user && (
+          <div style={{ color: '#6b7280' }}>Silakan login untuk melihat atau mengajukan retur.</div>
+        )}
 
       {user && (
         <div className={styles.grid}>
           <div className={styles.columns}>
             <div className={styles.column}>
-              <h3>Buat Permintaan Return Barang (Customer)</h3>
+              <h3>Ajukan Retur Barang</h3>
+              <p className={styles.fieldCaption}>Masukkan Invoice atau Deal ID untuk melihat rincian pesanan dan estimasi denda secara otomatis.</p>
               <form onSubmit={submitReturn}>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>Invoice / Deal ID</label>
@@ -245,19 +335,21 @@ export default function ReturnsPage() {
                   {invoiceLoading && <div className={styles.small} style={{ color: '#6b7280', marginTop: 6 }}>Mencari invoice...</div>}
                   {invoiceError && <div className={styles.small} style={{ color: 'crimson', marginTop: 6 }}>{invoiceError}</div>}
                   {invoicePreview && (
-                    <div className={styles.invoicePreview} style={{ marginTop: 10, padding: 10, borderRadius: 8, background: '#fff', border: '1px solid #e6e6e6' }}>
-                      <div style={{ display: 'flex', gap: 12 }}>
-                        {invoicePreview.serviceImage && <img src={invoicePreview.serviceImage} alt="img" style={{ width: 80, height: 60, objectFit: 'cover', borderRadius: 6 }} />}
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600 }}>{invoicePreview.serviceTitle}</div>
-                          <div className={styles.small}>{invoicePreview.vendorName} • {invoicePreview.customerName}</div>
-                          <div className={styles.small}>Invoice: {invoicePreview.id} — Deal: {invoicePreview.dealId || '-'}</div>
-                          <div className={styles.small}>Total: Rp {(Number(invoicePreview.totalAmount || invoicePreview.remainingPayment || 0)).toLocaleString('id-ID')}</div>
+                    <div className={styles.invoicePreview} style={{ marginTop: 14 }}>
+                      <div className={styles.invoicePreviewHeader}>
+                        <div>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>{invoicePreview.serviceTitle}</div>
+                          <div className={styles.invoicePreviewMain}>
+                            <div>{invoicePreview.vendorName} • {invoicePreview.customerName}</div>
+                            <div><strong>Invoice:</strong> {invoicePreview.invoiceId}</div>
+                            <div><strong>Deal:</strong> {invoicePreview.dealId || '-'}</div>
+                            <div><strong>Total:</strong> Rp {(Number(invoicePreview.totalAmount || invoicePreview.remainingPayment || 0)).toLocaleString('id-ID')}</div>
+                          </div>
                         </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-                            <button type="button" className={styles.btn} onClick={() => setInvoiceDetailOpen(true)}>Lihat detail</button>
-                            <button type="button" className={styles.btn} onClick={() => { setDealId(invoicePreview.dealId || invoicePreview.id); setInvoiceConfirmed(true); }}>Gunakan invoice ini</button>
-                            <button type="button" className={styles.secondary} onClick={() => { setInvoicePreview(null); setDealId(''); }}>Batal</button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
+                          <button type="button" className={styles.btn} onClick={() => setInvoiceDetailOpen(true)}>Lihat detail</button>
+                          <button type="button" className={styles.btn} onClick={() => { setDealId(invoicePreview.dealId || invoicePreview.invoiceId); setInvoiceConfirmed(true); }}>Gunakan invoice ini</button>
+                          <button type="button" className={styles.secondary} onClick={() => { setInvoicePreview(null); setDealId(''); }}>Batal</button>
                         </div>
                       </div>
                     </div>
@@ -267,10 +359,61 @@ export default function ReturnsPage() {
                   <label className={styles.label}>Kondisi Barang</label>
                   <select className={styles.select} value={itemCondition} onChange={(e) => setItemCondition(e.target.value)}>
                     <option value="good">Baik</option>
-                    <option value="minor_damage">Rusak ringan</option>
-                    <option value="major_damage">Rusak berat</option>
-                    <option value="lost">Hilang</option>
+                    <option value="goresan">Goresan</option>
+                    <option value="rusak">Rusak</option>
+                    <option value="hilang">Hilang</option>
                   </select>
+                </div>
+                {invoiceSummary && (
+                  <div style={{ marginBottom: 14, padding: 14, borderRadius: 10, border: '1px solid #e5e7eb', background: '#fafafa' }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Ringkasan Invoice</div>
+                    <div style={{ display: 'grid', gap: 6, fontSize: 13, color: '#4b5563' }}>
+                      <div><strong>Nama Barang:</strong> {invoiceSummary.itemName}</div>
+                      <div><strong>Harga Sewa:</strong> Rp {Number(invoiceSummary.rentalPrice || 0).toLocaleString('id-ID')}</div>
+                      <div><strong>Jumlah Sewa:</strong> {invoiceSummary.totalQuantity}</div>
+                      <div><strong>Durasi:</strong> {invoiceSummary.durationDays} hari</div>
+                      <div><strong>Total Transaksi:</strong> Rp {Number(invoiceSummary.totalAmount || 0).toLocaleString('id-ID')}</div>
+                    </div>
+                  </div>
+                )}
+                {itemCondition === 'hilang' && (
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>Jumlah Barang Hilang</label>
+                    <input
+                      className={styles.input}
+                      type="number"
+                      min="0"
+                      max={invoiceSummary?.totalQuantity || 1}
+                      value={lostQuantity}
+                      onChange={(e) => setLostQuantity(Number(e.target.value || 0))}
+                    />
+                    {invoiceSummary && (
+                      <div className={styles.small} style={{ color: '#6b7280' }}>
+                        Total jumlah sewa: {invoiceSummary.totalQuantity}
+                      </div>
+                    )}
+                    {lostError && <div className={styles.small} style={{ color: 'crimson' }}>{lostError}</div>}
+                  </div>
+                )}
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Estimasi Denda</label>
+                  <div style={{ fontWeight: 700, color: '#111827' }}>Rp {Number(fineAmount || 0).toLocaleString('id-ID')}</div>
+                  <div className={styles.small} style={{ color: '#6b7280' }}>
+                    Denda dihitung berdasarkan kondisi dan harga sewa invoice.
+                  </div>
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Lokasi COD</label>
+                  <textarea
+                    className={styles.textarea}
+                    value={codLocation}
+                    onChange={(e) => setCodLocation(e.target.value)}
+                    rows={3}
+                    placeholder="Tuliskan alamat pertemuan COD dengan vendor untuk pengembalian barang"
+                  />
+                  <div className={styles.small} style={{ color: '#6b7280' }}>
+                    Lokasi ini digunakan sebagai titik temu untuk proses pengembalian ke vendor.
+                  </div>
                 </div>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>Deskripsi Kerusakan (opsional)</label>
@@ -281,7 +424,7 @@ export default function ReturnsPage() {
                   <input className={styles.fileInput} type="file" multiple accept="image/*" onChange={handlePhotosChange} />
                 </div>
                 <div className={styles.actions}>
-                  <button className={styles.btn} type="submit" disabled={submitting}>{submitting ? 'Mengirim...' : 'Ajukan Retur'}</button>
+                  <button className={styles.btn} type="submit" disabled={submitting}>{submitting ? 'Mengirim...' : 'Ajukan retur ke vendor'}</button>
                 </div>
               </form>
             </div>
@@ -325,13 +468,25 @@ export default function ReturnsPage() {
                           <div style={{ fontSize: '13px', color: '#4b5563' }}>Biaya akhir dihitung setelah inspeksi vendor</div>
                         </div>
                       </div>
-                      <div style={{ display: 'grid', gap: 8, padding: '12px 0' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px', color: '#4b5563' }}>
-                          <div><strong>Kondisi</strong><br />{d.itemCondition || '-'}</div>
-                          <div><strong>Deskripsi</strong><br />{d.damageDescription || '-'}</div>
+                      <div style={{ display: 'grid', gap: 14, padding: '12px 0' }}>
+                        <div style={{ display: 'grid', gap: 10, fontSize: '13px', color: '#4b5563' }}>
+                          <div><strong>Invoice / Deal:</strong> {d.invoiceId || d.dealId || '-'}</div>
+                          <div><strong>Kondisi customer:</strong> {getConditionLabel(d.itemCondition)}</div>
+                          {String(d.itemCondition || '').toLowerCase().includes('hilang') && (
+                            <div><strong>Jumlah hilang:</strong> {d.lostQuantity || 0}</div>
+                          )}
+                          <div><strong>Lokasi COD:</strong> {d.codLocationDetail || d.codLocation || '-'}</div>
+                          <div><strong>Deskripsi customer:</strong> {d.damageDescription || '-'}</div>
+                          <div><strong>Total denda customer:</strong> {formatCurrency(Number(d.damageCharge || 0) + Number(d.lateCharge || 0))}</div>
+                          <div><strong>Status inspeksi:</strong> {d.returnStatus || '-'}</div>
                         </div>
                         {d.returnPhotos?.length > 0 && (
                           <div style={{ fontSize: '13px', color: '#4b5563' }}><strong>Foto bukti:</strong> {d.returnPhotos.length} file terlampir</div>
+                        )}
+                        {d.rejectionReason && (
+                          <div style={{ fontSize: '13px', color: '#b91c1c', background: '#fef2f2', padding: '10px', borderRadius: 8 }}>
+                            <strong>Alasan penolakan:</strong> {d.rejectionReason}
+                          </div>
                         )}
                       </div>
                       {Array.isArray(d.returnPhotos) && d.returnPhotos.length > 0 && (
@@ -348,7 +503,7 @@ export default function ReturnsPage() {
                         </div>
                       )}
 
-                      <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                      <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {isVendorOnThisReturn && (
                           <button onClick={() => openInspectModal(d)} className={`${styles.btn} ${styles.secondary}`}>Inspeksi</button>
                         )}
@@ -371,6 +526,11 @@ export default function ReturnsPage() {
                               {d.inspectionNotes && (
                                 <div className={styles.small} style={{ marginTop: 6 }}>
                                   Catatan vendor: {d.inspectionNotes}
+                                </div>
+                              )}
+                              {d.rejectionReason && (
+                                <div style={{ fontSize: '13px', color: '#b91c1c', background: '#fef2f2', padding: '10px', borderRadius: 8, marginTop: 8 }}>
+                                  <strong>Alasan penolakan:</strong> {d.rejectionReason}
                                 </div>
                               )}
                             </div>
@@ -418,26 +578,56 @@ export default function ReturnsPage() {
                     ))}
                   </div>
                 )}
-                <div style={{ marginBottom: 8 }}>
-                  <label className={styles.label}>Damage Status</label>
-                  <select className={styles.select} value={damageStatus} onChange={(e) => setDamageStatus(e.target.value)}>
-                    <option value="none">Tidak ada kerusakan</option>
-                    <option value="minor">Kerusakan ringan</option>
-                    <option value="major">Kerusakan berat</option>
-                    <option value="lost">Hilang</option>
-                  </select>
-                </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Damage Charge (Rp)</label>
-                  <input className={styles.input} value={damageCharge} onChange={(e) => setDamageCharge(e.target.value)} />
+                {vendorAction === 'reject' && (
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>Alasan Penolakan</label>
+                    <textarea
+                      className={styles.textarea}
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      rows={3}
+                      placeholder="Jelaskan alasan penolakan atau mismatch kondisi barang"
+                    />
+                  </div>
+                )}
+                <div className={styles.inspectionSummary}>
+                  <div className={styles.summaryCardTitle}>Data input customer</div>
+                  <div className={styles.summaryRow}>
+                    <div><strong>Invoice / Deal:</strong> {inspecting.invoiceId || inspecting.dealId || '-'}</div>
+                    <div><strong>Kondisi customer:</strong> {getConditionLabel(inspecting.itemCondition)}</div>
+                    {String(inspecting.itemCondition || '').toLowerCase().includes('hilang') && (
+                      <div><strong>Jumlah hilang:</strong> {inspecting.lostQuantity || 0}</div>
+                    )}
+                    <div><strong>Lokasi COD:</strong> {inspecting.codLocationDetail || inspecting.codLocation || '-'}</div>
+                    <div style={{ gridColumn: '1 / -1' }}><strong>Deskripsi customer:</strong> {inspecting.damageDescription || '-'}</div>
+                  </div>
                 </div>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>Catatan</label>
-                  <textarea className={styles.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+                  <textarea className={styles.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} />
                 </div>
                 <div className={styles.modalFooter}>
                   <button onClick={() => setInspecting(null)} className={`${styles.btn} ${styles.secondary}`}>Batal</button>
-                  <button onClick={submitInspection} className={styles.btn}>Simpan Inspeksi</button>
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.rejectButton}`}
+                    onClick={() => {
+                      if (vendorAction === 'reject' && rejectionReason.trim()) {
+                        submitInspection('reject');
+                      } else {
+                        setVendorAction('reject');
+                      }
+                    }}
+                  >
+                    {vendorAction === 'reject' ? 'Submit Reject' : 'Reject'}
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.approveButton}`}
+                    onClick={() => submitInspection('approve')}
+                  >
+                    Approve
+                  </button>
                 </div>
               </div>
             </div>
@@ -445,9 +635,9 @@ export default function ReturnsPage() {
           {invoiceDetailOpen && invoicePreview && (
             <div className={styles.modalOverlay}>
               <div className={styles.modal}>
-                <h3>Detail Invoice - {invoicePreview.id}</h3>
+                <h3>Detail Invoice - {invoicePreview.invoiceId}</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div className={styles.small}><strong>Invoice ID:</strong> {invoicePreview.id}</div>
+                  <div className={styles.small}><strong>Invoice ID:</strong> {invoicePreview.invoiceId}</div>
                   <div className={styles.small}><strong>Deal ID:</strong> {invoicePreview.dealId || '-'}</div>
                   <div className={styles.small}><strong>Layanan:</strong> {invoicePreview.serviceTitle}</div>
                   <div className={styles.small}><strong>Vendor:</strong> {invoicePreview.vendorName}</div>
@@ -465,7 +655,7 @@ export default function ReturnsPage() {
                 </div>
                 <div className={styles.modalFooter} style={{ marginTop: 12 }}>
                   <button className={`${styles.btn} ${styles.secondary}`} onClick={() => setInvoiceDetailOpen(false)}>Tutup</button>
-                  <button className={styles.btn} onClick={() => { setDealId(invoicePreview.dealId || invoicePreview.id); setInvoiceConfirmed(true); setInvoiceDetailOpen(false); }}>Gunakan invoice ini</button>
+                  <button className={styles.btn} onClick={() => { setDealId(invoicePreview.dealId || invoicePreview.invoiceId); setInvoiceConfirmed(true); setInvoiceDetailOpen(false); }}>Gunakan invoice ini</button>
                 </div>
               </div>
             </div>

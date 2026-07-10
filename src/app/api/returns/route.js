@@ -11,19 +11,32 @@ const normalizeItemCondition = (value) => {
   if (!raw) return null;
 
   if (['good', 'baik'].includes(raw)) {
-    return { code: 'good', label: 'Baik', damageStatus: 'none' };
+    return { code: 'good', label: 'Baik', damageStatus: 'none', percentage: 0 };
   }
-  if (['minor_damage', 'minor', 'rusak ringan', 'rusak_ringan'].includes(raw)) {
-    return { code: 'minor_damage', label: 'Rusak ringan', damageStatus: 'minor' };
+  if (['goresan', 'scratch', 'minor_damage', 'minor', 'rusak ringan', 'rusak_ringan'].includes(raw)) {
+    return { code: 'goresan', label: 'Goresan', damageStatus: 'minor', percentage: 0.2 };
   }
-  if (['major_damage', 'major', 'rusak berat', 'rusak_berat'].includes(raw)) {
-    return { code: 'major_damage', label: 'Rusak berat', damageStatus: 'major' };
+  if (['rusak', 'rusak berat', 'major_damage', 'major', 'rusak_berat'].includes(raw)) {
+    return { code: 'rusak', label: 'Rusak', damageStatus: 'major', percentage: 0.5 };
   }
-  if (['lost', 'hilang'].includes(raw)) {
-    return { code: 'lost', label: 'Hilang', damageStatus: 'lost' };
+  if (['hilang', 'lost'].includes(raw)) {
+    return { code: 'hilang', label: 'Hilang', damageStatus: 'lost', percentage: 1.0 };
   }
 
   return null;
+};
+
+const getDamageCharge = (baseAmount, itemConditionCode, lostQuantity = 0, requestedFineAmount = 0, totalQuantity = 1) => {
+  const normalizedQuantity = Number(totalQuantity || 1);
+  const normalizedLost = Number(lostQuantity || 0);
+  if (itemConditionCode === 'good') return 0;
+  if (itemConditionCode === 'goresan') return Math.round(baseAmount * 0.2);
+  if (itemConditionCode === 'rusak') return Math.round(baseAmount * 0.5);
+  if (itemConditionCode === 'hilang') {
+    if (normalizedLost <= 0 || normalizedQuantity <= 0) return baseAmount;
+    return Math.round(baseAmount * Math.min(1, normalizedLost / normalizedQuantity));
+  }
+  return Math.max(0, Number(requestedFineAmount || 0));
 };
 
 const toItemConditionLabel = (value) => {
@@ -128,7 +141,7 @@ function mapReturnRow(row, role = null, currentUserId = null) {
 }
 
 async function findInvoiceByInput(dealOrInvoiceId) {
-  const raw = String(dealOrInvoiceId || '').trim();
+  const raw = String(dealOrInvoiceId || '').trim().replace(/^#/, '');
   if (!raw) return null;
 
   const byInvoiceId = await query('SELECT * FROM invoices WHERE id = ? LIMIT 1', [raw]);
@@ -221,8 +234,125 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const dealId = searchParams.get('dealId');
+    const invoiceId = searchParams.get('invoiceId');
     const userId = searchParams.get('userId');
     const userRole = searchParams.get('userRole');
+
+    if (invoiceId) {
+      const invoice = await findInvoiceByInput(invoiceId);
+      if (!invoice) {
+        return NextResponse.json({ success: false, message: 'Invoice tidak ditemukan' }, { status: 404 });
+      }
+
+      // Find transaction - try multiple ways
+      let transaction = null;
+      
+      // Try by transaction_id first
+      if (invoice.transaction_id) {
+        const txResult = await query(
+          `SELECT t.* FROM transactions t WHERE t.id = ? LIMIT 1`,
+          [invoice.transaction_id]
+        );
+        transaction = txResult[0] || null;
+      }
+      
+      // Try by deal_id
+      if (!transaction && invoice.deal_id) {
+        const txResult = await query(
+          `SELECT t.* FROM transactions t WHERE t.deal_id = ? LIMIT 1`,
+          [invoice.deal_id]
+        );
+        transaction = txResult[0] || null;
+      }
+      
+      // Try by invoice_id
+      if (!transaction) {
+        const txResult = await query(
+          `SELECT t.* FROM transactions t WHERE t.invoice_id = ? LIMIT 1`,
+          [invoice.id]
+        );
+        transaction = txResult[0] || null;
+      }
+
+      // Get service details
+      let service = null;
+      if (transaction?.service_id) {
+        const svcResult = await query(
+          `SELECT * FROM services WHERE id = ? LIMIT 1`,
+          [transaction.service_id]
+        );
+        service = svcResult[0] || null;
+      }
+
+      // Parse service images if exists
+      let serviceImage = '';
+      if (service?.images) {
+        try {
+          const images = JSON.parse(service.images || '[]');
+          serviceImage = Array.isArray(images) && images.length > 0 ? images[0] : '';
+        } catch {
+          serviceImage = '';
+        }
+      }
+
+      // Get vendor and customer names
+      let vendorName = '';
+      let customerName = '';
+      
+      if (invoice.vendor_id) {
+        const vendorResult = await query(
+          `SELECT name FROM users WHERE id = ? LIMIT 1`,
+          [invoice.vendor_id]
+        );
+        vendorName = vendorResult[0]?.name || '';
+      }
+      
+      if (invoice.customer_id) {
+        const customerResult = await query(
+          `SELECT name FROM users WHERE id = ? LIMIT 1`,
+          [invoice.customer_id]
+        );
+        customerName = customerResult[0]?.name || '';
+      }
+
+      const qty = Number(transaction?.quantity || 1);
+      const totalAmt = Number(transaction?.total_amount || invoice.remaining_payment || 0);
+      const basePrice = Number(transaction?.base_price || 0);
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: invoice.id,
+          invoiceId: invoice.id,
+          dealId: invoice.deal_id,
+          customerId: invoice.customer_id,
+          vendorId: invoice.vendor_id,
+          serviceId: invoice.service_id,
+          serviceTitle: service?.title || 'Item',
+          serviceImage: serviceImage,
+          vendorName: vendorName,
+          customerName: customerName,
+          remainingPayment: Number(invoice.remaining_payment || 0),
+          totalAmount: totalAmt,
+          quantity: qty,
+          durationDays: Number(transaction?.duration_days || 1),
+          basePrice: basePrice,
+          discountAmount: Number(transaction?.discount_amount || 0),
+          notes: invoice.notes || '',
+          paymentType: invoice.payment_type || invoice.payment_method || '',
+          status: invoice.status || '',
+          paymentDeadline: invoice.payment_deadline || '',
+          createdAt: invoice.created_at || invoice.payment_deadline || '',
+          orderSummary: {
+            itemName: service?.title || 'Item',
+            rentalPrice: basePrice,
+            totalQuantity: qty,
+            durationDays: Number(transaction?.duration_days || 1),
+            totalAmount: totalAmt
+          }
+        }
+      }, { status: 200 });
+    }
 
     if (!dealId && (!userId || !userRole)) {
       return NextResponse.json({ success: false, message: 'dealId atau userId dan userRole diperlukan' }, { status: 400 });
@@ -299,8 +429,8 @@ export async function GET(request) {
       }
     }, { status: 200 });
   } catch (error) {
-    console.error('Error getting return status:', error);
-    return NextResponse.json({ success: false, message: 'Terjadi kesalahan server' }, { status: 500 });
+    console.error('Error getting return status:', error?.message || error, error?.stack);
+    return NextResponse.json({ success: false, message: 'Terjadi kesalahan server: ' + (error?.message || 'Unknown error') }, { status: 500 });
   }
 }
 
@@ -312,16 +442,22 @@ export async function POST(request) {
     let damageDescription = '';
     let returnPhotos = [];
     let type = null;
+    let form = null;
+    let jsonBody = null;
+    let requestedFineAmount = 0;
+    let lostQuantity = 0;
 
     const contentType = request.headers.get('content-type') || '';
 
     if (contentType.includes('multipart/form-data')) {
-      const form = await request.formData();
+      form = await request.formData();
       dealId = form.get('dealId');
       customerId = form.get('customerId');
       itemCondition = form.get('itemCondition');
       damageDescription = form.get('damageDescription') || '';
       type = form.get('type') || null;
+      requestedFineAmount = Number(form.get('fineAmount') || 0) || 0;
+      lostQuantity = Number(form.get('lostQuantity') || 0) || 0;
 
       const files = form.getAll('photos') || [];
       if (files.length > 0) {
@@ -344,12 +480,15 @@ export async function POST(request) {
       }
     } else {
       const body = await request.json();
+      jsonBody = body;
       dealId = body?.dealId;
       customerId = body?.customerId;
       itemCondition = body?.itemCondition;
       damageDescription = body?.damageDescription || '';
       returnPhotos = Array.isArray(body?.returnPhotos) ? body.returnPhotos : [];
       type = body?.type || null;
+      requestedFineAmount = Number(body?.fineAmount || 0) || 0;
+      lostQuantity = Number(body?.lostQuantity || 0) || 0;
     }
 
     if (!dealId || !customerId || !itemCondition) {
@@ -388,12 +527,25 @@ export async function POST(request) {
       ? (normalizedItemCondition?.label || String(itemCondition || '').trim())
       : null;
 
+    const totalQuantity = Number(deal?.quantity || 1);
+    if (itemConditionCode === 'hilang') {
+      const lostCount = Number(lostQuantity || 0);
+      if (lostCount <= 0) {
+        return NextResponse.json({ success: false, message: 'lostQuantity harus lebih dari 0 untuk kondisi Hilang' }, { status: 400 });
+      }
+      if (lostCount > totalQuantity) {
+        return NextResponse.json({ success: false, message: 'lostQuantity tidak boleh lebih besar dari total quantity sewa' }, { status: 400 });
+      }
+    }
+
     const expectedReturnDate = deal?.expected_return_date || null;
     const daysLate = requestType === 'end_of_use' ? daysBetweenDates(new Date().toISOString(), expectedReturnDate) : 0;
 
     const baseAmount = Number(invoice.remaining_payment || 0);
+    const damageCharge = requestType === 'end_of_use'
+      ? getDamageCharge(baseAmount, itemConditionCode, lostQuantity, requestedFineAmount, Number(deal?.quantity || 1))
+      : 0;
     const lateCharge = daysLate > 0 ? Math.round((baseAmount / Math.max(Number(deal?.duration_days || 1), 1)) * daysLate) : 0;
-    const damageCharge = (requestType === 'end_of_use' && itemConditionCode === 'lost') ? baseAmount : 0;
 
     const initialStatus = requestType === 'end_of_use' ? 'pending_inspection' : 'reported';
     const id = `RET-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -445,8 +597,8 @@ export async function POST(request) {
       }
     }, { status: 201 });
   } catch (error) {
-    console.error('Error initiating return:', error);
-    return NextResponse.json({ success: false, message: 'Terjadi kesalahan server' }, { status: 500 });
+    console.error('Error initiating return:', error?.message || error, error?.stack);
+    return NextResponse.json({ success: false, message: 'Terjadi kesalahan server: ' + (error?.message || 'Unknown error') }, { status: 500 });
   }
 }
 

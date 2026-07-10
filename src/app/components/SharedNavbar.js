@@ -476,12 +476,14 @@ export default function SharedNavbar() {
                 fontSize: '14px',
               }}
             >
-              {user.name.charAt(0).toUpperCase()}
+              {String(user?.name || user?.username || user?.email || 'U').charAt(0).toUpperCase()}
             </div>
             <div>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#333' }}>{user.name}</div>
+              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#333' }}>
+                {String(user?.name || user?.username || user?.email || 'User')}
+              </div>
               <div style={{ fontSize: '12px', color: '#666' }}>
-                {user.role === 'customer' ? 'Customer' : user.role === 'vendor' ? 'Vendor' : 'Admin'}
+                {user?.role === 'customer' ? 'Customer' : user?.role === 'vendor' ? 'Vendor' : 'Admin'}
               </div>
             </div>
           </div>
