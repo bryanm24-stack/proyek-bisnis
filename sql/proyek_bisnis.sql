@@ -58,6 +58,8 @@
     user_email VARCHAR(255),
     vendor_name VARCHAR(255) NOT NULL,
     phone_number VARCHAR(255),
+    identity_type VARCHAR(255),
+    identity_number VARCHAR(255),
     identity_file LONGTEXT,
     identity_file_name VARCHAR(255),
     status VARCHAR(50) DEFAULT 'pending',

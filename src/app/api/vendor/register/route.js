@@ -16,6 +16,10 @@ function normalizeRegistration(reg) {
     userEmail: reg.user_email,
     vendorName: reg.vendor_name,
     phoneNumber: reg.phone_number,
+    identityType: reg.identity_type,
+    identityNumber: reg.identity_number,
+    selfieFile: reg.selfie_file,
+    selfieFileName: reg.selfie_file_name,
     identityFile: reg.identity_file,
     identityFileName: reg.identity_file_name,
     status: reg.status,
@@ -35,6 +39,10 @@ async function ensureVendorRegistrationsTable() {
       user_email VARCHAR(255),
       vendor_name VARCHAR(255) NOT NULL,
       phone_number VARCHAR(255),
+      identity_type VARCHAR(255),
+      identity_number VARCHAR(255),
+      selfie_file LONGTEXT,
+      selfie_file_name VARCHAR(255),
       identity_file LONGTEXT,
       identity_file_name VARCHAR(255),
       status VARCHAR(50) DEFAULT 'pending',
@@ -47,29 +55,59 @@ async function ensureVendorRegistrationsTable() {
       INDEX idx_created_at (created_at)
     )
   `);
+
+  // Ensure columns exist (use individual ALTER statements and ignore duplicate-column errors)
+  try {
+    await query(`ALTER TABLE vendor_registrations ADD COLUMN identity_type VARCHAR(255)`);
+  } catch (e) {
+    // ignore if column exists
+  }
+  try {
+    await query(`ALTER TABLE vendor_registrations ADD COLUMN identity_number VARCHAR(255)`);
+  } catch (e) {
+  }
+  try {
+    await query(`ALTER TABLE vendor_registrations ADD COLUMN selfie_file LONGTEXT`);
+  } catch (e) {
+  }
+  try {
+    await query(`ALTER TABLE vendor_registrations ADD COLUMN selfie_file_name VARCHAR(255)`);
+  } catch (e) {
+  }
 }
 
 // POST - Submit vendor registration
 export async function POST(request) {
   try {
     await ensureVendorRegistrationsTable();
-
     const body = await request.json();
+    console.log('Vendor register body keys:', Object.keys(body));
+    if (body.selfieFile) {
+      console.log('selfieFile length:', String(body.selfieFile).length);
+    }
     const {
       userId,
       vendorName,
       phoneNumber,
+      identityType,
+      identityNumber,
       identityFile,
       identityFileName
+      , selfieFile,
+      selfieFileName
     } = body;
 
     const normalizedVendorName = normalizeOptionalString(vendorName);
     const normalizedPhoneNumber = normalizeOptionalString(phoneNumber);
+    const normalizedIdentityType = normalizeOptionalString(identityType);
+    const normalizedIdentityNumber = normalizeOptionalString(identityNumber);
     const normalizedIdentityFile = normalizeOptionalString(identityFile);
     const normalizedIdentityFileName = normalizeOptionalString(identityFileName);
+    const normalizedSelfieFile = normalizeOptionalString(selfieFile);
+    const normalizedSelfieFileName = normalizeOptionalString(selfieFileName);
 
     // Validasi input
-    if (!userId || !normalizedVendorName || !normalizedPhoneNumber || !normalizedIdentityFile) {
+    if (!userId || !normalizedVendorName || !normalizedPhoneNumber || !normalizedIdentityType || !normalizedIdentityNumber || !normalizedIdentityFile || !normalizedSelfieFile) {
       return NextResponse.json({
         success: false,
         message: 'Semua field wajib diisi!'
@@ -124,14 +162,18 @@ export async function POST(request) {
       if (existingReg.status === 'rejected') {
         await query(
           `UPDATE vendor_registrations 
-           SET vendor_name = ?, phone_number = ?, identity_file = ?, 
-               identity_file_name = ?, status = 'pending', submitted_at = ?, rejection_reason = NULL
+           SET vendor_name = ?, phone_number = ?, identity_type = ?, identity_number = ?, identity_file = ?, 
+               identity_file_name = ?, selfie_file = ?, selfie_file_name = ?, status = 'pending', submitted_at = ?, rejection_reason = NULL
            WHERE id = ?`,
           [
             normalizedVendorName,
             normalizedPhoneNumber,
+            normalizedIdentityType,
+            normalizedIdentityNumber,
             normalizedIdentityFile,
             normalizedIdentityFileName,
+            normalizedSelfieFile,
+            normalizedSelfieFileName,
             new Date().toISOString(),
             existingReg.id
           ]
@@ -152,9 +194,8 @@ export async function POST(request) {
 
     await query(
       `INSERT INTO vendor_registrations 
-       (id, user_id, user_name, user_email, vendor_name, phone_number, identity_file, 
-        identity_file_name, status, created_at, submitted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+       (id, user_id, user_name, user_email, vendor_name, phone_number, identity_type, identity_number, identity_file, identity_file_name, selfie_file, selfie_file_name, status, created_at, submitted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
       [
         registrationId,
         userId,
@@ -162,8 +203,12 @@ export async function POST(request) {
         user.email,
         normalizedVendorName,
         normalizedPhoneNumber,
+        normalizedIdentityType,
+        normalizedIdentityNumber,
         normalizedIdentityFile,
         normalizedIdentityFileName,
+        normalizedSelfieFile,
+        normalizedSelfieFileName,
         now,
         now
       ]
@@ -180,7 +225,8 @@ export async function POST(request) {
     console.error('Error di API Vendor Register:', error);
     return NextResponse.json({
       success: false,
-      message: 'Terjadi kesalahan server.'
+      message: 'Terjadi kesalahan server.',
+      error: String(error?.message || error)
     }, { status: 500 });
   }
 }

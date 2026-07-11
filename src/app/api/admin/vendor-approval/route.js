@@ -10,6 +10,8 @@ async function ensureVendorRegistrationsTable() {
       user_email VARCHAR(255),
       vendor_name VARCHAR(255) NOT NULL,
       phone_number VARCHAR(255),
+      identity_type VARCHAR(255),
+      identity_number VARCHAR(255),
       identity_file LONGTEXT,
       identity_file_name VARCHAR(255),
       status VARCHAR(50) DEFAULT 'pending',
@@ -22,6 +24,25 @@ async function ensureVendorRegistrationsTable() {
       INDEX idx_created_at (created_at)
     )
   `);
+
+  // Ensure columns exist (use individual ALTER statements and ignore duplicate-column errors)
+  try {
+    await query(`ALTER TABLE vendor_registrations ADD COLUMN identity_type VARCHAR(255)`);
+  } catch (e) {
+    // ignore if column exists
+  }
+  try {
+    await query(`ALTER TABLE vendor_registrations ADD COLUMN identity_number VARCHAR(255)`);
+  } catch (e) {
+  }
+  try {
+    await query(`ALTER TABLE vendor_registrations ADD COLUMN selfie_file LONGTEXT`);
+  } catch (e) {
+  }
+  try {
+    await query(`ALTER TABLE vendor_registrations ADD COLUMN selfie_file_name VARCHAR(255)`);
+  } catch (e) {
+  }
 }
 
 function normalizeRegistration(reg) {
@@ -33,6 +54,10 @@ function normalizeRegistration(reg) {
     userEmail: reg.user_email,
     vendorName: reg.vendor_name,
     phoneNumber: reg.phone_number,
+    identityType: reg.identity_type,
+    identityNumber: reg.identity_number,
+    selfieFile: reg.selfie_file,
+    selfieFileName: reg.selfie_file_name,
     identityFile: reg.identity_file,
     identityFileName: reg.identity_file_name,
     status: reg.status,
@@ -131,6 +156,28 @@ export async function POST(request) {
         [now, registrationId]
       );
 
+      // Create notification for user
+      const notificationId = `notif_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      try {
+        await query(
+          `INSERT INTO notifications (id, user_id, type, message, sender_name, related_id, related_data, is_read, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+          [
+            notificationId,
+            registration.user_id,
+            'vendor_approved',
+            `✓ Registrasi vendor Anda telah disetujui! Selamat datang sebagai vendor di RentGuard. Anda sekarang bisa menambahkan produk/jasa.`,
+            'Admin RentGuard',
+            registrationId,
+            JSON.stringify({ vendor_name: registration.vendor_name, status: 'approved' }),
+            now,
+            now
+          ]
+        );
+      } catch (notifErr) {
+        console.warn('Warning creating approval notification:', notifErr?.message);
+      }
+
       const updated = await query('SELECT * FROM vendor_registrations WHERE id = ?', [registrationId]);
 
       return NextResponse.json({
@@ -155,6 +202,28 @@ export async function POST(request) {
          WHERE id = ?`,
         [rejectionReason, now, registrationId]
       );
+
+      // Create notification for user
+      const notificationId = `notif_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      try {
+        await query(
+          `INSERT INTO notifications (id, user_id, type, message, sender_name, related_id, related_data, is_read, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+          [
+            notificationId,
+            registration.user_id,
+            'vendor_rejected',
+            `✕ Registrasi vendor Anda ditolak. Alasan: ${rejectionReason}. Anda dapat melakukan perbaikan data dan submit ulang untuk direview kembali.`,
+            'Admin RentGuard',
+            registrationId,
+            JSON.stringify({ vendor_name: registration.vendor_name, status: 'rejected', reason: rejectionReason }),
+            now,
+            now
+          ]
+        );
+      } catch (notifErr) {
+        console.warn('Warning creating rejection notification:', notifErr?.message);
+      }
 
       const updated = await query('SELECT * FROM vendor_registrations WHERE id = ?', [registrationId]);
 

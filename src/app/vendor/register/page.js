@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SharedNavbar from '../../components/SharedNavbar';
 
-
-import { readData, writeData } from '@/lib/storage';
 export default function VendorRegisterPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -16,8 +14,12 @@ export default function VendorRegisterPage() {
   const [formData, setFormData] = useState({
     vendorName: '',
     phoneNumber: '',
+    identityType: 'ktp',
+    identityNumber: '',
     identityFile: null,
-    identityFileName: ''
+    identityFileName: '',
+    selfieFile: null,
+    selfieFileName: ''
   });
   
   const [errorMsg, setErrorMsg] = useState('');
@@ -67,6 +69,7 @@ export default function VendorRegisterPage() {
   };
 
   const handleFileChange = (e) => {
+    const { name } = e.target;
     const file = e.target.files?.[0];
     if (file) {
       // Validate file size (max 5MB)
@@ -87,8 +90,8 @@ export default function VendorRegisterPage() {
       reader.onload = (event) => {
         setFormData(prev => ({
           ...prev,
-          identityFile: event.target?.result,
-          identityFileName: file.name || ''
+          [name]: event.target?.result,
+          [`${name}Name`]: file.name || ''
         }));
         setErrorMsg('');
       };
@@ -101,7 +104,7 @@ export default function VendorRegisterPage() {
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!formData.vendorName || !formData.phoneNumber || !formData.identityFile) {
+    if (!formData.vendorName || !formData.phoneNumber || !formData.identityType || !formData.identityNumber || !formData.identityFile || !formData.selfieFile) {
       setErrorMsg('Semua field wajib diisi!');
       return;
     }
@@ -116,8 +119,12 @@ export default function VendorRegisterPage() {
           userId: user.id,
           vendorName: formData.vendorName,
           phoneNumber: formData.phoneNumber,
+          identityType: formData.identityType,
+          identityNumber: formData.identityNumber,
           identityFile: formData.identityFile,
           identityFileName: formData.identityFileName
+          , selfieFile: formData.selfieFile,
+          selfieFileName: formData.selfieFileName
         })
       });
 
@@ -126,7 +133,7 @@ export default function VendorRegisterPage() {
       if (data.success) {
         setSuccessMsg('✓ Registrasi vendor berhasil dikirim! Silakan tunggu persetujuan admin.');
         setRegistrationStatus(data.data);
-        setFormData({ vendorName: '', phoneNumber: '', identityFile: null, identityFileName: '' });
+        setFormData({ vendorName: '', phoneNumber: '', identityType: 'ktp', identityNumber: '', identityFile: null, identityFileName: '', selfieFile: null, selfieFileName: '' });
         setTimeout(() => {
           window.location.reload();
         }, 2000);
@@ -214,10 +221,39 @@ export default function VendorRegisterPage() {
                 </div>
 
                 <div className="form-group">
+                  <label htmlFor="identityType">Jenis Identitas</label>
+                  <select
+                    id="identityType"
+                    name="identityType"
+                    value={formData.identityType}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="ktp">KTP</option>
+                    <option value="sim">SIM</option>
+                    <option value="passport">Paspor</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="identityNumber">Nomor Identitas</label>
+                  <input
+                    type="text"
+                    id="identityNumber"
+                    name="identityNumber"
+                    value={formData.identityNumber}
+                    onChange={handleChange}
+                    placeholder="Contoh: 1234567890123456"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
                   <label htmlFor="identityFile">Upload File Identitas</label>
                   <input
                     type="file"
                     id="identityFile"
+                    name="identityFile"
                     accept="application/pdf,image/jpeg,image/png,image/jpg"
                     onChange={handleFileChange}
                     onClick={(e) => {
@@ -229,6 +265,26 @@ export default function VendorRegisterPage() {
                   {formData.identityFile && (
                     <div style={{ marginTop: '10px', color: '#22c55e', fontWeight: '500' }}>
                       ✓ File sudah dipilih
+                    </div>
+                  )}
+                </div>
+                <div className="form-group">
+                  <label htmlFor="selfieFile">Upload Foto Selfie</label>
+                  <input
+                    type="file"
+                    id="selfieFile"
+                    name="selfieFile"
+                    accept="image/jpeg,image/png,image/jpg"
+                    onChange={handleFileChange}
+                    onClick={(e) => {
+                      e.target.value = null;
+                    }}
+                    required
+                  />
+                  <small>Format: JPG, PNG (Max 5MB) - Upload foto selfie pribadi</small>
+                  {formData.selfieFile && (
+                    <div style={{ marginTop: '10px', color: '#22c55e', fontWeight: '500' }}>
+                      ✓ Foto selfie sudah dipilih
                     </div>
                   )}
                 </div>
@@ -275,6 +331,34 @@ export default function VendorRegisterPage() {
                     value={formData.phoneNumber}
                     onChange={handleChange}
                     placeholder="Contoh: 08123456789"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="identityType">Jenis Identitas</label>
+                  <select
+                    id="identityType"
+                    name="identityType"
+                    value={formData.identityType}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="ktp">KTP</option>
+                    <option value="sim">SIM</option>
+                    <option value="passport">Paspor</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="identityNumber">Nomor Identitas</label>
+                  <input
+                    type="text"
+                    id="identityNumber"
+                    name="identityNumber"
+                    value={formData.identityNumber}
+                    onChange={handleChange}
+                    placeholder="Contoh: 1234567890123456"
                     required
                   />
                 </div>
