@@ -112,6 +112,7 @@
     specification_options JSON,
     description_table JSON,
     checklist JSON,
+    -- Store per-row item metadata, including per-item deskripsi values inside each item object
     items JSON,
     variations JSON,
     available_quantity INTEGER,

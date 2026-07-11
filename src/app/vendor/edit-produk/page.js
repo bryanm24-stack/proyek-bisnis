@@ -103,7 +103,7 @@ function EditProdukPageContent() {
             descriptionTable: item.descriptionTable || {},
             checklist: item.checklist || {},
             variations: item.variations || {},
-            items: item.items || []
+            items: (item.items || []).map((entry) => ({ ...entry, deskripsi: entry.deskripsi || '' })),
           });
         }
       }
@@ -176,7 +176,7 @@ function EditProdukPageContent() {
         descriptionTable: formData.descriptionTable || {},
         checklist: formData.checklist || {},
         variations: formData.variations || {},
-        items: formData.items || [],
+        items: (formData.items || []).map((item) => ({ ...item, deskripsi: item.deskripsi || '' })),
         images: formData.images.filter(img => typeof img === 'string' && (img.startsWith('data:') || img.startsWith('http'))),
         rating: 0,
         rentCount: 0

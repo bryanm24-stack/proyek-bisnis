@@ -318,24 +318,29 @@ export default function CustomerVerificationPage() {
                       <tr className={styles['detail-row']}>
                         <td colSpan="6" className={styles['detail-panel']}>
                           <div className={styles['detail-content']}>
-                            <div><strong>Jenis Identitas:</strong> {ktpData.idType || 'KTP'}</div>
-                            <div><strong>Nomor Identitas:</strong> {ktpData.nik || '-'}</div>
-                            <div><strong>Catatan:</strong> {ktpData.notes || '-'}</div>
-                            <div><strong>Tanggal Pengajuan:</strong> {verification.ktp_submitted_at ? new Date(verification.ktp_submitted_at).toLocaleString('id-ID') : '-'}</div>
-                            <div><strong>Riwayat Verifikasi:</strong> {verificationHistory}</div>
-                            <div className={styles['detail-images']}>
-                              {ktpData.idPhotoPreview && (
-                                <div className={styles['detail-image-card']}>
-                                  <div className={styles['detail-image-title']}>Foto Identitas</div>
-                                  <img src={ktpData.idPhotoPreview} alt="Foto Identitas" />
-                                </div>
-                              )}
-                              {ktpData.selfiePhotoPreview && (
-                                <div className={styles['detail-image-card']}>
-                                  <div className={styles['detail-image-title']}>Foto Selfie</div>
-                                  <img src={ktpData.selfiePhotoPreview} alt="Foto Selfie" />
-                                </div>
-                              )}
+                            <div className={styles['detail-grid']}>
+                              <div className={styles['detail-meta']}>
+                                <div style={{ marginBottom: '8px' }}><strong>Jenis Identitas:</strong> {ktpData.idType || 'KTP'}</div>
+                                <div style={{ marginBottom: '8px' }}><strong>Nomor Identitas:</strong> {ktpData.nik || '-'}</div>
+                                <div style={{ marginBottom: '8px' }}><strong>Catatan:</strong> {ktpData.notes || '-'}</div>
+                                <div style={{ marginBottom: '8px' }}><strong>Tanggal Pengajuan:</strong> {verification.ktp_submitted_at ? new Date(verification.ktp_submitted_at).toLocaleString('id-ID') : '-'}</div>
+                                <div style={{ marginBottom: '8px' }}><strong>Riwayat Verifikasi:</strong> {verificationHistory}</div>
+                              </div>
+
+                              <div className={styles['detail-images-grid']}>
+                                {ktpData.idPhotoPreview && (
+                                  <div className={styles['detail-image-card']}>
+                                    <div className={styles['detail-image-title']}>Foto Identitas</div>
+                                    <img src={ktpData.idPhotoPreview} alt="Foto Identitas" />
+                                  </div>
+                                )}
+                                {ktpData.selfiePhotoPreview && (
+                                  <div className={styles['detail-image-card']}>
+                                    <div className={styles['detail-image-title']}>Foto Selfie</div>
+                                    <img src={ktpData.selfiePhotoPreview} alt="Foto Selfie" />
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>

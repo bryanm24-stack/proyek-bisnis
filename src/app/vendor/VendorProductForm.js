@@ -847,8 +847,8 @@ export default function VendorProductForm({
     const newItemId = `item-${Date.now()}`;
     const baseSpecOptionValues = Object.fromEntries(activeSpecOptionFields.map((field) => [field.key, '']));
     const newItem = isBarangSelected
-      ? { id: newItemId, namaBarang: '', hargaPcs: '', stok: '', images: [], variationValues: {}, specOptionValues: baseSpecOptionValues }
-      : { id: newItemId, namaJasa: '', hargaSesi: '', images: [], variationValues: {}, specOptionValues: baseSpecOptionValues };
+      ? { id: newItemId, namaBarang: '', deskripsi: '', hargaPcs: '', stok: '', images: [], variationValues: {}, specOptionValues: baseSpecOptionValues }
+      : { id: newItemId, namaJasa: '', deskripsi: '', hargaSesi: '', images: [], variationValues: {}, specOptionValues: baseSpecOptionValues };
 
     setFormData(prev => ({
       ...prev,
@@ -1184,33 +1184,6 @@ export default function VendorProductForm({
           />
         </div>
 
-        {/* Deskripsi Lengkap */}
-        <div>
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>
-            {isJasaSelected 
-              ? '📄 Deskripsi Lengkap Layanan' 
-              : '📄 Deskripsi Lengkap Barang'}
-          </label>
-          <textarea
-            name="description"
-            placeholder={isJasaSelected 
-              ? 'Jelaskan proses layanan, deliverables, timeline, expertise tim, portfolio, dan hal penting lainnya...' 
-              : 'Spesifikasi teknis, kondisi barang, fitur lengkap, cara perawatan, aksesori yang disertakan, dll...'}
-            value={formData.description || ''}
-            onChange={handleInputChange}
-            rows="5"
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #ddd',
-              borderRadius: '8px',
-              fontSize: '14px',
-              boxSizing: 'border-box',
-              fontFamily: 'inherit'
-            }}
-          />
-        </div>
-
         {/* Shortcut Popup Tabel */}
         <button
           type="button"
@@ -1328,7 +1301,7 @@ export default function VendorProductForm({
                         textAlign: 'left', 
                         fontWeight: '700', 
                         color: '#374151',
-                        width: '35%'
+                        width: '25%'
                       }}>
                         Nama Barang
                       </th>
@@ -1337,7 +1310,16 @@ export default function VendorProductForm({
                         textAlign: 'left', 
                         fontWeight: '700', 
                         color: '#374151',
-                        width: '22%'
+                        width: '28%'
+                      }}>
+                        Deskripsi Paket/Barang
+                      </th>
+                      <th style={{ 
+                        padding: '12px 14px', 
+                        textAlign: 'left', 
+                        fontWeight: '700', 
+                        color: '#374151',
+                        width: '18%'
                       }}>
                         Harga per Pcs (Rp)
                       </th>
@@ -1346,7 +1328,7 @@ export default function VendorProductForm({
                         textAlign: 'left', 
                         fontWeight: '700', 
                         color: '#374151',
-                        width: '16%'
+                        width: '14%'
                       }}>
                         Jumlah Stok (Unit)
                       </th>
@@ -1517,6 +1499,26 @@ export default function VendorProductForm({
                               borderRadius: '6px',
                               fontSize: '13px',
                               boxSizing: 'border-box',
+                              transition: 'border-color 0.2s'
+                            }}
+                            onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                            onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                          />
+                        </td>
+                        <td style={{ padding: '12px 14px' }}>
+                          <textarea
+                            rows={2}
+                            placeholder="Spesifikasi item, kelengkapan, kondisi, dan catatan paket"
+                            value={item.deskripsi || ''}
+                            onChange={(e) => handleItemFieldChange(item.id, 'deskripsi', e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '8px',
+                              fontSize: '13px',
+                              boxSizing: 'border-box',
+                              resize: 'vertical',
                               transition: 'border-color 0.2s'
                             }}
                             onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
@@ -1750,7 +1752,7 @@ export default function VendorProductForm({
                         textAlign: 'left', 
                         fontWeight: '700', 
                         color: '#374151',
-                        width: '48%'
+                        width: '28%'
                       }}>
                         Nama Paket Layanan
                       </th>
@@ -1759,7 +1761,16 @@ export default function VendorProductForm({
                         textAlign: 'left', 
                         fontWeight: '700', 
                         color: '#374151',
-                        width: '25%'
+                        width: '28%'
+                      }}>
+                        Deskripsi Paket/Barang
+                      </th>
+                      <th style={{ 
+                        padding: '12px 14px', 
+                        textAlign: 'left', 
+                        fontWeight: '700', 
+                        color: '#374151',
+                        width: '22%'
                       }}>
                         Harga Paket (Rp)
                       </th>
@@ -1930,6 +1941,26 @@ export default function VendorProductForm({
                               borderRadius: '6px',
                               fontSize: '13px',
                               boxSizing: 'border-box',
+                              transition: 'border-color 0.2s'
+                            }}
+                            onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                            onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+                          />
+                        </td>
+                        <td style={{ padding: '12px 14px' }}>
+                          <textarea
+                            rows={2}
+                            placeholder="Masukkan detail paket seperti durasi, layanan yang disertakan, dan ketentuan"
+                            value={item.deskripsi || ''}
+                            onChange={(e) => handleItemFieldChange(item.id, 'deskripsi', e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '8px',
+                              fontSize: '13px',
+                              boxSizing: 'border-box',
+                              resize: 'vertical',
                               transition: 'border-color 0.2s'
                             }}
                             onFocus={(e) => e.target.style.borderColor = '#3b82f6'}

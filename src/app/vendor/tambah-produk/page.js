@@ -133,7 +133,7 @@ export default function TambahProdukPage() {
         specificationOptions: formData.specificationOptions || {},
         descriptionTable: formData.descriptionTable || {},
         checklist: formData.checklist || {},
-        items: formData.items || [],
+        items: (formData.items || []).map((item) => ({ ...item, deskripsi: item.deskripsi || '' })),
         variations: formData.variations || {},
         // ✅ FIXED: Accept all valid image formats (base64, http, https, blob)
         images: (formData.images || [])

@@ -1603,10 +1603,12 @@ export default function HomePageClient() {
                           {/* Selected Item Details */}
                           {selectedItemDetail && (
                             <div style={{
-                              backgroundColor: '#f8f9fa',
-                              padding: '16px',
-                              borderRadius: '14px',
-                              marginTop: '16px'
+                              backgroundColor: '#ffffff',
+                              padding: '20px',
+                              borderRadius: '20px',
+                              marginTop: '20px',
+                              border: '1px solid #e5e7eb',
+                              boxShadow: '0 10px 30px rgba(15, 23, 42, 0.06)'
                             }}>
                               {(() => {
                                 const jasaAvailability = getServiceAvailability(selectedService);
@@ -1615,112 +1617,107 @@ export default function HomePageClient() {
 
                                 return (
                                   <>
-                              <div style={{ marginBottom: '16px' }}>
-                                <img
-                                  src={getItemPreviewImage(selectedItemDetail)}
-                                  alt={selectedItemDetail.namaBarang || selectedItemDetail.namaJasa}
-                                  style={{
-                                    width: '100%',
-                                    objectFit: 'cover',
-                                    borderRadius: '14px'
-                                  }}
-                                />
-                              </div>
-                              <h4 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: 'bold' }}>
-                                {selectedItemDetail.namaBarang || selectedItemDetail.namaJasa}
-                              </h4>
-                              {selectedItemDetail.deskripsi && (
-                                <p style={{ 
-                                  margin: '0 0 12px 0', 
-                                  fontSize: '14px', 
-                                  color: '#555',
-                                  lineHeight: '1.5'
-                                }}>
-                                  {selectedItemDetail.deskripsi}
-                                </p>
-                              )}
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                                <div>
-                                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Harga</p>
-                                  <p style={{ margin: '0', fontSize: '16px', fontWeight: 'bold', color: '#B28A67' }}>
-                                    Rp {selectedItemDetail.hargaPcs ? Number(selectedItemDetail.hargaPcs).toLocaleString('id-ID') : Number(selectedItemDetail.hargaSesi).toLocaleString('id-ID')}
-                                    {selectedItemDetail.hargaSesi ? ' / Hari' : ' / Pcs'}
-                                  </p>
-                                </div>
-                                {selectedItemDetail.stok !== undefined && (
-                                  <div>
-                                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Ketersediaan</p>
-                                    <p style={{ 
-                                      margin: '0', 
-                                      fontSize: '16px', 
-                                      fontWeight: 'bold',
-                                      color: selectedItemDetail.stok > 0 ? '#10b981' : '#dc2626'
-                                    }}>
-                                      {selectedItemDetail.stok > 0 ? `${selectedItemDetail.stok} Tersedia` : 'Habis'}
-                                    </p>
-                                  </div>
-                                )}
-                                {isJasaItem && (
-                                  <div>
-                                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#666' }}>Availability</p>
-                                    <p style={{
-                                      margin: '0',
-                                      fontSize: '16px',
-                                      fontWeight: 'bold',
-                                      color: jasaAvailability > 0 ? '#10b981' : '#dc2626'
-                                    }}>
-                                      {jasaAvailability > 0 ? `${jasaAvailability} Tim/Provider` : 'Penuh'}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                              {(() => {
-                                const selectedItemReviews = serviceReviews.filter((review) => String(review.itemId || '') === String(selectedItemDetail.id));
-                                const latestItemReviews = selectedItemReviews.slice(0, 3);
-                                if (latestItemReviews.length === 0) {
-                                  return (
-                                    <div style={{ marginBottom: '16px', padding: '10px 12px', borderRadius: '10px', background: '#fff', border: '1px solid #e5e7eb' }}>
-                                      <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: '700' }}>Review Paket Ini</div>
-                                      <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>Belum ada review untuk paket terpilih.</div>
-                                    </div>
-                                  );
-                                }
+                                    <div style={{ display: 'grid', gap: '20px' }}>
+                                      <div style={{ width: '100%', overflow: 'hidden', borderRadius: '14px', maxHeight: '280px', background: '#f3f4f6' }}>
+                                        <img
+                                          src={getItemPreviewImage(selectedItemDetail)}
+                                          alt={selectedItemDetail.namaBarang || selectedItemDetail.namaJasa}
+                                          style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            objectFit: 'cover',
+                                            display: 'block',
+                                            borderRadius: '14px'
+                                          }}
+                                        />
+                                      </div>
 
-                                return (
-                                  <div style={{ marginBottom: '16px', padding: '10px 12px', borderRadius: '10px', background: '#fff', border: '1px solid #e5e7eb' }}>
-                                    <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: '700', marginBottom: '6px' }}>
-                                      Review Paket Ini ({selectedItemReviews.length})
-                                    </div>
-                                    <div style={{ display: 'grid', gap: '6px' }}>
-                                      {latestItemReviews.map((review) => (
-                                        <div key={review.id} style={{ fontSize: '12px', color: '#374151', background: '#f9fafb', borderRadius: '8px', padding: '8px' }}>
-                                          <div style={{ fontWeight: '700' }}>⭐ {Number(review.rating || 0).toFixed(1)} - {review.customerName || 'Customer'}</div>
-                                          <div style={{ marginTop: '3px' }}>{review.review?.trim() || 'Customer tidak menulis komentar.'}</div>
+                                      <div style={{ display: 'grid', gap: '14px' }}>
+                                        <div>
+                                          <h4 style={{ margin: '0 0 10px 0', fontSize: '20px', fontWeight: '700', color: '#111827' }}>
+                                            {selectedItemDetail.namaBarang || selectedItemDetail.namaJasa}
+                                          </h4>
+                                          {selectedItemDetail.deskripsi ? (
+                                            <p style={{ margin: 0, fontSize: '15px', color: '#4b5563', lineHeight: '1.75' }}>
+                                              {selectedItemDetail.deskripsi}
+                                            </p>
+                                          ) : (
+                                            <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>
+                                              Tidak ada deskripsi paket tersedia.
+                                            </p>
+                                          )}
                                         </div>
-                                      ))}
+
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+                                          <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '14px' }}>
+                                            <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: '#6b7280' }}>Harga</p>
+                                            <p style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#B28A67' }}>
+                                              Rp {selectedItemDetail.hargaPcs ? Number(selectedItemDetail.hargaPcs).toLocaleString('id-ID') : Number(selectedItemDetail.hargaSesi).toLocaleString('id-ID')}
+                                              {selectedItemDetail.hargaSesi ? ' / Hari' : ' / Pcs'}
+                                            </p>
+                                          </div>
+                                          <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '14px' }}>
+                                            <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: '#6b7280' }}>
+                                              Ketersediaan
+                                            </p>
+                                            <p style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: isUnavailable ? '#dc2626' : '#10b981' }}>
+                                              {isJasaItem ? (jasaAvailability > 0 ? `${jasaAvailability} Tim/Provider` : 'Penuh') : (selectedItemDetail.stok > 0 ? `${selectedItemDetail.stok} Tersedia` : 'Habis')}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {(() => {
+                                        const selectedItemReviews = serviceReviews.filter((review) => String(review.itemId || '') === String(selectedItemDetail.id));
+                                        const latestItemReviews = selectedItemReviews.slice(0, 3);
+                                        if (latestItemReviews.length === 0) {
+                                          return (
+                                            <div style={{ padding: '16px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e5e7eb' }}>
+                                              <div style={{ fontSize: '13px', color: '#475569', fontWeight: '700' }}>Review Paket Ini</div>
+                                              <div style={{ marginTop: '6px', fontSize: '13px', color: '#6b7280' }}>Belum ada review untuk paket terpilih.</div>
+                                            </div>
+                                          );
+                                        }
+
+                                        return (
+                                          <div style={{ padding: '16px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #e5e7eb' }}>
+                                            <div style={{ marginBottom: '12px', fontSize: '13px', color: '#475569', fontWeight: '700' }}>
+                                              Review Paket Ini ({selectedItemReviews.length})
+                                            </div>
+                                            <div style={{ display: 'grid', gap: '10px' }}>
+                                              {latestItemReviews.map((review) => (
+                                                <div key={review.id} style={{ fontSize: '13px', color: '#334155', background: '#ffffff', borderRadius: '12px', padding: '12px', border: '1px solid #e5e7eb' }}>
+                                                  <div style={{ fontWeight: '700' }}>⭐ {Number(review.rating || 0).toFixed(1)} - {review.customerName || 'Customer'}</div>
+                                                  <div style={{ marginTop: '6px', color: '#475569' }}>{review.review?.trim() || 'Customer tidak menulis komentar.'}</div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        );
+                                      })()}
+
+                                      <button
+                                        className="btn-primary-modal"
+                                        onClick={() => openChatModal(selectedService, selectedItemDetail)}
+                                        disabled={(user && user.id === selectedService.vendorId) || isUnavailable}
+                                        style={{
+                                          width: '100%',
+                                          padding: '14px 18px',
+                                          backgroundColor: (user && user.id === selectedService.vendorId) || isUnavailable ? '#d1d5db' : '#B28A67',
+                                          color: 'white',
+                                          border: 'none',
+                                          borderRadius: '12px',
+                                          cursor: (user && user.id === selectedService.vendorId) || isUnavailable ? 'not-allowed' : 'pointer',
+                                          opacity: (user && user.id === selectedService.vendorId) || isUnavailable ? 0.6 : 1,
+                                          fontSize: '15px',
+                                          fontWeight: '700'
+                                        }}
+                                      >
+                                        {isUnavailable
+                                          ? (isJasaItem ? '⛔ Availability Penuh' : '⛔ Stok Habis')
+                                          : 'Chat untuk Paket Ini'}
+                                      </button>
                                     </div>
-                                  </div>
-                                );
-                              })()}
-                              <button
-                                className="btn-primary-modal"
-                                onClick={() => openChatModal(selectedService, selectedItemDetail)}
-                                disabled={user && user.id === selectedService.vendorId || isUnavailable}
-                                style={{
-                                  width: '100%',
-                                  padding: '10px',
-                                  backgroundColor: isUnavailable ? '#d1d5db' : '#B28A67',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  cursor: (user && user.id === selectedService.vendorId) || isUnavailable ? 'not-allowed' : 'pointer',
-                                  opacity: (user && user.id === selectedService.vendorId) || isUnavailable ? 0.5 : 1
-                                }}
-                              >
-                                {isUnavailable
-                                  ? (isJasaItem ? '⛔ Availability Penuh' : '⛔ Stok Habis')
-                                  : ' Chat untuk Paket Ini'}
-                              </button>
                                   </>
                                 );
                               })()}
@@ -3790,9 +3787,10 @@ export default function HomePageClient() {
 
         .modal-image {
           width: 100%;
-          height: 500px;
-          margin-bottom: 24px;
-          border-radius: 14px;
+          max-height: 280px;
+          height: auto;
+          margin-bottom: 20px;
+          border-radius: 12px;
           overflow: hidden;
           position: relative;
           background: #f3f4f6;
@@ -3804,7 +3802,11 @@ export default function HomePageClient() {
         .modal-image img {
           width: 100%;
           height: 100%;
-          object-fit: contain;
+          object-fit: cover;
+          display: block;
+          border-radius: 12px;
+          box-shadow: 0 6px 18px rgba(15,23,42,0.08);
+          border: 1px solid #edf2f7;
         }
 
         .modal-image-nav {

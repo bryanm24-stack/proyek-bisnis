@@ -16,6 +16,14 @@ function snakeToCamel(str) {
   return str.replace(/_([a-z])/g, (_, char) => char.toUpperCase());
 }
 
+function normalizeItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => ({
+    ...item,
+    deskripsi: item?.deskripsi ?? ''
+  }));
+}
+
 function normalizeServiceCapacity(service) {
   if (!service) return service;
 
@@ -31,7 +39,7 @@ function normalizeServiceCapacity(service) {
   const parsedSpecificationOptions = parseJsonSafe(normalized.specificationOptions, {});
   const parsedDescriptionTable = parseJsonSafe(normalized.descriptionTable, {});
   const parsedChecklist = parseJsonSafe(normalized.checklist, {});
-  const parsedItems = parseJsonSafe(normalized.items, []);
+  const parsedItems = normalizeItems(parseJsonSafe(normalized.items, []));
   const parsedVariations = parseJsonSafe(normalized.variations, {});
 
   if (normalized.type === 'jasa') {

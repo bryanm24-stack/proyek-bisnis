@@ -47,15 +47,16 @@ function NavLink({ href, active, children }) {
     <Link
       href={href}
       style={{
-          fontSize: '16px',
+          fontSize: '14px',
           color: active ? '#B28A67' : '#444',
           textDecoration: 'none',
           fontWeight: active ? '600' : '500',
-          padding: '14px 16px',
+          padding: '10px 14px',
           borderRadius: '12px',
           background: active ? '#f8f4ef' : 'transparent',
           transition: 'background 0.2s ease, color 0.2s ease',
           display: 'block',
+          lineHeight: '1.4',
         }}
     >
       {children}
@@ -236,7 +237,7 @@ export default function SharedNavbar() {
             <div style={{ fontWeight: '700', color: '#333', fontSize: '15px' }}>Akun</div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 14px 16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 14px 16px', height: 'calc(100vh - 140px)', overflow: 'hidden', justifyContent: 'space-between' }}>
             <Link
               href="/login"
               style={{
@@ -545,8 +546,9 @@ export default function SharedNavbar() {
           <div style={{ fontWeight: '700', color: '#333', fontSize: '16px' }}>Navigasi</div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '0 14px 20px', maxHeight: '60vh', overflowY: 'auto' }}>
-          <NavLink href="/" active={isActive('/')}>
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', padding: '0 14px 18px', height: 'calc(100% - 56px)', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: '1 1 auto' }}>
+            <NavLink href="/" active={isActive('/')}>
             Home
           </NavLink>
           <NavLink href="/notifications" active={isActive('/notifications')}>
@@ -618,6 +620,71 @@ export default function SharedNavbar() {
               </NavLink>
             </>
           )}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '8px', flex: '0 0 auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, #C8A587, #B28A67)',
+                  color: 'white',
+                  padding: '6px 10px',
+                  borderRadius: '50%',
+                  fontWeight: 'bold',
+                  minWidth: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '14px',
+                }}
+              >
+                {String(user?.name || user?.username || user?.email || 'U').charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#333' }}>
+                  {String(user?.name || user?.username || user?.email || 'User')}
+                </div>
+                <div style={{ fontSize: '11px', color: '#666' }}>
+                  {user?.role === 'customer' ? 'Customer' : user?.role === 'vendor' ? 'Vendor' : 'Admin'}
+                </div>
+              </div>
+            </div>
+
+            <Link
+              href="/settings"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                background: '#F3F4F6',
+                color: '#333',
+                border: '1px solid #e5e7eb',
+                padding: '8px 12px',
+                borderRadius: '10px',
+                textDecoration: 'none',
+                fontSize: '13px',
+                fontWeight: '600',
+              }}
+            >
+              Profil Saya
+            </Link>
+
+            <button
+              onClick={handleLogout}
+              style={{
+                background: '#ef4444',
+                color: 'white',
+                border: 'none',
+                padding: '8px 12px',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '600',
+              }}
+            >
+              🚪 Logout
+            </button>
+          </div>
         </div>
       </aside>
     </>
