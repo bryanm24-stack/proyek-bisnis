@@ -9,6 +9,6 @@ export async function GET() {
     return NextResponse.json({ success: true, data }, { status: 200 });
   } catch (error) {
     console.error('Error loading admin complaints:', error);
-    return NextResponse.json({ success: false, message: 'Gagal memuat complaint admin.' }, { status: 500 });
+    return NextResponse.json({ success: false, message: 'Gagal memuat komplain admin.' }, { status: 500 });
   }
 }

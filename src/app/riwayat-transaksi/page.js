@@ -136,7 +136,7 @@ function TransactionHistoryContent() {
       <main style={{ maxWidth: '1240px', margin: '0 auto', padding: '24px' }}>
         <h1 style={{ margin: 0, fontSize: '30px', color: '#0f172a' }}>Riwayat Transaksi</h1>
         <p style={{ margin: '8px 0 18px', color: '#475569' }}>
-          Semua histori transaksi ada di sini. Untuk histori complaint, pindah ke tab Riwayat Complaint.
+          Semua histori transaksi ada di sini. Untuk histori komplain, pindah ke tab Riwayat Komplain.
         </p>
 
         <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
@@ -205,7 +205,7 @@ function TransactionHistoryContent() {
 
             {filteredInvoices.length === 0 ? (
               <div style={{ padding: '24px', borderRadius: '14px', border: '1px dashed #cbd5e1', background: '#fff', color: '#64748b' }}>
-                Tidak ada transaksi untuk filter yang dipilih.
+                Tidak ada tagihan untuk filter yang dipilih.
               </div>
             ) : (
               <div style={{ display: 'grid', gap: '14px' }}>
@@ -217,7 +217,7 @@ function TransactionHistoryContent() {
                         <div>
                           <div style={{ fontWeight: '800', color: '#0f172a', fontSize: '20px' }}>{invoice.serviceTitle || 'Transaksi Sewa'}</div>
                           <div style={{ marginTop: '4px', color: '#64748b', fontSize: '13px' }}>
-                            Invoice: {invoice.id}
+                            Tagihan: {invoice.id}
                           </div>
                         </div>
                         <span style={{ background: tone.bg, color: tone.fg, padding: '6px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: '800' }}>

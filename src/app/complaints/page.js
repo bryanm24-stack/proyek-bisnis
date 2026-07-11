@@ -73,11 +73,11 @@ export default function ComplaintsPage() {
       const response = await fetch(`/api/complaints?userId=${userId}&scope=active`);
       const result = await response.json();
       if (!response.ok || result.success === false) {
-        throw new Error(result.message || 'Gagal memuat complaint aktif');
+        throw new Error(result.message || 'Gagal memuat komplain aktif');
       }
       setComplaints(Array.isArray(result.data) ? result.data : []);
     } catch (loadError) {
-      setListError(loadError.message || 'Gagal memuat complaint aktif');
+      setListError(loadError.message || 'Gagal memuat komplain aktif');
     } finally {
       setListLoading(false);
     }
@@ -105,7 +105,7 @@ export default function ComplaintsPage() {
         throw new Error(result.message || 'Gagal mengonfirmasi penerimaan');
       }
       await loadComplaints(user.id);
-      alert('Terima kasih, Anda telah mengonfirmasi penerimaan hasil complaint/refund.');
+      alert('Terima kasih, Anda telah mengonfirmasi penerimaan hasil komplain/refund.');
     } catch (submitError) {
       setError(submitError.message || 'Gagal mengonfirmasi penerimaan');
     } finally {
@@ -117,7 +117,7 @@ export default function ComplaintsPage() {
     event.preventDefault();
     if (!user?.id) return;
     if (!referenceId.trim()) {
-      setError('Invoice / Deal ID wajib diisi');
+      setError('Tagihan / Deal ID wajib diisi');
       return;
     }
 
@@ -137,23 +137,23 @@ export default function ComplaintsPage() {
       });
       const result = await response.json();
       if (!response.ok || result.success === false) {
-        throw new Error(result.message || 'Gagal mengajukan complaint');
+        throw new Error(result.message || 'Gagal mengajukan komplain');
       }
 
       setReferenceId('');
       setDescription('');
       setEvidenceFiles([]);
       await loadComplaints(user.id);
-      alert(result.message || 'Complaint berhasil diajukan');
+      alert(result.message || 'Komplain berhasil diajukan');
     } catch (submitError) {
-      setError(submitError.message || 'Gagal mengajukan complaint');
+      setError(submitError.message || 'Gagal mengajukan komplain');
     } finally {
       setSubmitting(false);
     }
   }
 
   if (loading) {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Memuat halaman complaint...</div>;
+    return <div style={{ padding: '40px', textAlign: 'center' }}>Memuat halaman komplain...</div>;
   }
 
   return (
@@ -161,19 +161,19 @@ export default function ComplaintsPage() {
       <SharedNavbar />
       <main className={styles.container}>
         <div className={styles.hero}>
-          <span className={styles.kicker}>Complaint Terpisah Dari Retur</span>
-          <h1 className={styles.title}>Buat Laporan Complaint</h1>
+          <span className={styles.kicker}>Komplain Terpisah Dari Retur</span>
+          <h1 className={styles.title}>Buat Laporan Komplain</h1>
           <p className={styles.subtitle}>
-            Halaman ini dipisahkan dari retur agar complaint kerusakan dan pembatalan tidak tercampur dengan proses pengembalian biasa.
-            Complaint bisa diajukan oleh customer maupun vendor (saat menjadi penyewa), dan semua mediasi berjalan melalui admin.
+            Halaman ini dipisahkan dari retur agar komplain kerusakan dan pembatalan tidak tercampur dengan proses pengembalian biasa.
+            Komplain bisa diajukan oleh customer maupun vendor (saat menjadi penyewa), dan semua mediasi berjalan melalui admin.
           </p>
         </div>
 
         <div className={styles.grid}>
           <section className={styles.panel}>
             <div className={styles.panelBody}>
-              <h2 className={styles.panelTitle}>Buat Laporan Complaint ({submitterLabel})</h2>
-              <p className={styles.panelDesc}>Isi referensi transaksi yang valid lalu pilih jenis complaint yang sesuai.</p>
+              <h2 className={styles.panelTitle}>Buat Laporan Komplain ({submitterLabel})</h2>
+              <p className={styles.panelDesc}>Isi referensi transaksi yang valid lalu pilih jenis komplain yang sesuai.</p>
 
               <div className={styles.alert}>
                 <strong>Perhatian:</strong> jenis <strong>Pembatalan</strong> dipakai untuk transaksi yang sudah dibayar dan akan otomatis dibuat sebagai draft mediasi admin.
@@ -181,7 +181,7 @@ export default function ComplaintsPage() {
 
               <form className={styles.form} onSubmit={handleSubmit}>
                 <div className={styles.field}>
-                  <label className={styles.label}>Invoice / Deal ID</label>
+                  <label className={styles.label}>Tagihan / Deal ID</label>
                   <input
                     className={styles.input}
                     placeholder="Contoh: #INV-1778 atau DEAL-123"
@@ -191,7 +191,7 @@ export default function ComplaintsPage() {
                 </div>
 
                 <div className={styles.field}>
-                  <label className={styles.label}>Jenis Complaint</label>
+                  <label className={styles.label}>Jenis Komplain</label>
                   <div className={styles.switchRow}>
                     {complaintTypes.map((item) => {
                       const active = item.value === type;
@@ -216,7 +216,7 @@ export default function ComplaintsPage() {
                 </div>
 
                 <div className={styles.field}>
-                  <label className={styles.label}>Deskripsi Complaint (opsional)</label>
+                  <label className={styles.label}>Deskripsi Komplain (opsional)</label>
                   <textarea
                     className={styles.textarea}
                     value={description}
@@ -231,14 +231,14 @@ export default function ComplaintsPage() {
                   <label className={styles.label}>Foto Bukti</label>
                   <input className={styles.fileInput} type="file" accept="image/*" multiple onChange={handleFileChange} />
                   <div className={styles.fileNote}>
-                    Bukti visual bersifat opsional, tetapi sangat membantu admin saat memediasi complaint dengan vendor.
+                    Bukti visual bersifat opsional, tetapi sangat membantu admin saat memediasi komplain dengan vendor.
                   </div>
                 </div>
 
                 {error && <div className={styles.error}>{error}</div>}
 
                 <button className={styles.submit} type="submit" disabled={submitting}>
-                  {submitting ? 'Mengirim Complaint...' : 'Ajukan Complaint'}
+                  {submitting ? 'Mengirim Komplain...' : 'Ajukan Komplain'}
                 </button>
               </form>
             </div>
@@ -246,15 +246,15 @@ export default function ComplaintsPage() {
 
           <section className={styles.panel}>
             <div className={styles.panelBody}>
-              <h2 className={styles.panelTitle}>Complaint Aktif Anda / Vendor</h2>
-              <p className={styles.panelDesc}>Halaman ini fokus untuk complaint aktif. Riwayat lengkap ada di menu Riwayat Transaksi.</p>
+              <h2 className={styles.panelTitle}>Komplain Aktif Anda / Vendor</h2>
+              <p className={styles.panelDesc}>Halaman ini fokus untuk komplain aktif. Riwayat lengkap ada di menu Riwayat Transaksi.</p>
 
               {listLoading ? (
-                <div className={styles.empty}>Memuat complaint aktif...</div>
+                <div className={styles.empty}>Memuat komplain aktif...</div>
               ) : listError ? (
                 <div className={styles.error}>{listError}</div>
               ) : complaints.length === 0 ? (
-                <div className={styles.empty}>Tidak ada complaint aktif. Cek menu Riwayat Transaksi untuk daftar selesai.</div>
+                <div className={styles.empty}>Tidak ada komplain aktif. Cek menu Riwayat Transaksi untuk daftar selesai.</div>
               ) : (
                 <div className={styles.list}>
                   {complaints.map((complaint) => {
@@ -264,7 +264,7 @@ export default function ComplaintsPage() {
                         <div className={styles.cardTop}>
                           <div>
                             <div style={{ fontWeight: 800, color: '#1f2937' }}>
-                              {complaint.type === 'pembatalan' ? 'Complaint Pembatalan' : 'Complaint Kerusakan'}
+                              {complaint.type === 'pembatalan' ? 'Komplain Pembatalan' : 'Komplain Kerusakan'}
                             </div>
                             <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>
                               Referensi: {complaint.invoiceId || complaint.dealId || complaint.transactionId}

@@ -71,7 +71,7 @@ export default function ReturnsPage() {
     } catch {}
   }, []);
 
-  // Debounced invoice lookup when user types an Invoice ID
+  // Debounced tagihan lookup when user types a Tagihan ID
   useEffect(() => {
     setInvoicePreview(null);
     setInvoiceSummary(null);
@@ -96,14 +96,14 @@ export default function ReturnsPage() {
         if (!resp.ok || json.success === false) {
           setInvoicePreview(null);
           setInvoiceSummary(null);
-          setInvoiceError(json.message || 'Invoice tidak ditemukan');
+          setInvoiceError(json.message || 'Tagihan tidak ditemukan');
         } else {
           setInvoicePreview(json.data);
           setInvoiceSummary(json.data.orderSummary || null);
           setInvoiceError('');
         }
       } catch (err) {
-        if (!cancelled) setInvoiceError(err.message || 'Gagal mencari invoice');
+        if (!cancelled) setInvoiceError(err.message || 'Gagal mencari tagihan');
       } finally {
         if (!cancelled) setInvoiceLoading(false);
       }
@@ -191,12 +191,12 @@ export default function ReturnsPage() {
   async function submitReturn(e) {
     e.preventDefault();
     if (!user) return alert('Login terlebih dahulu');
-    if (!dealId) return alert('Masukkan Deal ID atau Invoice ID (contoh: #INV-1778)');
+    if (!dealId) return alert('Masukkan Deal ID atau Tagihan ID (contoh: #INV-1778)');
     setSubmitting(true);
     try {
-      // Resolve if user entered an Invoice ID like INV-... or #INV-...
+      // Resolve if user entered a Tagihan ID like INV-... or #INV-...
       let targetDealId = dealId.trim();
-      // If user already confirmed an invoice preview, prefer it
+      // If user already confirmed a tagihan preview, prefer it
       if (invoiceConfirmed && invoicePreview) {
         targetDealId = invoicePreview.dealId || invoicePreview.invoiceId || targetDealId;
       }
@@ -206,7 +206,7 @@ export default function ReturnsPage() {
         const resp = await fetch(`/api/returns?invoiceId=${encodeURIComponent(normalized)}`);
         const json = await resp.json();
         if (!resp.ok || json.success === false || !json.data) {
-          throw new Error(json.message || 'Invoice tidak ditemukan. Pastikan ID benar.');
+          throw new Error(json.message || 'Tagihan tidak ditemukan. Pastikan ID benar.');
         }
         targetDealId = json.data.dealId || json.data.invoiceId || targetDealId;
       }
@@ -315,7 +315,7 @@ export default function ReturnsPage() {
         <div className={styles.pageHeader}>
           <h2 className={styles.pageTitle}>Retur (Pengembalian Akhir)</h2>
           <p className={styles.pageSubtitle}>
-            Ajukan retur dan cek estimasi denda secara otomatis dari invoice atau deal Anda.
+            Ajukan retur dan cek estimasi denda secara otomatis dari tagihan atau deal Anda.
           </p>
         </div>
         {!user && (
@@ -327,12 +327,12 @@ export default function ReturnsPage() {
           <div className={styles.columns}>
             <div className={styles.column}>
               <h3>Ajukan Retur Barang</h3>
-              <p className={styles.fieldCaption}>Masukkan Invoice atau Deal ID untuk melihat rincian pesanan dan estimasi denda secara otomatis.</p>
+              <p className={styles.fieldCaption}>Masukkan Tagihan atau Deal ID untuk melihat rincian pesanan dan estimasi denda secara otomatis.</p>
               <form onSubmit={submitReturn}>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Invoice / Deal ID</label>
+                  <label className={styles.label}>Tagihan / Deal ID</label>
                   <input placeholder="Contoh: #INV-1778 atau DEAL-123" className={styles.input} value={dealId} onChange={(e) => setDealId(e.target.value)} />
-                  {invoiceLoading && <div className={styles.small} style={{ color: '#6b7280', marginTop: 6 }}>Mencari invoice...</div>}
+                  {invoiceLoading && <div className={styles.small} style={{ color: '#6b7280', marginTop: 6 }}>Mencari tagihan...</div>}
                   {invoiceError && <div className={styles.small} style={{ color: 'crimson', marginTop: 6 }}>{invoiceError}</div>}
                   {invoicePreview && (
                     <div className={styles.invoicePreview} style={{ marginTop: 14 }}>
@@ -341,14 +341,14 @@ export default function ReturnsPage() {
                           <div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>{invoicePreview.serviceTitle}</div>
                           <div className={styles.invoicePreviewMain}>
                             <div>{invoicePreview.vendorName} • {invoicePreview.customerName}</div>
-                            <div><strong>Invoice:</strong> {invoicePreview.invoiceId}</div>
+                            <div><strong>Tagihan:</strong> {invoicePreview.invoiceId}</div>
                             <div><strong>Deal:</strong> {invoicePreview.dealId || '-'}</div>
                             <div><strong>Total:</strong> Rp {(Number(invoicePreview.totalAmount || invoicePreview.remainingPayment || 0)).toLocaleString('id-ID')}</div>
                           </div>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
                           <button type="button" className={styles.btn} onClick={() => setInvoiceDetailOpen(true)}>Lihat detail</button>
-                          <button type="button" className={styles.btn} onClick={() => { setDealId(invoicePreview.dealId || invoicePreview.invoiceId); setInvoiceConfirmed(true); }}>Gunakan invoice ini</button>
+                          <button type="button" className={styles.btn} onClick={() => { setDealId(invoicePreview.dealId || invoicePreview.invoiceId); setInvoiceConfirmed(true); }}>Gunakan tagihan ini</button>
                           <button type="button" className={styles.secondary} onClick={() => { setInvoicePreview(null); setDealId(''); }}>Batal</button>
                         </div>
                       </div>

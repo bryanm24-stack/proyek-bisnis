@@ -354,7 +354,7 @@ export async function createComplaintDraft({
 
   const normalizedType = normalizeComplaintType(type);
   if (!normalizedType) {
-    throw new Error('Tipe complaint tidak valid');
+    throw new Error('Tipe komplain tidak valid');
   }
 
   const existingRows = await query(
@@ -414,7 +414,7 @@ export async function createComplaintDraft({
     'complaint_created',
     normalizedType === 'pembatalan'
       ? 'Ada permintaan pembatalan yang menunggu mediasi admin.'
-      : 'Ada complaint baru dari customer yang menunggu mediasi admin.',
+      : 'Ada komplain baru dari customer yang menunggu mediasi admin.',
     complaintId,
     { complaintId, transactionId, vendorId, userId, type: normalizedType }
   );
@@ -577,13 +577,13 @@ export async function updateComplaintWorkflow({
       await createNotification(
         current.vendor_id,
         'complaint_forwarded_to_vendor',
-        'Admin meneruskan instruksi complaint/refund yang perlu Anda proses.',
+        'Admin meneruskan instruksi komplain/refund yang perlu Anda proses.',
         complaintId,
         { complaintId, transactionId: current.transaction_id }
       );
     } else if (normalizedAction === 'resolve') {
       if (current.status !== COMPLAINT_STATUSES.REFUND_PROCESSED) {
-        throw new Error('Complaint hanya bisa diselesaikan setelah vendor mengirim bukti refund');
+        throw new Error('Komplain hanya bisa diselesaikan setelah vendor mengirim bukti refund');
       }
       if (!current.refund_proof_url || !current.refund_paid_at) {
         throw new Error('Bukti refund vendor belum lengkap');
@@ -599,7 +599,7 @@ export async function updateComplaintWorkflow({
       await createNotification(
         current.user_id,
         'complaint_resolved',
-        'Complaint Anda telah diselesaikan oleh admin.',
+        'Komplain Anda telah diselesaikan oleh admin.',
         complaintId,
         { complaintId, transactionId: current.transaction_id }
       );
@@ -611,13 +611,13 @@ export async function updateComplaintWorkflow({
       throw new Error('Aksi customer tidak dikenali');
     }
     if (String(current.user_id) !== String(actorId)) {
-      throw new Error('Anda tidak memiliki akses ke complaint ini');
+      throw new Error('Anda tidak memiliki akses ke komplain ini');
     }
     if (current.status !== COMPLAINT_STATUSES.RESOLVED) {
-      throw new Error('Konfirmasi penerimaan hanya tersedia setelah admin menutup complaint');
+      throw new Error('Konfirmasi penerimaan hanya tersedia setelah admin menutup komplain');
     }
     if (!current.admin_verified_at) {
-      throw new Error('Complaint belum diverifikasi admin');
+      throw new Error('Komplain belum diverifikasi admin');
     }
 
     await query(
@@ -630,19 +630,19 @@ export async function updateComplaintWorkflow({
     await createNotification(
       current.user_id,
       'complaint_customer_confirmed',
-      'Anda telah mengonfirmasi penerimaan hasil complaint/refund.',
+      'Anda telah mengonfirmasi penerimaan hasil komplain/refund.',
       complaintId,
       { complaintId, transactionId: current.transaction_id }
     );
   } else if (normalizedRole === 'vendor') {
     if (String(current.vendor_id) !== String(actorId)) {
-      throw new Error('Anda tidak memiliki akses ke complaint ini');
+      throw new Error('Anda tidak memiliki akses ke komplain ini');
     }
     if (normalizedAction !== 'submit_refund_payment') {
       throw new Error('Aksi vendor tidak dikenali');
     }
     if (current.status !== COMPLAINT_STATUSES.FORWARDED_TO_VENDOR) {
-      throw new Error('Complaint ini belum siap diproses refund oleh vendor');
+      throw new Error('Komplain ini belum siap diproses refund oleh vendor');
     }
 
     const normalizedRefundMethod = String(refundMethod || '').trim();
@@ -690,7 +690,7 @@ export async function updateComplaintWorkflow({
     await createNotification(
       current.user_id,
       'complaint_refund_submitted',
-      'Vendor telah mengirim bukti refund. Complaint sedang diverifikasi admin.',
+      'Vendor telah mengirim bukti refund. Komplain sedang diverifikasi admin.',
       complaintId,
       { complaintId, transactionId: current.transaction_id }
     );

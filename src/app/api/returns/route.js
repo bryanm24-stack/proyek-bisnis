@@ -241,7 +241,7 @@ export async function GET(request) {
     if (invoiceId) {
       const invoice = await findInvoiceByInput(invoiceId);
       if (!invoice) {
-        return NextResponse.json({ success: false, message: 'Invoice tidak ditemukan' }, { status: 404 });
+        return NextResponse.json({ success: false, message: 'Tagihan tidak ditemukan' }, { status: 404 });
       }
 
       // Find transaction - try multiple ways
@@ -497,11 +497,11 @@ export async function POST(request) {
 
     const invoice = await findInvoiceByInput(dealId);
     if (!invoice) {
-      return NextResponse.json({ success: false, message: 'Invoice tidak ditemukan untuk deal/invoice ID tersebut' }, { status: 404 });
+      return NextResponse.json({ success: false, message: 'Tagihan tidak ditemukan untuk deal/invoice ID tersebut' }, { status: 404 });
     }
 
     if (String(invoice.customer_id || '') && String(invoice.customer_id) !== String(customerId)) {
-      return NextResponse.json({ success: false, message: 'Anda tidak memiliki akses untuk invoice ini' }, { status: 403 });
+      return NextResponse.json({ success: false, message: 'Anda tidak memiliki akses untuk tagihan ini' }, { status: 403 });
     }
 
     const deals = invoice.deal_id
@@ -725,7 +725,7 @@ export async function PUT(request) {
 
     return NextResponse.json({
       success: true,
-      message: isComplaint ? 'Resolusi complaint tersimpan' : 'Inspeksi pengembalian berhasil disimpan',
+      message: isComplaint ? 'Resolusi komplain tersimpan' : 'Inspeksi pengembalian berhasil disimpan',
       data: {
         returnId: requestRow.id,
         dealId: requestRow.deal_id,

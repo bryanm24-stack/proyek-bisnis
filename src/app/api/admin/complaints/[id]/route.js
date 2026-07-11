@@ -11,7 +11,7 @@ export async function PATCH(request, { params }) {
     const complaintId = resolvedParams?.id;
 
     if (!complaintId) {
-      return NextResponse.json({ success: false, message: 'Complaint ID diperlukan' }, { status: 400 });
+      return NextResponse.json({ success: false, message: 'Komplain ID diperlukan' }, { status: 400 });
     }
 
     const contentType = request.headers.get('content-type') || '';
@@ -76,8 +76,8 @@ export async function PATCH(request, { params }) {
 
     return NextResponse.json({ success: true, data }, { status: 200 });
   } catch (error) {
-    console.error('Error updating complaint workflow:', error);
-    return NextResponse.json({ success: false, message: error.message || 'Gagal memperbarui complaint.' }, { status: 500 });
+    console.error('Error updating komplain workflow:', error);
+    return NextResponse.json({ success: false, message: error.message || 'Gagal memperbarui komplain.' }, { status: 500 });
   }
 }
 
@@ -89,12 +89,12 @@ export async function GET(request, { params }) {
     const data = await getComplaintById(complaintId);
 
     if (!data) {
-      return NextResponse.json({ success: false, message: 'Complaint tidak ditemukan' }, { status: 404 });
+      return NextResponse.json({ success: false, message: 'Komplain tidak ditemukan' }, { status: 404 });
     }
 
     return NextResponse.json({ success: true, data }, { status: 200 });
   } catch (error) {
-    console.error('Error reading complaint detail:', error);
-    return NextResponse.json({ success: false, message: 'Gagal memuat detail complaint.' }, { status: 500 });
+    console.error('Error reading komplain detail:', error);
+    return NextResponse.json({ success: false, message: 'Gagal memuat detail komplain.' }, { status: 500 });
   }
 }

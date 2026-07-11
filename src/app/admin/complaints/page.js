@@ -37,7 +37,7 @@ export default function AdminComplaintsPage() {
         setNote(selected?.adminNote || '');
       }
     } catch (error) {
-      console.error('Error loading admin complaints:', error);
+      console.error('Error loading admin komplain:', error);
     } finally {
       setLoading(false);
     }
@@ -83,11 +83,11 @@ export default function AdminComplaintsPage() {
       });
       const result = await response.json();
       if (!response.ok || result.success === false) {
-        throw new Error(result.message || 'Gagal memperbarui complaint');
+        throw new Error(result.message || 'Gagal memperbarui komplain');
       }
       await fetchComplaints(selectedComplaint.id);
     } catch (error) {
-      alert(error.message || 'Gagal memperbarui complaint');
+      alert(error.message || 'Gagal memperbarui komplain');
     } finally {
       setActionLoading(false);
     }
@@ -110,7 +110,7 @@ export default function AdminComplaintsPage() {
       <main style={{ maxWidth: '1280px', margin: '0 auto', padding: '24px' }}>
         <h1 style={{ margin: 0, color: '#0f172a', fontSize: '30px' }}>Manajemen Keluhan</h1>
         <p style={{ color: '#475569', margin: '8px 0 20px' }}>
-          Admin menjadi mediator tunggal antara pelanggan dan vendor untuk complaint kerusakan maupun pembatalan yang sudah dibayar.
+          Admin menjadi mediator tunggal antara pelanggan dan vendor untuk komplain kerusakan maupun pembatalan yang sudah dibayar.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '12px', marginBottom: '18px' }}>
@@ -134,7 +134,7 @@ export default function AdminComplaintsPage() {
             </div>
             <div style={{ display: 'grid' }}>
               {complaints.length === 0 ? (
-                <div style={{ padding: '18px 20px', color: '#64748b' }}>Belum ada complaint yang tercatat.</div>
+                <div style={{ padding: '18px 20px', color: '#64748b' }}>Belum ada komplain yang tercatat.</div>
               ) : complaints.map((complaint) => (
                 <button
                   key={complaint.id}
@@ -173,12 +173,12 @@ export default function AdminComplaintsPage() {
 
           <section style={{ background: '#fff', borderRadius: '18px', border: '1px solid #e5e7eb', padding: '20px' }}>
             {!selectedComplaint ? (
-              <div style={{ color: '#64748b' }}>Pilih complaint untuk melihat detail mediasi.</div>
+              <div style={{ color: '#64748b' }}>Pilih komplain untuk melihat detail mediasi.</div>
             ) : (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap', marginBottom: '18px' }}>
                   <div>
-                    <h2 style={{ margin: '0 0 6px', color: '#0f172a' }}>Detail Complaint</h2>
+                    <h2 style={{ margin: '0 0 6px', color: '#0f172a' }}>Detail Komplain</h2>
                     <div style={{ color: '#64748b', fontSize: '14px' }}>{selectedComplaint.id}</div>
                   </div>
                   <div style={{ padding: '10px 12px', borderRadius: '12px', background: '#f8fafc', color: '#0f172a', fontWeight: '700' }}>
@@ -268,7 +268,7 @@ export default function AdminComplaintsPage() {
                       disabled={actionLoading}
                       style={{ background: '#15803d', color: '#fff', border: 'none', borderRadius: '12px', padding: '12px 16px', fontWeight: '800', cursor: 'pointer' }}
                     >
-                      Selesaikan Complaint
+                      Selesaikan Komplain
                     </button>
                   )}
 
@@ -280,7 +280,7 @@ export default function AdminComplaintsPage() {
 
                   {selectedComplaint.status === 'RESOLVED' && (
                     <div style={{ padding: '12px 14px', borderRadius: '12px', background: '#dcfce7', color: '#166534', fontWeight: '700' }}>
-                      Complaint sudah ditutup dan hasilnya terlihat oleh pelanggan.
+                      Komplain sudah ditutup dan hasilnya terlihat oleh pelanggan.
                     </div>
                   )}
                 </div>

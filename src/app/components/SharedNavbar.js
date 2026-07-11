@@ -556,12 +556,12 @@ export default function SharedNavbar() {
             Chat
           </NavLink>
           <NavLink href="/returns" active={isActive('/returns')}>
-            Returns
+            Retur
           </NavLink>
 
           {(user.role === 'customer' || user.role === 'member' || user.role === 'vendor') && (
             <NavLink href="/complaints" active={isExactPath('/complaints')}>
-              Complaint
+              Komplain
             </NavLink>
           )}
 

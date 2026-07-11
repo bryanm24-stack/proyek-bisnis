@@ -247,7 +247,7 @@ export async function POST(request) {
 
           return NextResponse.json({
             success: true,
-            message: 'Transaksi sudah dibayar. Permintaan pembatalan diteruskan ke admin melalui complaint.',
+            message: 'Transaksi sudah dibayar. Permintaan pembatalan diteruskan ke admin melalui komplain.',
             data: {
               deal: mapDealRow(existingDealRow, chat),
               chat,

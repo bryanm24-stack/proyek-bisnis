@@ -97,21 +97,21 @@ export default function VendorComplaintsPage() {
   }
 
   if (loading) {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Memuat instruksi complaint vendor...</div>;
+    return <div style={{ padding: '40px', textAlign: 'center' }}>Memuat instruksi komplain vendor...</div>;
   }
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
       <SharedNavbar />
       <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '24px' }}>
-        <h1 style={{ margin: '0 0 8px', fontSize: '28px', color: '#0f172a' }}>Instruksi Complaint Vendor</h1>
+        <h1 style={{ margin: '0 0 8px', fontSize: '28px', color: '#0f172a' }}>Instruksi Komplain Vendor</h1>
         <p style={{ margin: '0 0 20px', color: '#475569' }}>
-          Vendor hanya menerima complaint aktif hasil mediasi admin. Riwayat lengkap tersedia di menu Riwayat Transaksi.
+          Vendor hanya menerima komplain aktif hasil mediasi admin. Riwayat lengkap tersedia di menu Riwayat Transaksi.
         </p>
 
         {complaints.length === 0 ? (
           <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '16px', padding: '24px', color: '#64748b' }}>
-            Belum ada complaint aktif dari admin.
+            Belum ada komplain aktif dari admin.
           </div>
         ) : (
           <div style={{ display: 'grid', gap: '16px' }}>
@@ -156,14 +156,14 @@ export default function VendorComplaintsPage() {
 
                 {complaint.description && (
                   <div style={{ padding: '14px', borderRadius: '14px', background: '#f8fafc', color: '#334155', lineHeight: 1.5, marginBottom: '12px' }}>
-                    <strong>Ringkasan complaint customer:</strong><br />
+                    <strong>Ringkasan komplain customer:</strong><br />
                     {complaint.description}
                   </div>
                 )}
 
                 {complaint.evidenceUrl && (
                   <a href={complaint.evidenceUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', marginBottom: '12px', color: '#b45309', fontWeight: '700' }}>
-                    Lihat bukti complaint
+                    Lihat bukti komplain
                   </a>
                 )}
 
@@ -254,8 +254,8 @@ export default function VendorComplaintsPage() {
                 ) : (
                   <div style={{ padding: '12px 14px', borderRadius: '12px', background: complaint.status === 'REFUND_PROCESSED' ? '#dcfce7' : '#f8fafc', color: complaint.status === 'REFUND_PROCESSED' ? '#166534' : '#475569', fontWeight: '700' }}>
                     {complaint.status === 'REFUND_PROCESSED'
-                      ? 'Bukti refund sudah terkirim. Menunggu verifikasi admin sebelum complaint ditutup.'
-                      : 'Complaint ini sudah ditutup admin.'}
+                      ? 'Bukti refund sudah terkirim. Menunggu verifikasi admin sebelum komplain ditutup.'
+                      : 'Komplain ini sudah ditutup admin.'}
                   </div>
                 )}
               </article>

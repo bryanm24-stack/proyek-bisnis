@@ -97,7 +97,7 @@ export async function POST(request) {
     const referenceId = getReferenceId(payload);
 
     if (!userId || !normalizedType || !referenceId) {
-      return NextResponse.json({ success: false, message: 'userId, type, dan Invoice/Deal/Transaction ID wajib diisi' }, { status: 400 });
+      return NextResponse.json({ success: false, message: 'userId, type, dan Tagihan/Deal/Transaction ID wajib diisi' }, { status: 400 });
     }
 
     const context = await resolveComplaintReference(referenceId);
@@ -112,7 +112,7 @@ export async function POST(request) {
     if (normalizedType === 'pembatalan' && !isPaidTransactionContext(context)) {
       return NextResponse.json({
         success: false,
-        message: 'Complaint pembatalan hanya dipakai untuk transaksi yang sudah dibayar. Jika belum bayar, gunakan pembatalan deal biasa.'
+        message: 'Komplain pembatalan hanya dipakai untuk transaksi yang sudah dibayar. Jika belum bayar, gunakan pembatalan deal biasa.'
       }, { status: 400 });
     }
 
@@ -147,11 +147,11 @@ export async function POST(request) {
       success: true,
       message: normalizedType === 'pembatalan'
         ? 'Permintaan pembatalan berhasil diteruskan ke admin untuk dimediasi.'
-        : 'Complaint berhasil diajukan ke admin.',
+        : 'Komplain berhasil diajukan ke admin.',
       data: complaint
     }, { status: 201 });
   } catch (error) {
-    console.error('Error creating complaint:', error);
-    return NextResponse.json({ success: false, message: error.message || 'Gagal membuat complaint.' }, { status: 500 });
+    console.error('Error creating komplain:', error);
+    return NextResponse.json({ success: false, message: error.message || 'Gagal membuat komplain.' }, { status: 500 });
   }
 }

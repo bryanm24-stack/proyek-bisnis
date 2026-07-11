@@ -130,11 +130,11 @@ export default function VendorOngoingPage() {
 
                 {deal.complains && deal.complains.length > 0 && (
                   <div className={styles.complainsSection}>
-                    <h4>Complain dari Customer:</h4>
+                    <h4>Komplain dari Customer:</h4>
                     {deal.complains.map(complain => (
                       <div key={complain.id} className={styles.complainItem}>
                         {complain.photo && (
-                          <img src={complain.photo} alt="Foto complain" className={styles.complainPhoto} />
+                          <img src={complain.photo} alt="Foto komplain" className={styles.complainPhoto} />
                         )}
                         <p><strong>Alasan:</strong> {complain.reason}</p>
                         <p className={styles.complainDate}>

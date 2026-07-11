@@ -76,10 +76,10 @@ export default function VendorInvoicesPage() {
     if (!invoiceId) return;
     try {
       await navigator.clipboard.writeText(String(invoiceId));
-      alert(`Invoice ID berhasil disalin: ${invoiceId}`);
+      alert(`Tagihan ID berhasil disalin: ${invoiceId}`);
     } catch (error) {
-      console.error('Error copying invoice ID:', error);
-      alert('Gagal menyalin Invoice ID');
+      console.error('Error copying tagihan ID:', error);
+      alert('Gagal menyalin Tagihan ID');
     }
   };
 
@@ -129,7 +129,7 @@ export default function VendorInvoicesPage() {
       <div>
         <SharedNavbar />
         <div style={{ textAlign: 'center', padding: '50px', color: '#666' }}>
-           Memuat invoice...
+           Memuat tagihan...
         </div>
       </div>
     );
@@ -147,10 +147,10 @@ export default function VendorInvoicesPage() {
         {/* Header */}
         <div style={{ marginBottom: '32px' }}>
           <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>
-             Invoice Transaksi
+             Tagihan Transaksi
           </h1>
           <p style={{ color: '#666', fontSize: '16px' }}>
-            Riwayat invoice akun kamu saat menyewa barang/jasa.
+            Riwayat tagihan akun kamu saat menyewa barang/jasa.
           </p>
         </div>
 
@@ -159,7 +159,7 @@ export default function VendorInvoicesPage() {
           {[
             { value: 'pending', label: ' Menunggu Pembayaran' },
             { value: 'paid', label: ' Sudah Dibayar' },
-            { value: 'all', label: ' Semua Invoice' }
+            { value: 'all', label: ' Semua Tagihan' }
           ].map(btn => (
             <button
               key={btn.value}
@@ -191,10 +191,10 @@ export default function VendorInvoicesPage() {
             color: '#666'
           }}>
             <p style={{ fontSize: '18px', marginBottom: '8px' }}>
-              📭 Tidak ada invoice
+              📭 Tidak ada tagihan
             </p>
             <p style={{ fontSize: '14px', color: '#999' }}>
-              Invoice akan muncul saat ada deal yang disepakati dan menunggu pembayaran
+              Tagihan akan muncul saat ada deal yang disepakati dan menunggu pembayaran
             </p>
           </div>
         ) : (
@@ -223,7 +223,7 @@ export default function VendorInvoicesPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <div>
                     <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: '600' }}>
-                      Invoice #{invoice.id || 'N/A'}
+                      Tagihan #{invoice.id || 'N/A'}
                     </h3>
                     <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>
                       {counterpartyLabel}: <strong>{counterpartyName}</strong>
@@ -233,7 +233,7 @@ export default function VendorInvoicesPage() {
                       onClick={(event) => copyInvoiceId(invoice.id, event)}
                       style={{ marginTop: '8px', border: '1px solid #d6d3d1', background: '#fff', color: '#44403c', borderRadius: '8px', padding: '6px 10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
                     >
-                      Salin Invoice ID
+                      Salin Tagihan ID
                     </button>
                   </div>
                   <div style={{ textAlign: 'right' }}>
@@ -292,10 +292,10 @@ export default function VendorInvoicesPage() {
                       marginTop: '16px',
                       borderLeft: '4px solid #B28A67'
                     }}>
-                      <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}> Detail Invoice</h4>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}> Detail Tagihan</h4>
                       <div style={{ display: 'grid', gap: '8px', fontSize: '13px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
-                          <span style={{ color: '#666' }}>Invoice ID Lengkap:</span>
+                          <span style={{ color: '#666' }}>Tagihan ID Lengkap:</span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                             <strong style={{ wordBreak: 'break-all', textAlign: 'right' }}>{invoice.id || 'N/A'}</strong>
                             <button
@@ -308,7 +308,7 @@ export default function VendorInvoicesPage() {
                           </div>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ color: '#666' }}>Tanggal Invoice:</span>
+                          <span style={{ color: '#666' }}>Tanggal Tagihan:</span>
                           <strong>{invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString('id-ID') : 'N/A'}</strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>

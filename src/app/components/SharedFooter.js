@@ -98,12 +98,12 @@ export default function SharedFooter() {
                   ? [
                       { label: ' Barang/Jasa Saya', href: '/vendor/produk' },
                       { label: ' Chat', href: '/vendor/chats' },
-                      { label: ' Invoice', href: '/vendor/invoices' }
+                      { label: ' Tagihan', href: '/vendor/invoices' }
                     ]
                   : [
                       { label: '📝 Daftar Vendor', href: '/vendor/register' },
                       { label: ' Chat', href: '/customer/chats' },
-                      { label: ' Invoice', href: '/customer/invoices' }
+                      { label: ' Tagihan', href: '/customer/invoices' }
                     ])
               ].map((link, idx) => (
                 <Link

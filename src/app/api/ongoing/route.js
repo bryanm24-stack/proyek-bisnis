@@ -139,11 +139,11 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Complain berhasil dikirim',
+      message: 'Komplain berhasil dikirim',
       data: complain
     }, { status: 201 });
   } catch (error) {
-    console.error('Error submitting complain:', error);
+    console.error('Error submitting komplain:', error);
     return NextResponse.json({
       success: false,
       message: 'Terjadi kesalahan server.'

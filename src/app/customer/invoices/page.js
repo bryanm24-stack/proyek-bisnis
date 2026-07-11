@@ -49,10 +49,10 @@ export default function CustomerInvoicesPage() {
     if (!invoiceId) return;
     try {
       await navigator.clipboard.writeText(String(invoiceId));
-      alert(`Invoice ID berhasil disalin: ${invoiceId}`);
+      alert(`Tagihan ID berhasil disalin: ${invoiceId}`);
     } catch (error) {
-      console.error('Error copying invoice ID:', error);
-      alert('Gagal menyalin Invoice ID');
+      console.error('Error copying tagihan ID:', error);
+      alert('Gagal menyalin Tagihan ID');
     }
   };
 
@@ -255,7 +255,7 @@ export default function CustomerInvoicesPage() {
       <div>
         <SharedNavbar />
         <div style={{ textAlign: 'center', padding: '50px', color: '#666' }}>
-           Memuat invoice...
+           Memuat tagihan...
         </div>
       </div>
     );
@@ -268,10 +268,10 @@ export default function CustomerInvoicesPage() {
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 24px' }}>
         <div style={{ marginBottom: '18px' }}>
           <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>
-             Invoice Pembelian
+             Tagihan Pembelian
           </h1>
           <p style={{ color: '#666', fontSize: '16px' }}>
-            Kelola invoice pembayaran Anda dengan rincian lengkap.
+            Kelola tagihan pembayaran Anda dengan rincian lengkap.
           </p>
         </div>
 
@@ -281,11 +281,11 @@ export default function CustomerInvoicesPage() {
             <div style={{ fontSize: '20px', fontWeight: '800', color: '#5b21b6' }}>{formatCurrency(summary.totalPending)}</div>
           </div>
           <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '10px', padding: '12px 14px' }}>
-            <div style={{ fontSize: '12px', color: '#6b7280' }}>Invoice pending</div>
+            <div style={{ fontSize: '12px', color: '#6b7280' }}>Tagihan pending</div>
             <div style={{ fontSize: '20px', fontWeight: '800', color: '#5b21b6' }}>{summary.pendingCount}</div>
           </div>
           <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '10px', padding: '12px 14px' }}>
-            <div style={{ fontSize: '12px', color: '#6b7280' }}>Invoice dibayar</div>
+            <div style={{ fontSize: '12px', color: '#6b7280' }}>Tagihan dibayar</div>
             <div style={{ fontSize: '20px', fontWeight: '800', color: '#065f46' }}>{summary.paidCount}</div>
           </div>
         </div>
@@ -294,7 +294,7 @@ export default function CustomerInvoicesPage() {
           {[
             { value: 'pending', label: ' Menunggu Pembayaran' },
             { value: 'paid', label: ' Sudah Dibayar' },
-            { value: 'all', label: ' Semua Invoice' }
+            { value: 'all', label: ' Semua Tagihan' }
           ].map((btn) => (
             <button
               key={btn.value}
@@ -318,8 +318,8 @@ export default function CustomerInvoicesPage() {
 
         {invoices.length === 0 ? (
           <div style={{ background: '#f3f4f6', padding: '40px', borderRadius: '12px', textAlign: 'center', color: '#666' }}>
-            <p style={{ fontSize: '18px', marginBottom: '8px' }}>📭 Tidak ada invoice</p>
-            <p style={{ fontSize: '14px', color: '#999' }}>Invoice akan muncul saat deal disepakati.</p>
+            <p style={{ fontSize: '18px', marginBottom: '8px' }}>📭 Tidak ada tagihan</p>
+            <p style={{ fontSize: '14px', color: '#999' }}>Tagihan akan muncul saat deal disepakati.</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gap: '20px' }}>
@@ -340,7 +340,7 @@ export default function CustomerInvoicesPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <div>
                     <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: '600' }}>
-                      Invoice #{invoice.id || 'N/A'}
+                      Tagihan #{invoice.id || 'N/A'}
                     </h3>
                     <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>
                       Vendor: <strong>{invoice.vendorName || 'Unknown'}</strong>
@@ -350,7 +350,7 @@ export default function CustomerInvoicesPage() {
                       onClick={(event) => copyInvoiceId(invoice.id, event)}
                       style={{ marginTop: '8px', border: '1px solid #d6d3d1', background: '#fff', color: '#44403c', borderRadius: '8px', padding: '6px 10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
                     >
-                      Salin Invoice ID
+                      Salin Tagihan ID
                     </button>
                   </div>
                   <div style={{ textAlign: 'right' }}>
@@ -398,7 +398,7 @@ export default function CustomerInvoicesPage() {
                       <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}> Detail Invoice</h4>
                       <div style={{ display: 'grid', gap: '8px', fontSize: '13px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
-                          <span style={{ color: '#666' }}>Invoice ID Lengkap:</span>
+                          <span style={{ color: '#666' }}>Tagihan ID Lengkap:</span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                             <strong style={{ wordBreak: 'break-all', textAlign: 'right' }}>{invoice.id || 'N/A'}</strong>
                             <button
@@ -411,7 +411,7 @@ export default function CustomerInvoicesPage() {
                           </div>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ color: '#666' }}>Tanggal Invoice:</span>
+                          <span style={{ color: '#666' }}>Tanggal Tagihan:</span>
                           <strong>{formatDate(invoice.createdAt)}</strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
